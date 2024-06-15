@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="css/tokens/Ref/yds.css">
+    <link rel="stylesheet" href="css/tokens/Ref/mui.css">
+    <link rel="stylesheet" href="css/tokens/theme.css">
+    <link rel="stylesheet" href="css/tokens/usage-colors.css">
+    <link rel="stylesheet" href="css/master.css">
+
+    <title>Dynamic Shades Calculation</title>
+
+</head>
+<body>
+    <h1>Pick a Color</h1>
+    <input type="color" class="color-picker" id="colorPicker" value="#3498db">
+    <div class="color-display">
+        <div class="color-box" id="strongBox">Strong</div>
+        <div class="color-box" id="defaultBox">Default</div>
+        <div class="color-box" id="subtleBox">Subtle</div>
+        <div class="color-box" id="tintBox">Tint</div>
+    </div>
+
+    <div>
+        <label for="colorblindSwitch">Colorblind Mode:</label>
+        <input type="checkbox" id="colorblindSwitch">
+    </div>
+
+    <div class="color-display">
+        <div class="color-box" style="color: var(--sysNeutral7)">Neutral 7</div>
+        <div class="color-box" style="color: var(--sysNeutral6)">Neutral 6</div>
+        <div class="color-box" style="color: var(--sysNeutral5)">Neutral 5</div>
+        <div class="color-box" style="color: var(--sysNeutral4)">Neutral 4</div>
+        <div class="color-box" style="color: var(--sysNeutral3)">Neutral 3</div>
+        <div class="color-box" style="color: var(--sysNeutral2)">Neutral 2</div>
+        <div class="color-box" style="color: var(--sysNeutral1)">Neutral 1</div>
+        <div class="color-box" style="color: var(--sysNeutral0)">Neutral 0</div>
+    </div>
+    <div class="color-display">
+        <div class="color-box" style="color: var(--sysWarningDefault)">Warning Default</div>
+        <div class="color-box" style="color: var(--sysWarningSubtle)">Warning Subtle</div>
+        <div class="color-box" style="color: var(--sysDangerDefault)">Danger Default</div>
+        <div class="color-box" style="color: var(--sysDangerSubtle)">Danger Subtle</div>
+        <div class="color-box" style="color: var(--sysInfoDefault)">Info Default</div>
+        <div class="color-box" style="color: var(--sysInfoSubtle)">Info Subtle</div>
+        <div class="color-box" style="color: var(--sysSuccessDefault)">Success Default</div>
+        <div class="color-box" style="color: var(--sysSuccessSubtle)">Success Subtle</div>
+    </div>
+
+    <div class="color-display">
+        <div class="color-box" style="color: var(--textInverse)">text inverse</div>
+        <div class="color-box" style="color: var(--text)">text</div>
+        <div class="color-box" style="color: var(--OnprimaryText)">OnprimaryText</div>
+        <div class="color-box" style="color: var(--OnsecondaryText)">OnsecondaryText</div>
+    </div>
+
+    <script src="js/master.js"></script>
+    <script src="js/color-shade-calculator.js"></script>
+</body>
+</html>
+
+

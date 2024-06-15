@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="css/tokens/Ref/yds.css">
+    <link rel="stylesheet" href="css/tokens/Ref/mui.css">
+    <link rel="stylesheet" href="css/tokens/theme.css">
+    <link rel="stylesheet" href="css/tokens/usage-colors.css">
+    <link rel="stylesheet" href="css/typography.css">
+    <link rel="stylesheet" href="css/materials.css">
+    <link rel="stylesheet" href="css/heroanimation.css">   
+    <link rel="stylesheet" href="css/master.css">
+</head>
+<body>
+    
+    <div class="hero">
+        <div class="hero-left">
+            <h1>A systems based approach to product design</h1>
+            <p class="hero-subhead">I help you with a systems approach to product design. Because I hate wasting time and talent, and I love teams.</p>
+            <a href="#" class="hero-cta">Get Started</a>
+        </div>
+        <div class="hero-right">
+            <div class="glass">
+                <div class="glass box" id="color-picker-container">
+                    <p>Color</p>
+                    <div id="hue-canvas-container">
+                        <canvas id="hue-canvas" width="215" height="12"></canvas>
+                        <div id="hue-cursor" class="cursor"></div>
+                        <div id="hue-hitbox" class="hitbox"></div>
+                    </div>
+                    <div id="spectrum-canvas-container">
+                        <canvas id="spectrum-canvas" width="215" height="126"></canvas>
+                        <div id="spectrum-cursor" class="cursor"></div>
+                        <div id="spectrum-hitbox" class="hitbox"></div>
+                    </div>
+                </div>
+                <div style="display: none;">
+                    <label for="colorblindSwitch">Colorblind Mode:</label>
+                    <input type="checkbox" id="colorblindSwitch">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="color-display">
+        <div class="color-box" id="strongBox">Strong</div>
+        <div class="color-box" id="defaultBox">Default</div>
+        <div class="color-box" id="subtleBox">Subtle</div>
+        <div class="color-box" id="tintBox">Tint</div>
+    </div>
+
+    <div id="c" class="container">
+        <div id="s" class="stage"></div>	
+    </div>
+    <div class="preview" style="display: none;">
+      
+    </div>
+
+        
+
+    <script src="js/master.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tinycolor/1.4.2/tinycolor.min.js"></script>
+    <script src="js/color-shade-calculator.js"></script>
+    <script src="js/heroanimation.js"></script>
+
+</body>
+</html>
+
+

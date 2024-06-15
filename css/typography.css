@@ -1,0 +1,113 @@
+@font-face {
+    font-family: 'RNSPhysis';
+    src: url('../fonts/woff2/RNSPhysis-Black.woff2') format('woff2'),
+         url('../fonts/woff/RNSPhysis-Black.woff') format('woff'),
+         url('../fonts/eot/RNSPhysis-Black.eot') format('eot');
+    font-weight: 900;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'RNSPhysis';
+    src: url('../fonts/woff2/RNSPhysis-Bold.woff2') format('woff2'),
+         url('../fonts/woff/RNSPhysis-Bold.woff') format('woff'),
+         url('../fonts/eot/RNSPhysis-Bold.eot') format('eot');
+    font-weight: 700;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'RNSPhysis';
+    src: url('../fonts/woff2/RNSPhysis-Light.woff2') format('woff2'),
+         url('../fonts/woff/RNSPhysis-Light.woff') format('woff'),
+         url('../fonts/eot/RNSPhysis-Light.eot') format('eot');
+    font-weight: 300;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'RNSPhysis';
+    src: url('../fonts/woff2/RNSPhysis-Medium.woff2') format('woff2'),
+         url('../fonts/woff/RNSPhysis-Medium.woff') format('woff'),
+         url('../fonts/eot/RNSPhysis-Medium.eot') format('eot');
+    font-weight: 500;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'RNSPhysis';
+    src: url('../fonts/woff2/RNSPhysis-Thin.woff2') format('woff2'),
+         url('../fonts/woff/RNSPhysis-Thin.woff') format('woff'),
+         url('../fonts/eot/RNSPhysis-Thin.eot') format('eot');
+    font-weight: 100;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'RNSPhysis';
+    src: url('../fonts/woff2/RNSPhysis-BlackItalic.woff2') format('woff2'),
+         url('../fonts/woff/RNSPhysis-BlackItalic.woff') format('woff'),
+         url('../fonts/eot/RNSPhysis-BlackItalic.eot') format('eot');
+    font-weight: 900;
+    font-style: italic;
+}
+
+@font-face {
+    font-family: 'RNSPhysis';
+    src: url('../fonts/woff2/RNSPhysis-BoldItalic.woff2') format('woff2'),
+         url('../fonts/woff/RNSPhysis-BoldItalic.woff') format('woff'),
+         url('../fonts/eot/RNSPhysis-BoldItalic.eot') format('eot');
+    font-weight: 700;
+    font-style: italic;
+}
+
+@font-face {
+    font-family: 'RNSPhysis';
+    src: url('../fonts/woff2/RNSPhysis-LightItalic.woff2') format('woff2'),
+         url('../fonts/woff/RNSPhysis-LightItalic.woff') format('woff'),
+         url('../fonts/eot/RNSPhysis-LightItalic.eot') format('eot');
+    font-weight: 300;
+    font-style: italic;
+}
+
+@font-face {
+    font-family: 'RNSPhysis';
+    src: url('../fonts/woff2/RNSPhysis-MediumItalic.woff2') format('woff2'),
+         url('../fonts/woff/RNSPhysis-MediumItalic.woff') format('woff'),
+         url('../fonts/eot/RNSPhysis-MediumItalic.eot') format('eot');
+    font-weight: 500;
+    font-style: italic;
+}
+
+@font-face {
+    font-family: 'RNSPhysis';
+    src: url('../fonts/woff2/RNSPhysis-ThinItalic.woff2') format('woff2'),
+         url('../fonts/woff/RNSPhysis-ThinItalic.woff') format('woff'),
+         url('../fonts/eot/RNSPhysis-ThinItalic.eot') format('eot');
+    font-weight: 100;
+    font-style: italic;
+}
+
+:root {
+    --base-screen-scaling: 1.2;
+    --base: calc(1em*var(--base-screen-scaling));
+    --h1-font-size: calc(var(--base)*5.5); /* 100px / 16px */
+    --subhead-font-size: calc(var(--base)*1.75); /* 32px / 16px */
+}
+
+body {
+    font-family: 'RNSPhysis', Helvetica, Arial, sans-serif;
+}
+
+h1 {
+    font-size: var(--h1-font-size);
+    font-weight: 600; /* semibold */
+    line-height: 1.1;
+    letter-spacing: -0.015em;
+    margin-bottom: 30px;
+}
+
+.hero-subhead {
+    font-size: var(--subhead-font-size);
+    font-weight: 400;
+}

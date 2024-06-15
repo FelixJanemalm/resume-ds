@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        #color-picker-container {
+            position: absolute; /* Change to relative, fixed, or absolute as needed */
+            top: 50px; /* Adjust as needed */
+            left: 50px; /* Adjust as needed */
+            padding: 10px;
+            background: #fff;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        #hue-canvas {
+            border-radius: 8px;
+        }
+        #spectrum-canvas {
+            border-radius: 4px;
+        }
+        .cursor {
+            position: absolute;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            translate: -10px -10px;
+            pointer-events: none;
+        }
+        #hue-canvas-container {
+            position: relative;
+            height: 35px; /* Increased height for better cursor visibility */
+        }
+        #spectrum-canvas-container {
+            position: relative;
+        }
+        #hue-cursor {
+            top: 7px; /* Positioning the cursor above the hue slider */
+        }
+        .hitbox {
+            position: absolute;
+            background: transparent;
+        }
+        #hue-hitbox {
+            top: -10px;
+            left: -10px;
+            width: 235px; /* 215px canvas width + 20px extra for hitbox */
+            height: 32px; /* 12px canvas height + 20px extra for hitbox */
+        }
+        #spectrum-hitbox {
+            top: -10px;
+            left: -10px;
+            width: 235px; /* 215px canvas width + 20px extra for hitbox */
+            height: 146px; /* 126px canvas height + 20px extra for hitbox */
+        }
+    </style>
+</head>
+<body>
+    <div id="color-picker-container">
+        <div id="hue-canvas-container">
+            <canvas id="hue-canvas" width="215" height="12"></canvas>
+            <div id="hue-cursor" class="cursor"></div>
+            <div id="hue-hitbox" class="hitbox"></div>
+        </div>
+        <div id="spectrum-canvas-container">
+            <canvas id="spectrum-canvas" width="215" height="126"></canvas>
+            <div id="spectrum-cursor" class="cursor"></div>
+            <div id="spectrum-hitbox" class="hitbox"></div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tinycolor/1.4.2/tinycolor.min.js"></script>
+    <script src="js/colorpicker.js"></script>
+</body>
+</html>
