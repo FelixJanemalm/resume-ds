@@ -109,6 +109,8 @@
         --textSubtle: var(--sysNeutral5);
         --text: var(--sysNeutral6);
 
+        --inversionRatio: 0;
+
     }
 
 .default-dark {
@@ -165,7 +167,7 @@
         --border: var(--sysNeutral3);
 
         /* background */ 
-        --contrastBg: var(--sysNeutralAlt7);
+        --contrastBg: var(--sysNeutral7);
         --warningBg: var(--sysWarningDefault);
         --warningBgSubtle: var(--sysWarningSubtle);
         --dangerBg: var(--sysDangerDefault);
@@ -175,7 +177,7 @@
         --secondaryBgTint: var(--sysSecondaryTint);
         --primaryBg: var(--sysPrimaryDefault);
         --primaryBgSubtle: var(--sysPrimarySubtle);
-        --primaryBgTint: var(--sysPrimaryTint);
+        --primaryBgTint: var(--sysPrimaryStrong);
         --bgDisabled: var(--sysNeutral2);
         --bgStrong: var(--sysNeutral2);
         --bgMedium: var(--sysNeutral1);
@@ -193,12 +195,15 @@
         --secondaryOnContrastText: var(--sysSecondarySubtle);
         --secondaryText: var(--sysSecondaryStrong);
         --primaryOnContrastText: var(--sysPrimarySubtle);
-        --primaryText: var(--sysPrimaryStrong);
+        --primaryText: var(--sysPrimaryDefault);
         --btnTextDisabled: var(--sysNeutral4);
         --textDisabled: var(--sysNeutral3);
         --textStrong: var(--sysNeutral7);
         --textSubtle: var(--sysNeutral5);
         --text: var(--sysNeutral6);
+
+        --inversionRatio: 1;
+        --bgGlass: var(rgba(--sysNeutral0, .9));
     
     }
     
@@ -256,7 +261,7 @@
         --border: var(--sysNeutral3);
 
         /* background */ 
-        --contrastBg: var(--sysNeutralAlt7);
+        --contrastBg: var(--sysNeutral7);
         --warningBg: var(--sysWarningDefault);
         --warningBgSubtle: var(--sysWarningSubtle);
         --dangerBg: var(--sysDangerDefault);
@@ -290,6 +295,8 @@
         --textStrong: var(--sysNeutral7);
         --textSubtle: var(--sysNeutral5);
         --text: var(--sysNeutral6);
+
+        --inversionRatio: 0;
     
     }
 
@@ -348,7 +355,7 @@
         --border: var(--sysNeutral3);
 
         /* background */ 
-        --contrastBg: var(--sysNeutralAlt7);
+        --contrastBg: var(--sysNeutral7);
         --warningBg: var(--sysWarningDefault);
         --warningBgSubtle: var(--sysWarningSubtle);
         --dangerBg: var(--sysDangerDefault);
@@ -358,7 +365,7 @@
         --secondaryBgTint: var(--sysSecondaryTint);
         --primaryBg: var(--sysPrimaryDefault);
         --primaryBgSubtle: var(--sysPrimarySubtle);
-        --primaryBgTint: var(--sysPrimaryTint);
+        --primaryBgTint: var(--sysPrimaryStrong);
         --bgDisabled: var(--sysNeutral2);
         --bgStrong: var(--sysNeutral2);
         --bgMedium: var(--sysNeutral1);
@@ -376,11 +383,13 @@
         --secondaryOnContrastText: var(--sysSecondarySubtle);
         --secondaryText: var(--sysSecondaryStrong);
         --primaryOnContrastText: var(--sysPrimarySubtle);
-        --primaryText: var(--sysPrimaryStrong);
+        --primaryText: var(--sysPrimaryDefault);
         --btnTextDisabled: var(--sysNeutral4);
         --textDisabled: var(--sysNeutral3);
         --textStrong: var(--sysNeutral7);
         --textSubtle: var(--sysNeutral5);
         --text: var(--sysNeutral6);
+
+        --inversionRatio: 1;
     
     }

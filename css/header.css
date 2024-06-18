@@ -1,0 +1,53 @@
+@import url('css/tokens/Ref/yds.css');
+@import url('css/tokens/Ref/mui.css');
+@import url('css/tokens/theme.css');
+@import url('css/tokens/usage-colors.css');
+
+
+header {
+    background-color: var(--bg);
+    opacity: 1;
+    backdrop-filter: blur(100px);
+    box-shadow: 0 1px 8px rgba(0, 0, 0, 0.2);
+    position: sticky;
+    z-index: 9;
+}
+
+header:hover {
+    opacity: 1;
+    backdrop-filter: blur(18px);
+}
+
+nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0rem 3rem;
+}
+
+.logo {
+    font-size: 1.25rem;
+    font-weight: bold;
+    text-decoration: none;
+}
+
+.nav-links {
+    list-style: none;
+    display: flex;
+    gap: 1.5rem;
+}
+
+.nav-links li {
+    display: inline;
+}
+
+a {
+    text-decoration: none;
+    color: var(--text);
+    font-weight: 500;
+    transition: color 0.3s;
+}
+
+.nav-links a:hover {
+    color: var(--primaryText);
+}

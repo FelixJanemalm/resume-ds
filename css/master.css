@@ -1,75 +1,16 @@
-
-
 body {
     background-color: var(--primary-color);
     color: var(--text);
     text-align: center;
     margin: 0px;
+    transition: 2s cubic-bezier(0.215, 0.610, 0.355, 1);
 }
 
-.container,
-.stage {
-	box-sizing: border-box;
-	min-width: 600px;
-	height: 90vh;
-    width: 75%;
+:root {
+    --marginSides: 8vw;
 }
 
-.container {
-	position: sticky;
-	top: 0;
-	left: 0;
-	transform: translate(95vw, -63vh);
-	perspective: 1500px;
-    z-index: 2;
-	
-	.stage {
-		position: absolute;
-		transform-style: preserve-3d;
-		transform-origin: 0;
-		transform: rotateX(0deg) rotateY(-10deg) rotateZ(-105deg);
-		
-		.slice {
-			position: absolute;
-			height: 100%;
-			transform-style: preserve-3d;
-			transform-origin: 0;
-			background-repeat: none;
-		}
-	}
-}
-
-.hero {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 50px;
-    background-color: var(--bg);
-    min-height: 66vh;
-}
-
-.hero-subhead
-{
-    width: 80%;
-    z-index: 3;
-}   
-
-.hero-left {
-    flex: 2;
-    text-align: left;
-    z-index: 3;
-}
-
-.hero-right {
-    flex: 0.5;
-    margin-left: 40px;
-    margin-right: 40px;
-    display: flex;
-    justify-content: center;
-    z-index: 3;
-}
-
-.hero-cta {
+.primary-btn {
     display: inline-block;
     padding: 10px 20px;
     background-color: var(--button-color);
@@ -77,13 +18,14 @@ body {
     border-radius: 5px;
     text-decoration: none;
     transition: background-color 0.3s ease;
+    margin-top: 20px;
 }
 
-.hero-cta:hover {
+.primary-btn:hover {
     background-color: var(--button-hover-color);
 }
 
-.hero-cta:active {
+.primary-btn:active {
     background-color: var(--button-pressed-color);
 }
 
@@ -130,7 +72,8 @@ body {
     }
     .hero {
         flex-direction: column;
-        padding: 20px;
+        padding-left: 20px;
+        padding-right: 20px;
     }
 
     .hero-left, .hero-right {
@@ -168,3 +111,4 @@ body {
     font-weight: bold;
     border: 1px solid var(--border);
 }
+  

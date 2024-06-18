@@ -268,9 +268,10 @@ function calculateShades(color) {
 function calculateButtonColors(color) {
     let [h, s, l] = hexToHsl(color);
 
-    let buttonL = l < 50 ? Math.max(l + 30, 50) : Math.min(l - 30, 50);
-    let buttonHoverL = buttonL < 50 ? buttonL + 10 : buttonL - 10;
-    let buttonPressedL = buttonL < 50 ? buttonL + 20 : buttonL - 20;
+    // Calculate the lightness adjustments dynamically
+    let buttonL = l < 50 ? Math.min(l + (55 - 0.5 * l), 90) : Math.max(l - (70 - l * 0.1), 40);
+    let buttonHoverL = buttonL < 50 ? Math.min(buttonL + (50 - buttonL) * 0.3, 85) : Math.max(buttonL - (buttonL - 50) * 0.2, 25);
+    let buttonPressedL = buttonL < 50 ? Math.min(buttonL + (50 - buttonL) * 0.4, 95) : Math.max(buttonL - (buttonL - 50) * 0.3, 20);
 
     return {
         button: hslToHex(h, s, buttonL),
@@ -278,6 +279,8 @@ function calculateButtonColors(color) {
         buttonPressed: hslToHex(h, s, buttonPressedL)
     };
 }
+
+
 
 function hexToRgba(hex, opacity) {
     let c;
@@ -309,7 +312,7 @@ function updateColors(color) {
     const selectedColor = limitBrightness(color);
     const shades = calculateShades(selectedColor);
     const buttonColors = calculateButtonColors(selectedColor);
-    const bgStrongOpacity = hexToRgba(shades.tint, 0.6);
+    const bgStrongOpacity = hexToRgba(shades.tint, 0.9);
 
     document.documentElement.style.setProperty('--primary-color', selectedColor);
     document.documentElement.style.setProperty('--sysPrimaryStrong', shades.strong);

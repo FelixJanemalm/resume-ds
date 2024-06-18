@@ -1,0 +1,192 @@
+.hero-wrapper {
+    background-color: var(--bg);
+    min-height: 78vh;
+    width: 100vw;
+    overflow: hidden;
+}
+
+.hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--bg);
+    min-height: 78vh;
+    width: 100vw;
+    max-width: 1200px;
+    padding-left: var(--marginSides);
+    padding-right: var(--marginSides);
+    padding-bottom: 40px;
+}
+
+.hero-subhead
+{
+    width: 80%;
+    z-index: 3;
+}   
+
+.hero-left {
+    flex: 2;
+    text-align: left;
+    z-index: 3;
+}
+
+.hero-right {
+    flex: 0.5;
+    margin-left: 20px;
+    margin-right: 20px;
+    display: flex;
+    justify-content: center;
+    z-index: 3;
+}
+
+
+/* Bg Animation */
+.container,
+.stage {
+	box-sizing: border-box;
+	min-width: 600px;
+	height: 100%;
+    width: 80%;
+}
+
+.container {
+	position: absolute;
+	top: 0;
+	right: 0;
+	perspective: 1500px;
+    z-index: 2;
+    filter: invert(var(--inversionRatio));
+    overflow: hidden;
+    height: 84.3%;
+	
+	.stage {
+		position: absolute;
+        top: 0;
+        right: 0;
+		transform-style: preserve-3d;
+		transform-origin: 0;
+		transform: rotateX(0deg) rotateY(-10deg) rotateZ(-105deg) translate(-90%, 90%);
+		
+		.slice {
+			position: absolute;
+			height: 100vh;
+			transform-style: preserve-3d;
+			transform-origin: 0;
+			background-repeat: none;
+            top: 0;
+            right: 0;
+		}
+	}
+}
+
+.hue-filter {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 130%;
+    background: var(--primary-color); /* Use white background to apply color filter */
+    mix-blend-mode: hue;
+    pointer-events: none; /* Allows interaction with elements beneath the filter */
+    z-index: 3; /* Ensure the filter is on top of all other elements */
+}
+
+.hue-rotate {
+    background: linear-gradient(var(--text), var(--button-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    padding-bottom: 20px;
+    filter: hue-rotate(30deg);
+  }
+
+
+/* Color Picker */
+.swatch {
+    width: 30px;
+    height: 30px;
+    border: none;
+    margin: 5px;
+}
+
+#color-indicator {
+    width: 100px;
+    height: 100px;
+    margin-bottom: 20px;
+}
+
+#hue-canvas {
+    margin-bottom: 10px;
+}
+
+.cursor {
+    position: absolute;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    width: 18px;
+    height: 18px;
+    z-index: 5;
+}
+
+#color-picker-container {
+    position: absolute; /* Change to relative, fixed, or absolute as needed */
+    top: 50px; /* Adjust as needed */
+    left: 50px; /* Adjust as needed */
+    padding: 16px 24px;
+    border-radius: 8px;
+    align-self: center;
+    translate: -50% -50%;
+    text-align: left;
+}
+
+#color-picker-container p {
+    margin-top: 0px;
+    margin-bottom: 16px;
+    font-size: 24px;
+    font-weight: 300;
+}
+
+#hue-canvas {
+    border-radius: 8px;
+}
+
+#spectrum-canvas {
+    border-radius: 4px;
+}
+
+#hue-canvas-container {
+    position: relative;
+    height: 33px; /* Increased height for better cursor visibility */
+}
+
+#spectrum-canvas-container {
+    position: relative;
+}
+
+#hue-cursor {
+    top: 7px; /* Positioning the cursor above the hue slider */
+}
+
+.hitbox {
+    position: absolute;
+    background: transparent;
+}
+
+.hitbox:active {
+cursor: grabbing;
+}
+
+#hue-hitbox {
+    top: -10px;
+    left: -10px;
+    width: 235px; /* 215px canvas width + 20px extra for hitbox */
+    height: 32px; /* 12px canvas height + 20px extra for hitbox */
+}
+
+#spectrum-hitbox {
+    top: -10px;
+    left: -10px;
+    width: 235px; /* 215px canvas width + 20px extra for hitbox */
+    height: 146px; /* 126px canvas height + 20px extra for hitbox */
+}

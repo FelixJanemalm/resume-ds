@@ -1,103 +1,12 @@
 .glass {
     backdrop-filter: blur(18px);
     box-shadow: 2px 6px 8px 2px rgba(0, 0, 0, 0.25);
-    background: var(--bgStrong-opacity);
+    /* background: var(--bgStrong-opacity); */
+    /* background: rgba(255, 255, 255, 0.9); */
+    background: var(--bg);
 }
 
 .box {
     border-radius: 24px;
     padding: 24px 30px;
-}
-
-
-/* Color Picker */
-
-.swatch {
-    width: 30px;
-    height: 30px;
-    border: none;
-    margin: 5px;
-}
-
-#color-indicator {
-    width: 100px;
-    height: 100px;
-    margin-bottom: 20px;
-}
-
-#hue-canvas {
-    margin-bottom: 10px;
-}
-
-.cursor {
-    position: absolute;
-    border: 2px solid #fff;
-    border-radius: 50%;
-    pointer-events: none;
-    transform: translate(-50%, -50%);
-    width: 18px;
-    height: 18px;
-    z-index: 5;
-}
-
-#color-picker-container {
-    position: absolute; /* Change to relative, fixed, or absolute as needed */
-    top: 50px; /* Adjust as needed */
-    left: 50px; /* Adjust as needed */
-    padding: 10px;
-    border-radius: 8px;
-    align-self: center;
-    translate: -50% -50%;
-    text-align: left;
-}
-
-#color-picker-container p {
-    margin-top: 0px;
-    margin-bottom: 16px;
-    font-size: 24px;
-    font-weight: 300;
-}
-
-#hue-canvas {
-    border-radius: 8px;
-}
-
-#spectrum-canvas {
-    border-radius: 4px;
-}
-
-#hue-canvas-container {
-    position: relative;
-    height: 33px; /* Increased height for better cursor visibility */
-}
-
-#spectrum-canvas-container {
-    position: relative;
-}
-
-#hue-cursor {
-    top: 7px; /* Positioning the cursor above the hue slider */
-}
-
-.hitbox {
-    position: absolute;
-    background: transparent;
-}
-
-.hitbox:active {
-cursor: grabbing;
-}
-
-#hue-hitbox {
-    top: -10px;
-    left: -10px;
-    width: 235px; /* 215px canvas width + 20px extra for hitbox */
-    height: 32px; /* 12px canvas height + 20px extra for hitbox */
-}
-
-#spectrum-hitbox {
-    top: -10px;
-    left: -10px;
-    width: 235px; /* 215px canvas width + 20px extra for hitbox */
-    height: 146px; /* 126px canvas height + 20px extra for hitbox */
 }

@@ -89,10 +89,15 @@
 }
 
 :root {
-    --base-screen-scaling: 1.2;
-    --base: calc(1em*var(--base-screen-scaling));
-    --h1-font-size: calc(var(--base)*5.5); /* 100px / 16px */
-    --subhead-font-size: calc(var(--base)*1.75); /* 32px / 16px */
+    --base: calc(1em * 1); /* Base font size */
+    --h1-font-size: calc(var(--base) * 5.5); /* h1 font size based on base */
+    --subhead-font-size: calc(var(--base) * 1.4); /* Subhead font size based on base */
+    --body-font-size: calc(var(--base) * 1.2); /* Body font size based on base */
+    --cta-font-size: calc(var(--base) * 1.2); 
+    --h2-font-size: calc(var(--h1-font-size) * 1.2); /* h2 font size based on h1 */
+    --h3-font-size: calc(var(--h2-font-size) * 1.2); /* h3 font size based on h2 */
+    --h4-font-size: calc(var(--h3-font-size) * 1.2); /* h4 font size based on h3 */
+    --h5-font-size: calc(var(--h4-font-size) * 1.2); /* h5 font size based on h4 */
 }
 
 body {
@@ -105,9 +110,19 @@ h1 {
     line-height: 1.1;
     letter-spacing: -0.015em;
     margin-bottom: 30px;
+    background: linear-gradient(var(--button-color), var(--text));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    padding-bottom: 10px;
 }
 
 .hero-subhead {
     font-size: var(--subhead-font-size);
-    font-weight: 400;
+    font-weight: 300;
+}
+
+.hero-cta {
+    font-weight: 500;
+    font-size: var( --cta-font-size);
+    margin-top: 20px;
 }
