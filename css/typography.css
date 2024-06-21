@@ -126,3 +126,36 @@ h1 {
     font-size: var( --cta-font-size);
     margin-top: 20px;
 }
+
+#color-picker-container p {
+    font-size: 24px;
+    font-weight: 300;
+}
+
+/* Media query for desktop (1440p and up) */
+@media (min-width: 1920px) {
+    :root {
+        --base: calc(1em * 1.4);
+    }
+}
+
+/* Media query for Desktop (1440p to 1900) */
+@media (max-width: 1919px) and (min-width: 1440px) {
+    :root {
+        --base: calc(1em * 1);
+    }
+}
+
+/* Media query for tablets (768px to 1439px) */
+@media (max-width: 1439px) and (min-width: 768px) {
+    :root {
+        --base: calc(1em * .9);
+    }
+}
+
+/* Media query for mobile devices (up to 767px) */
+@media (max-width: 767px) {
+    :root {
+        --base: calc(1em * .75);
+    }
+}

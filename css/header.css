@@ -11,6 +11,7 @@ header {
     box-shadow: 0 1px 8px rgba(0, 0, 0, 0.2);
     position: sticky;
     z-index: 9;
+    width: 100%;
 }
 
 header:hover {

@@ -6,10 +6,6 @@ body {
     transition: 2s cubic-bezier(0.215, 0.610, 0.355, 1);
 }
 
-:root {
-    --marginSides: 8vw;
-}
-
 .primary-btn {
     display: inline-block;
     padding: 10px 20px;
@@ -20,6 +16,18 @@ body {
     transition: background-color 0.3s ease;
     margin-top: 20px;
 }
+.secondary-btn {
+    display: inline-block;
+    padding: 10px 10px;
+    color: var(--text);
+    text-decoration: none;
+    transition: background-color 0.3s ease;
+    margin-top: 20px;
+}
+
+.secondary-btn svg {
+    transform: translate(4px, 8px);
+}
 
 .primary-btn:hover {
     background-color: var(--button-hover-color);
@@ -29,66 +37,22 @@ body {
     background-color: var(--button-pressed-color);
 }
 
-
-
-
-/* Media query for desktop (1440p and up) */
-@media (min-width: 1920px) {
-    :root {
-        --base-screen-scaling: 1.4;
-    }
-    .hero {
-        padding-left: 18vw;
-        padding-right: 18vw;
-    }
+.secondary-btn:hover {
+    color: var(--button-color);
 }
 
-/* Media query for Desktop (1440p to 1900) */
-@media (max-width: 1919px) and (min-width: 1440px) {
-    :root {
-        --base-screen-scaling: 1.2;
-    }
-    .hero {
-        padding-left: 220px;
-        padding-right: 220px;
-    }
+.secondary-btn:active {
+    color: var(--button-pressed-color);
 }
 
-/* Media query for tablets (768px to 1439px) */
-@media (max-width: 1439px) and (min-width: 768px) {
-    :root {
-        --base-screen-scaling: 1;
-    }
-    .hero {
-        padding-left: 100px;
-        padding-right: 100px;
-    }
+:root {
+    --marginSides: 7.5vw;
 }
 
-/* Media query for mobile devices (up to 767px) */
 @media (max-width: 767px) {
     :root {
-        --base-screen-scaling: .75;
+        --marginSides: 40px;
     }
-    .hero {
-        flex-direction: column;
-        padding-left: 20px;
-        padding-right: 20px;
-    }
-
-    .hero-left, .hero-right {
-        width: 100%;
-        text-align: center;
-    }
-
-    .hero-right {
-        margin-top: 20px;
-    }
-
-    .hero-subhead
-    {
-        width: 100%;
-    }   
 }
 
 /* debug color board css */

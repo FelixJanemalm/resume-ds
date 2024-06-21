@@ -1,33 +1,45 @@
 .hero-wrapper {
-    background-color: var(--bg);
-    min-height: 78vh;
-    width: 100vw;
+   /* min-height: 78vh; */
+    width: 100%;
     overflow: hidden;
+    margin: 0;
+    padding: 0;
+    min-height: calc(100vh - (128px + 56px));
+}
+
+.hero-bg {
+    background-color: var(--bg);
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: -2;
 }
 
 .hero {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background-color: var(--bg);
-    min-height: 78vh;
-    width: 100vw;
-    max-width: 1200px;
+    min-height: 100%;
+    width: 100%;
+    max-width: 1300px;
     padding-left: var(--marginSides);
     padding-right: var(--marginSides);
-    padding-bottom: 40px;
+    padding-bottom: 80px;
+    vertical-align: middle;
+    min-height: calc(100vh - (128px + 56px));
 }
 
 .hero-subhead
 {
     width: 80%;
-    z-index: 3;
 }   
 
 .hero-left {
     flex: 2;
     text-align: left;
-    z-index: 3;
+    z-index: 1;
 }
 
 .hero-right {
@@ -36,7 +48,6 @@
     margin-right: 20px;
     display: flex;
     justify-content: center;
-    z-index: 3;
 }
 
 
@@ -54,10 +65,10 @@
 	top: 0;
 	right: 0;
 	perspective: 1500px;
-    z-index: 2;
+    z-index: -1;
     filter: invert(var(--inversionRatio));
     overflow: hidden;
-    height: 84.3%;
+    height: 100%;
 	
 	.stage {
 		position: absolute;
@@ -84,16 +95,17 @@
     top: 0;
     left: 0;
     width: 100%;
-    height: 130%;
+    height: 100%;
     background: var(--primary-color); /* Use white background to apply color filter */
     mix-blend-mode: hue;
     pointer-events: none; /* Allows interaction with elements beneath the filter */
-    z-index: 3; /* Ensure the filter is on top of all other elements */
+    z-index: 0; /* Ensure the filter is on top of all other elements */
 }
 
 .hue-rotate {
     background: linear-gradient(var(--text), var(--button-color));
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
     padding-bottom: 20px;
     filter: hue-rotate(30deg);
@@ -126,13 +138,11 @@
     transform: translate(-50%, -50%);
     width: 18px;
     height: 18px;
-    z-index: 5;
 }
 
 #color-picker-container {
     position: absolute; /* Change to relative, fixed, or absolute as needed */
-    top: 50px; /* Adjust as needed */
-    left: 50px; /* Adjust as needed */
+    top: calc(50%); /* Adjust as needed */
     padding: 16px 24px;
     border-radius: 8px;
     align-self: center;
@@ -143,8 +153,6 @@
 #color-picker-container p {
     margin-top: 0px;
     margin-bottom: 16px;
-    font-size: 24px;
-    font-weight: 300;
 }
 
 #hue-canvas {
@@ -189,4 +197,58 @@ cursor: grabbing;
     left: -10px;
     width: 235px; /* 215px canvas width + 20px extra for hitbox */
     height: 146px; /* 126px canvas height + 20px extra for hitbox */
+}
+
+
+/* Media query for big desktop (1920p and up) */
+@media (min-width: 1920px) {
+    .hero {
+        padding-left: 10vw;
+    }
+
+    .hero-left {
+        width: 100%;
+        flex: none;
+    }
+
+    #color-picker-container {
+        left: 70%; /* Adjust as needed */
+    }
+}
+@media (min-width: 2250px) {
+    #color-picker-container {
+        left: 60%; /* Adjust as needed */
+    }
+}
+
+/* Media query for Desktop (1440p to 1900) */
+@media (max-width: 1919px) and (min-width: 1440px) {
+    #color-picker-container {
+        left: 75%; /* Adjust as needed */
+    }
+}
+
+/* Media query for tablets (768px to 1439px) */
+@media (max-width: 1439px) and (min-width: 768px) {
+    #color-picker-container {
+        left: 84%; /* Adjust as needed */
+    }
+}
+
+/* Media query for mobile devices (up to 767px) */
+@media (max-width: 767px) {
+    .hero {
+        flex-direction: column;
+    }
+    .hero-subhead
+    {
+        width: 100%;
+    }   
+    #color-picker-container {
+        position: relative;
+        width: fit-content;
+        translate: 0 0;
+        margin-bottom: 40px;
+    }
+    
 }
