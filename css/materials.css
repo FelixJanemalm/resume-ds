@@ -10,3 +10,46 @@
     border-radius: 24px;
     padding: 24px 30px;
 }
+
+
+:root {
+    --line: color-mix(in lch, var(--primaryBg) 15%, transparent);
+}
+
+:root[data-theme='light'] {
+    --line: color-mix(in lch, var(--primaryBg) 35%, transparent);
+}
+
+.grid-bg::before {
+    --size: 60px;
+    content: '';
+    height: 100%;
+    width: 100%;
+    position: absolute;
+    background: linear-gradient(
+                90deg,
+                var(--bgMedium-opacity) 1px,
+                transparent 1px var(--size)
+            )
+            50% 50% / var(--size) var(--size),
+        linear-gradient(var(--bgMedium-opacity) 1px, transparent 1px var(--size)) 50% 50% /
+            var(--size) var(--size);
+    mask: linear-gradient(-25deg, transparent 40%, white);
+    top: 100vh;
+    left: 0;
+    transform-style: flat;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.shadow {
+    box-shadow: 12px 40px 40px rgba(0, 0, 0, 0.25);
+    -webkit-box-shadow: 12px 40px 40px rgba(0, 0, 0, 0.25);
+}
+
+.gradient {
+    background: linear-gradient(var(--button-color), var(--text));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}

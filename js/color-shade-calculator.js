@@ -313,6 +313,7 @@ function updateColors(color) {
     const shades = calculateShades(selectedColor);
     const buttonColors = calculateButtonColors(selectedColor);
     const bgStrongOpacity = hexToRgba(shades.tint, 0.9);
+    const bgMediumOpacity = hexToRgba(shades.subtle, 0.4);
 
     document.documentElement.style.setProperty('--primary-color', selectedColor);
     document.documentElement.style.setProperty('--sysPrimaryStrong', shades.strong);
@@ -323,6 +324,7 @@ function updateColors(color) {
     document.documentElement.style.setProperty('--button-hover-color', buttonColors.buttonHover);
     document.documentElement.style.setProperty('--button-pressed-color', buttonColors.buttonPressed);
     document.documentElement.style.setProperty('--bgStrong-opacity', bgStrongOpacity);
+    document.documentElement.style.setProperty('--bgMedium-opacity', bgMediumOpacity);
 
     document.getElementById('strongBox').style.backgroundColor = shades.strong;
     document.getElementById('defaultBox').style.backgroundColor = shades.default;

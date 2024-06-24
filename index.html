@@ -14,6 +14,10 @@
     <link rel="stylesheet" href="css/hero.css">
     <link rel="stylesheet" href="css/tools.css">
     <link rel="stylesheet" href="css/testimonials.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/OwlCarousel2/2.3.4/assets/owl.carousel.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/OwlCarousel2/2.3.4/assets/owl.theme.default.css">
+    <link rel="stylesheet" href="css/cards.css">
+    <link rel="stylesheet" href="css/reader.css">
 </head>
 <body>
 
@@ -31,7 +35,7 @@
     <div class="hue-filter"></div>
 
     <div class="hero-wrapper">
-        <div class="hero">
+        <div class="hero grid-bg">
             <div class="hero-left">
                 <h1>A systems based approach to <span class="hue-rotate">product design</span></h1>
                 <div class="glass box" id="color-picker-container">
@@ -71,9 +75,66 @@
         <div class="mover-1"></div>
     </div>
 
+    <section class="reader" id="read">
+        <div class="content">
+          <div data-split aria-hidden="true">
+            The little details make a great component: Matching structure in code & Figma. Self syncing tokens. Responsive. Verrrrsatile. Attuned to your workflow.
+          </div>
+        </div>
+        <div class="after-reader">
+            <video autoplay muted loop class="shadow">
+              <source src="images/demoTableComponent.mp4" type="video/mp4">
+              Your browser does not support the video tag.
+            </video>
+          </div>
+    </section>
+    <div class="spacer"></div>
+      
+
+    <section class="card-wrapper">
+        <h2 class="h2-gradient">From design to code...</h2>
+        <div class="owl-carousel custom-carousel owl-theme">
+          <div class="item" style="background-image: url(images/uxcanvas.png);">
+            <div class="item-desc">
+              <h3>Intent</h3>
+              <p>Driving clarity around the why and crafting fast paths to validation.</p>
+            </div>
+          </div>
+          <div class="item" style="background-image: url(images/uxcanvas.png);">
+            <div class="item-desc">
+              <h3>Validation</h3>
+              <p>Continuous feedback, quantifiably measured to inform the next iteration</p>
+            </div>
+          </div>
+          <div class="item active">
+            <video autoplay muted loop controls class="background-video">
+                <source src="images/demoTableComponent.mp4" type="video/mp4">
+                Your browser does not support the video tag.
+              </video>
+            <div class="item-desc">
+              <h3>Componentization</h3>
+              <p>Encoding components with optimal user, designer & developer experience</p>
+            </div>
+          </div>
+          <div class="item" style="background-image: url(images/uxcanvas.png);">
+            <div class="item-desc">
+              <h3>Tokenization</h3>
+              <p>Sentiment based design tokens with multi level architecture</p>
+            </div>
+          </div>
+          <div class="item" style="background-image: url(images/uxcanvas.png);">
+            <div class="item-desc">
+              <h3>Followup</h3>
+              <p>Continuous feedback, quantifiably measured to inform the next iteration</p>
+            </div>
+          </div>
+        </div>
+        </div>
+      </section>
+
     <div class="testimonials-wrapper">
         <div data-carousel>
-            <h2>Don't take my word for it</h2>
+            <h2 class="h2-gradient">Don't take my word for it</h2>
             <ul class="slide__list Wallop-list">
                 <li class="slide__item Wallop-item Wallop-item--current">
                     <blockquote>
@@ -163,23 +224,8 @@
         <div class="color-box" style="color: var(--OnsecondaryText)">OnsecondaryText</div>
     </div>
 
-    <svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
-        <!-- Draw a circle -->
-        <circle class="test-shape" cx="50" cy="50" r="40" stroke="black" stroke-width="3" fill="var(--sysPrimaryStrong)" />
-        
-        <!-- Draw a rectangle -->
-        <rect class="test-shape" x="100" y="100" width="80" height="50" stroke="black" stroke-width="3" fill="var(--refYdsColorLime300)" />
-        
-        <!-- Draw a line -->
-        <line class="test-shape" x1="10" y1="150" x2="190" y2="150" stroke="blue" stroke-width="2" />
-      </svg>
-
     <script src="https://unpkg.com/@dotlottie/player-component@latest/dist/dotlottie-player.mjs" type="module"></script> 
     <dotlottie-player src="https://lottie.host/7401522f-2d8b-4049-ad18-eb0edb6af224/CE9lFrNlEH.json" background="transparent" speed="1" style="width: 300px; height: 300px;" loop autoplay></dotlottie-player>
-    
-    <div id="lottie-container" style="height: 500px; width: 500px; background-color: black;"></div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.7.14/lottie.min.js"></script>
-    <script type="module" src="js/lottie-theme.js"></script>
         
     <script src="js/master.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tinycolor/1.4.2/tinycolor.min.js"></script>
@@ -187,6 +233,12 @@
     <script src="js/heroanimation.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/wallop/2.4.1/js/Wallop.min.js"></script>
     <script src="js/testimonials.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/OwlCarousel2/2.3.4/owl.carousel.min.js"></script>
+    <script src="js/cards.js"></script>
+    <script src="js/reader.js"></script>
+    <script src="https://cdn.skypack.dev/gsap@3.12.0"></script>
+    <script src="https://cdn.skypack.dev/gsap@3.12.0/ScrollTrigger"></script>
 
 </body>
 </html>
