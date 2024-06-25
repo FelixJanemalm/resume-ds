@@ -1,9 +1,3 @@
-@import url('css/tokens/Ref/yds.css');
-@import url('css/tokens/Ref/mui.css');
-@import url('css/tokens/theme.css');
-@import url('css/tokens/usage-colors.css');
-
-
 header {
     background-color: var(--bg);
     opacity: 1;

@@ -18,6 +18,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/OwlCarousel2/2.3.4/assets/owl.theme.default.css">
     <link rel="stylesheet" href="css/cards.css">
     <link rel="stylesheet" href="css/reader.css">
+    <link rel="stylesheet" href="css/image-text.css">
+    <link rel="stylesheet" href="css/footer.css">
 </head>
 <body>
 
@@ -71,26 +73,6 @@
         <div class="hero-bg"></div>
     </div>
 
-    <div class="tools">
-        <div class="mover-1"></div>
-    </div>
-
-    <section class="reader" id="read">
-        <div class="content">
-          <div data-split aria-hidden="true">
-            The little details make a great component: Matching structure in code & Figma. Self syncing tokens. Responsive. Verrrrsatile. Attuned to your workflow.
-          </div>
-        </div>
-        <div class="after-reader">
-            <video autoplay muted loop class="shadow">
-              <source src="images/demoTableComponent.mp4" type="video/mp4">
-              Your browser does not support the video tag.
-            </video>
-          </div>
-    </section>
-    <div class="spacer"></div>
-      
-
     <section class="card-wrapper">
         <h2 class="h2-gradient">From design to code...</h2>
         <div class="owl-carousel custom-carousel owl-theme">
@@ -130,7 +112,22 @@
           </div>
         </div>
         </div>
-      </section>
+    </section>
+
+    <section class="reader" id="read">
+        <div class="content">
+          <div data-split aria-hidden="true">
+            The little details make a great component: Matching structure in code & Figma. Self syncing tokens. Responsive. Verrrrsatile. Attuned to your workflow.
+          </div>
+        </div>
+        <div class="after-reader">
+            <video autoplay muted loop class="shadow">
+              <source src="images/demoTableComponent.mp4" type="video/mp4">
+              Your browser does not support the video tag.
+            </video>
+          </div>
+    </section>
+    <div class="spacer"></div>
 
     <div class="testimonials-wrapper">
         <div data-carousel>
@@ -184,49 +181,88 @@
         </div>
     </div>
 
-    <div class="color-display">
-        <div class="color-box" id="strongBox">Strong</div>
-        <div class="color-box" id="defaultBox">Default</div>
-        <div class="color-box" id="subtleBox">Subtle</div>
-        <div class="color-box" id="tintBox">Tint</div>
-    </div>
+    <section class="image-text">
+        <div class="image">
+            <img src="images/dashboard.png" alt="Dashboard">
+        </div>
+        <div class="text">
+            <h2>Data visualization</h2>
+            <p>Capturing complex business logic on a dashboard and leveraging usability studies to improve the designs</p>
+            <a href="#" class="secondary-btn" style="padding-left: 0; margin: 0;">
+                View in Figma
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-arrow-right" viewBox="0 0 16 16">
+                    <path fill-rule="evenodd" d="M10.354 3.646a.5.5 0 0 0-.708.708L12.293 7H1.5a.5.5 0 0 0 0 1h10.793l-2.647 2.646a.5.5 0 0 0 .708.708l3.5-3.5a.5.5 0 0 0 0-.708l-3.5-3.5z"/>
+                </svg>
+            </a>
+        </div>
+    </section>
 
-    <div>
-        <label for="colorblindSwitch">Colorblind Mode:</label>
-        <input type="checkbox" id="colorblindSwitch">
-    </div>
+    <section class="image-text">
+        <div class="image">
+            <img src="images/prototype-ia.png" alt="Figma prototye and IA map">
+        </div>
+        <div class="text">
+            <h2>Creating a SaaS product</h2>
+            <p>Building a multi million dollar SaaS product on a hardware subscription model</p>
+            <a href="#" class="secondary-btn" style="padding-left: 0; margin: 0;">
+                View in Figma
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-arrow-right" viewBox="0 0 16 16">
+                    <path fill-rule="evenodd" d="M10.354 3.646a.5.5 0 0 0-.708.708L12.293 7H1.5a.5.5 0 0 0 0 1h10.793l-2.647 2.646a.5.5 0 0 0 .708.708l3.5-3.5a.5.5 0 0 0 0-.708l-3.5-3.5z"/>
+                </svg>
+            </a>
+        </div>
+    </section>
 
-    <div class="color-display">
-        <div class="color-box" style="color: var(--sysNeutral7)">Neutral 7</div>
-        <div class="color-box" style="color: var(--sysNeutral6)">Neutral 6</div>
-        <div class="color-box" style="color: var(--sysNeutral5)">Neutral 5</div>
-        <div class="color-box" style="color: var(--sysNeutral4)">Neutral 4</div>
-        <div class="color-box" style="color: var(--sysNeutral3)">Neutral 3</div>
-        <div class="color-box" style="color: var(--sysNeutral2)">Neutral 2</div>
-        <div class="color-box" style="color: var(--sysNeutral1)">Neutral 1</div>
-        <div class="color-box" style="color: var(--sysNeutral0)">Neutral 0</div>
-    </div>
-    <div class="color-display">
-        <div class="color-box" style="color: var(--sysWarningDefault)">Warning Default</div>
-        <div class="color-box" style="color: var(--sysWarningSubtle)">Warning Subtle</div>
-        <div class="color-box" style="color: var(--sysDangerDefault)">Danger Default</div>
-        <div class="color-box" style="color: var(--sysDangerSubtle)">Danger Subtle</div>
-        <div class="color-box" style="color: var(--sysInfoDefault)">Info Default</div>
-        <div class="color-box" style="color: var(--sysInfoSubtle)">Info Subtle</div>
-        <div class="color-box" style="color: var(--sysSuccessDefault)">Success Default</div>
-        <div class="color-box" style="color: var(--sysSuccessSubtle)">Success Subtle</div>
-    </div>
+    <section class="image-text">
+        <div class="image">
+            <img src="images/flowcharts.png" alt="Process artefacts and flowcharts">
+        </div>
+        <div class="text">
+            <h2>Cross functional product workflow</h2>
+            <p>Over the years working with XF teams we developed a robust hand-off and QA process which enables simple and effective collaboration</p>
+            <a href="#" class="secondary-btn" style="padding-left: 0; margin: 0;">
+                View in Figma
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-arrow-right" viewBox="0 0 16 16">
+                    <path fill-rule="evenodd" d="M10.354 3.646a.5.5 0 0 0-.708.708L12.293 7H1.5a.5.5 0 0 0 0 1h10.793l-2.647 2.646a.5.5 0 0 0 .708.708l3.5-3.5a.5.5 0 0 0 0-.708l-3.5-3.5z"/>
+                </svg>
+            </a>
+        </div>
+    </section>
 
-    <div class="color-display">
-        <div class="color-box" style="color: var(--textInverse)">text inverse</div>
-        <div class="color-box" style="color: var(--text)">text</div>
-        <div class="color-box" style="color: var(--OnprimaryText)">OnprimaryText</div>
-        <div class="color-box" style="color: var(--OnsecondaryText)">OnsecondaryText</div>
-    </div>
+    <footer>
+            <span>
+                <a href="" target="_blank">
+                    <svg width="16" height="20" viewBox="0 0 16 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7.77618 20C6.37306 18.8032 5.0725 17.4911 3.88809 16.0775C2.11068 13.9546 9.81645e-07 10.793 9.81645e-07 7.7803C-0.00157443 4.63378 1.89322 1.79641 4.8002 0.592222C7.70718 -0.611966 11.0534 0.0543808 13.2773 2.28032C14.7397 3.73625 15.5589 5.71671 15.5524 7.7803C15.5524 10.793 13.4417 13.9546 11.6643 16.0775C10.4799 17.4911 9.1793 18.8032 7.77618 20ZM7.77618 4.44765C6.58554 4.44765 5.48534 5.08285 4.89002 6.11398C4.2947 7.1451 4.2947 8.4155 4.89002 9.44662C5.48534 10.4777 6.58554 11.1129 7.77618 11.1129C9.61675 11.1129 11.1088 9.62087 11.1088 7.7803C11.1088 5.93973 9.61675 4.44765 7.77618 4.44765Z" fill="currentColor"/>
+                    </svg>
+                    Los Angeles
+                </a>
+            </span>
+            <span>
+                <a href="Resume.pdf" download>
+                    Resume.pdf
+                    <svg width="18" height="22" viewBox="0 0 18 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9.85 2C9.85 1.53056 9.46944 1.15 9 1.15C8.53056 1.15 8.15 1.53056 8.15 2L9.85 2ZM8.39896 17.601C8.73091 17.933 9.2691 17.933 9.60104 17.601L15.0104 12.1917C15.3424 11.8597 15.3424 11.3215 15.0104 10.9896C14.6785 10.6576 14.1403 10.6576 13.8083 10.9896L9 15.7979L4.19167 10.9896C3.85973 10.6576 3.32154 10.6576 2.98959 10.9896C2.65765 11.3215 2.65765 11.8597 2.98959 12.1917L8.39896 17.601ZM8.15 2L8.15 17L9.85 17L9.85 2L8.15 2Z" fill="currentColor"/>
+                        <path d="M1.21094 20.9688H17.0004" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                    </svg>
+                </a>
+            </span>
+            <span>
+                <a href="mailto:hello@felixjanemalm.com">hello@felixjanemalm.com</a>
+            </span>
+            <span>
+                <a href="https://www.linkedin.com" target="_blank">
+                    <svg width="20" height="21" viewBox="0 0 20 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M0 6.53138H4.42553V20.9687H0V6.53138ZM16.9787 7.4231C17.8582 7.90435 18.5816 8.63329 19.1489 9.60994C19.7163 10.5866 20 11.5845 20 12.6036V20.9687H15.5319V12.6036C15.5319 12.3771 15.4468 12.1223 15.2766 11.8392C15.1064 11.5562 14.9504 11.3721 14.8085 11.2872C14.5816 11.1457 14.2695 11.0749 13.8723 11.0749C13.4752 11.0749 13.1631 11.1315 12.9362 11.2448L11.1064 12.1365V20.9687H6.6383V6.53138H11.1064V7.21079C11.9858 6.81447 12.9787 6.63046 14.0851 6.65877C15.1915 6.68708 16.156 6.94186 16.9787 7.4231ZM2.21277 0.96875C2.83688 0.96875 3.3617 1.18106 3.78723 1.60569C4.21277 2.03032 4.42553 2.55403 4.42553 3.17682C4.42553 3.79961 4.21277 4.33039 3.78723 4.76917C3.3617 5.20796 2.83688 5.42735 2.21277 5.42735C1.58865 5.42735 1.06383 5.20796 0.638298 4.76917C0.212766 4.33039 0 3.79961 0 3.17682C0 2.55403 0.212766 2.03032 0.638298 1.60569C1.06383 1.18106 1.58865 0.96875 2.21277 0.96875Z" fill="currentColor"/>
+                    </svg>          
+                </a>
+            </span>
+    </footer>
 
-    <script src="https://unpkg.com/@dotlottie/player-component@latest/dist/dotlottie-player.mjs" type="module"></script> 
-    <dotlottie-player src="https://lottie.host/7401522f-2d8b-4049-ad18-eb0edb6af224/CE9lFrNlEH.json" background="transparent" speed="1" style="width: 300px; height: 300px;" loop autoplay></dotlottie-player>
-        
+    <div class="tools">
+        <div class="mover-1"></div>
+    </div>
+   
     <script src="js/master.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tinycolor/1.4.2/tinycolor.min.js"></script>
     <script src="js/color-shade-calculator.js"></script>
@@ -239,6 +275,47 @@
     <script src="js/reader.js"></script>
     <script src="https://cdn.skypack.dev/gsap@3.12.0"></script>
     <script src="https://cdn.skypack.dev/gsap@3.12.0/ScrollTrigger"></script>
+
+
+    <div class="debug">
+        <label for="colorblindSwitch">Colorblind Mode:</label>
+        <input type="checkbox" id="colorblindSwitch">
+    </div>
+
+    <div class="color-display debug">
+        <div class="color-box" id="strongBox">Strong</div>
+        <div class="color-box" id="defaultBox">Default</div>
+        <div class="color-box" id="subtleBox">Subtle</div>
+        <div class="color-box" id="tintBox">Tint</div>
+    </div>
+
+    <div class="color-display debug">
+        <div class="color-box" style="color: var(--sysNeutral7)">Neutral 7</div>
+        <div class="color-box" style="color: var(--sysNeutral6)">Neutral 6</div>
+        <div class="color-box" style="color: var(--sysNeutral5)">Neutral 5</div>
+        <div class="color-box" style="color: var(--sysNeutral4)">Neutral 4</div>
+        <div class="color-box" style="color: var(--sysNeutral3)">Neutral 3</div>
+        <div class="color-box" style="color: var(--sysNeutral2)">Neutral 2</div>
+        <div class="color-box" style="color: var(--sysNeutral1)">Neutral 1</div>
+        <div class="color-box" style="color: var(--sysNeutral0)">Neutral 0</div>
+    </div>
+    <div class="color-display debug">
+        <div class="color-box" style="color: var(--sysWarningDefault)">Warning Default</div>
+        <div class="color-box" style="color: var(--sysWarningSubtle)">Warning Subtle</div>
+        <div class="color-box" style="color: var(--sysDangerDefault)">Danger Default</div>
+        <div class="color-box" style="color: var(--sysDangerSubtle)">Danger Subtle</div>
+        <div class="color-box" style="color: var(--sysInfoDefault)">Info Default</div>
+        <div class="color-box" style="color: var(--sysInfoSubtle)">Info Subtle</div>
+        <div class="color-box" style="color: var(--sysSuccessDefault)">Success Default</div>
+        <div class="color-box" style="color: var(--sysSuccessSubtle)">Success Subtle</div>
+    </div>
+
+    <div class="color-display debug">
+        <div class="color-box" style="color: var(--textInverse)">text inverse</div>
+        <div class="color-box" style="color: var(--text)">text</div>
+        <div class="color-box" style="color: var(--OnprimaryText)">OnprimaryText</div>
+        <div class="color-box" style="color: var(--OnsecondaryText)">OnsecondaryText</div>
+    </div>
 
 </body>
 </html>

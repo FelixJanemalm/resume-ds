@@ -1,9 +1,13 @@
 body {
-    background-color: var(--primary-color);
+    background-color: var(--bg)!important;
     color: var(--text);
     text-align: center;
     margin: 0px;
     transition: 2s cubic-bezier(0.215, 0.610, 0.355, 1);
+}
+
+.debug {
+    display: none!important;
 }
 
 .primary-btn {

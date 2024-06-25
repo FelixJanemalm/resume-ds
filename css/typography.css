@@ -146,6 +146,11 @@ h1 {
     font-weight: 300;
 }
 
+footer {
+    font-size: 18px;
+    font-weight: 400;
+}
+
 /* Media query for desktop (1440p and up) */
 @media (min-width: 1920px) {
     :root {
