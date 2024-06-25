@@ -85,7 +85,7 @@
         --secondaryBgTint: var(--sysSecondaryTint);
         --primaryBg: var(--sysPrimaryDefault);
         --primaryBgSubtle: var(--sysPrimarySubtle);
-        --primaryBgTint: var(--sysPrimaryTint);
+        --primaryBgTint: var(--sysPrimaryStrong);
         --bgDisabled: var(--sysNeutral2);
         --bgStrong: var(--sysNeutral2);
         --bgMedium: var(--sysNeutral1);
@@ -272,7 +272,7 @@
         --secondaryBgTint: var(--sysSecondaryTint);
         --primaryBg: var(--sysPrimaryDefault);
         --primaryBgSubtle: var(--sysPrimarySubtle);
-        --primaryBgTint: var(--sysPrimaryTint);
+        --primaryBgTint: var(--sysPrimaryStrong);
         --bgDisabled: var(--sysNeutral2);
         --bgStrong: var(--sysNeutral2);
         --bgMedium: var(--sysNeutral1);

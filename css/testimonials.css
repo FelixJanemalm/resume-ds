@@ -228,3 +228,66 @@ blockquote {
 		opacity: 0;
 	}
 }
+
+@media (max-width: 1100px) {
+
+	.testimonials-wrapper {
+		padding-top: 75px;
+        padding-bottom: 75px;
+	}
+	
+	[data-carousel] {
+		margin-left: 10px;
+		margin-right: 10px;
+	}
+
+	.slide__quote, .slide__cite {
+		padding-left: 10px;
+		padding-right: 5px;
+		width: 100%;
+	}
+
+	.Wallop-list::after {
+		background: linear-gradient(to left, var(--primaryBgTint), transparent 60%);
+	}
+
+	.Wallop-list::before {
+		background: linear-gradient(to right, var(--primaryBgTint), transparent 60%);
+	}		
+
+}
+
+@media (max-width: 750px) {
+
+	.testimonials-wrapper {
+		padding-top: 50px;
+        padding-bottom: 50px;
+	}
+	
+	[data-carousel] {
+		margin-left: 10px;
+		margin-right: 10px;
+	}
+	.slide__quote, .slide__cite {
+	padding-left: 10px;
+	padding-right: 5px;
+	width: 100%;
+	}
+
+	.Wallop-item, .Wallop-list {
+		padding: 0;
+	}
+
+	.Wallop-list::after {
+			background: linear-gradient(to left, var(--primaryBgTint), transparent 33%);
+	}
+
+	.Wallop-list::before {
+		background: linear-gradient(to right, var(--primaryBgTint), transparent 33%);
+	}
+
+	[data-carousel] button {
+		padding: 4px;
+		width: 24px;
+	  }
+}
