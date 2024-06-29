@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var content = toSplit.innerText;
     var contentLength = content.length;
   
-    var PPC = 10; // Pixels per character...
+    var PPC = 5; // Pixels per character...
     var BUFFER = 40;
   
     // Set CSS custom properties

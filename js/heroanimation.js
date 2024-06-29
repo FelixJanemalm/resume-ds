@@ -1,7 +1,7 @@
 const n = 300,											// number of slices 
     // (more = smooth, but less performant)
     o = Math.PI / n,						// offset per slice
-    range = 30,											// range of motion (total degrees)
+    range = 45,											// range of motion (total degrees)
     tf = 0.0004,									// timing factor (higher = faster)
     d = document,
     c = d.getElementById("c"),
