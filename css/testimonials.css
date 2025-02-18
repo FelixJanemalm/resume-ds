@@ -4,6 +4,7 @@
 	box-sizing: border-box;
 }
 
+
 button {
 	background-color: transparent;
 	border: none;
@@ -23,6 +24,7 @@ button {
 	&:hover,
 	&:focus {
 		opacity: 0.6;
+		cursor: pointer;
 	}
 }
 
@@ -43,6 +45,11 @@ button {
 	padding-bottom: 100px;
 	position: relative;
 }
+
+.testimonials-wrapper a {
+	color: var(--primaryText);
+}
+
 
 .slide__list {
 	width: 100%;
@@ -101,7 +108,7 @@ blockquote {
 	max-width: 800px;
 	margin-left: auto;
 	margin-right: auto;
-	color: var(--text);
+	color: #fafafa;
 }
 
 .slide__heading {

@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let hueRect = hueCanvas.getBoundingClientRect();
 
     let currentColor = '';
-    let hue = 210; // Starting with a nice blue hue
+    let hue = 210; // Starting hue
     let saturation = 1;
     let lightness = 0.5;
 

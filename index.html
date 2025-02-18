@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="css/typography.css">
     <link rel="stylesheet" href="css/materials.css"> 
     <link rel="stylesheet" href="css/header.css">
+    <link rel="stylesheet" href="css/drawer.css">
     <link rel="stylesheet" href="css/hero.css">
     <link rel="stylesheet" href="css/tools.css">
     <link rel="stylesheet" href="css/testimonials.css">
@@ -20,24 +21,56 @@
     <link rel="stylesheet" href="css/reader.css">
     <link rel="stylesheet" href="css/image-text.css">
     <link rel="stylesheet" href="css/footer.css">
+    <script src="https://unpkg.com/@dotlottie/player-component@2.7.12/dist/dotlottie-player.mjs" type="module"></script>
 </head>
 <body>
 
     <header>
         <nav>
-            <div class="logo"><a href="#home">Felix Janemalm</a></div>
+            <div class="logo">
+                <a href="#home">
+                    <span class="full-logo">Felix Janemalm</span>
+                    <span class="short-logo">F</span>
+                </a>
+            </div>
             <ul class="nav-links">
-                <li><a href="#home">Portfolio</a></li>
-                <li><a href="#about">Resume</a></li>
-                <li><a href="#contact">Contact</a></li>
+                <li><a href="#work">Work</a></li>
+                <li><a href="Resume.pdf" target="_blank">Resume.pdf</a></li>
+                <li><a href="#contact" id="contactBtn">Contact</a></li>
             </ul>
         </nav>
+        <div id="progress-bar"></div>
     </header>
+
+    <div id="overlay" class="overlay"></div> <!-- Background dim effect -->
+
+    <div id="drawer" class="drawer">
+        <div class="drawer-content">
+          <nav class="nav-links">
+            <span>
+                <a href="mailto:hello@felixjanemalm.com">
+                    <svg width="16" height="16" viewBox="0 0 140 112" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;">
+                            <path d="M118.666 0H20.9411C15.3872 0 10.0607 2.20629 6.1335 6.1335C2.20629 10.0607 0 15.3872 0 20.9411V90.7446C0 96.2986 2.20629 101.625 6.1335 105.552C10.0607 109.479 15.3872 111.686 20.9411 111.686H118.666C124.22 111.686 129.546 109.479 133.474 105.552C137.401 101.625 139.607 96.2986 139.607 90.7446V20.9411C139.607 15.3872 137.401 10.0607 133.474 6.1335C129.546 2.20629 124.22 0 118.666 0ZM118.666 13.9607L73.2938 45.1629C72.2326 45.7756 71.0289 46.0981 69.8036 46.0981C68.5783 46.0981 67.3745 45.7756 66.3134 45.1629L20.9411 13.9607H118.666Z" fill="currentColor"/>
+                        </svg>
+                            
+                    hello@felixjanemalm.com</a>
+             </span>                     
+            <a href="https://www.linkedin.com/in/felixjanemalm/" target="_blank">
+                <svg width="16" height="16" viewBox="0 0 20 21" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;">
+                <path d="M0 6.53138H4.42553V20.9687H0V6.53138ZM16.9787 7.4231C17.8582 7.90435 18.5816 8.63329 19.1489 9.60994C19.7163 10.5866 20 11.5845 20 12.6036V20.9687H15.5319V12.6036C15.5319 12.3771 15.4468 12.1223 15.2766 11.8392C15.1064 11.5562 14.9504 11.3721 14.8085 11.2872C14.5816 11.1457 14.2695 11.0749 13.8723 11.0749C13.4752 11.0749 13.1631 11.1315 12.9362 11.2448L11.1064 12.1365V20.9687H6.6383V6.53138H11.1064V7.21079C11.9858 6.81447 12.9787 6.63046 14.0851 6.65877C15.1915 6.68708 16.156 6.94186 16.9787 7.4231ZM2.21277 0.96875C2.83688 0.96875 3.3617 1.18106 3.78723 1.60569C4.21277 2.03032 4.42553 2.55403 4.42553 3.17682C4.42553 3.79961 4.21277 4.33039 3.78723 4.76917C3.3617 5.20796 2.83688 5.42735 2.21277 5.42735C1.58865 5.42735 1.06383 5.20796 0.638298 4.76917C0.212766 4.33039 0 3.79961 0 3.17682C0 2.55403 0.212766 2.03032 0.638298 1.60569C1.06383 1.18106 1.58865 0.96875 2.21277 0.96875Z" fill="currentColor"/>
+                </svg>
+                /felixjanemalm</a>
+          </nav>
+        </div>
+    </div>    
+
+
 
     <div class="hue-filter"></div>
 
     <div class="hero-wrapper">
-        <div class="hero grid-bg">
+        <canvas id="grid"></canvas>
+        <div class="hero"> 
             <div class="hero-left">
                 <h1>A systems based approach to <span class="hue-rotate">product design</span></h1>
                 <div class="glass box" id="color-picker-container">
@@ -52,16 +85,25 @@
                         <div id="spectrum-cursor" class="cursor"></div>
                         <div id="spectrum-hitbox" class="hitbox"></div>
                     </div>
+                    <!--
+                    <div id="color-picker-arrow">
+                        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 4V20M12 20L6 14M12 20L18 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    -->
                 </div>
                 <div class="hero-content">
                     <p class="hero-subhead">Hi I'm Felix 👋, a Figma expert and empath, dedicated to empowering those around me to have meaningful outcomes.</p>
-                    <a href="#" class="primary-btn">View Work</a>
-                    <a href="#" class="secondary-btn" style="margin-left: 20px;">
+                    <a href="#work" class="primary-btn">View Work</a>
+                    <!--
+                    <a href="#" id="contactBtn" class="secondary-btn" style="margin-left: 20px;">
                     Contact Me
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-arrow-right" viewBox="0 0 16 16">
                         <path fill-rule="evenodd" d="M10.354 3.646a.5.5 0 0 0-.708.708L12.293 7H1.5a.5.5 0 0 0 0 1h10.793l-2.647 2.646a.5.5 0 0 0 .708.708l3.5-3.5a.5.5 0 0 0 0-.708l-3.5-3.5z"/>
                     </svg>
                     </a>
+                    -->
                 </div>
             </div>
             <div class="hero-right">
@@ -71,21 +113,34 @@
             </div>
         </div>
         <div class="hero-bg"></div>
+        <a href="#scalability" id="scroll-down-arrow">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 4V20M12 20L6 14M12 20L18 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </a>            
     </div>
 
-    <section class="card-wrapper">
-        <h2 class="h2-gradient">From design to code...</h2>
+    <section class="card-wrapper" id="scalability">
+        <!--<div class="hue-filter" style="z-index: 0; margin-top: -50px;"></div>
+        <dotlottie-player src="https://lottie.host/d6334a39-5090-4d0f-8d38-cf0cb2a9e9e8/CNrdxKRT8m.lottie" background="transparent" speed="1" style="width: auto; height: 100%; position: absolute; z-index: -1; top:0; margin-top: -50px; transform: scaleX(-1);" loop autoplay></dotlottie-player>-->
+        <h2 class="h2-gradient">The architecture of scalability</h2>
         <div class="owl-carousel custom-carousel owl-theme">
-          <div class="item" style="background-image: url(images/uxcanvas.png);">
+          <div class="item">
+            <video autoplay muted loop controls class="background-video">
+                <source src="images/value-v1.mp4" type="video/mp4">
+                Your browser does not support the video tag.
+              </video>
             <div class="item-desc">
-              <h3>Intent</h3>
-              <p>The power of a great problem statement is often overlooked. By clarifying the 'why' and defining the problem our direction becomes purposeful.</p>
+              <h3>Value</h3>
+              <p>The power of a great problem statement is often overlooked. By clarifying the 'why' our direction becomes purposeful.</p>
             </div>
           </div>
-          <div class="item" style="background-image: url(images/uxcanvas.png);">
+          <div class="item">
+            <div class="hue-filter" style="z-index: 1;"></div>
+            <dotlottie-player src="https://lottie.host/23500ac5-13f4-4f84-95d7-579c3f134a6b/jSd8kwdgJI.lottie" background="black" speed="1" style="width: 100%; height: 100%; position: absolute;" loop pause></dotlottie-player>
             <div class="item-desc">
-              <h3>Validation</h3>
-              <p>A clear hypothesis guides user testing and affinity mapping. Quantifying feedback aligns everyone for the next iteration, maximizing efficiency by minimizing unnecessary work.</p>
+              <h3>Team</h3>
+              <p>Creating safe environments for rapid feedback loops & balancing autonomy with alignment.</p>
             </div>
           </div>
           <div class="item active">
@@ -98,17 +153,22 @@
               <p>Encoding components with optimal user, designer & developer experience. Structured and designed to scale. </p>
             </div>
           </div>
-          <div class="item" style="background-image: url(images/uxcanvas.png);">
+          <div class="item">
+            <video autoplay muted loop controls class="background-video">
+                <source src="images/tokens-v3-export.mp4" type="video/mp4">
+                Your browser does not support the video tag.
+              </video>
             <div class="item-desc">
               <h3>Tokenization</h3>
-              <p>Sentiment based design tokens for easy usage, with multi level architecture for easy theming, synced for maintainability.</p>
+              <p>Sentiment based, multi level referencing for translating designs across brands, breakpoints, and platforms.</p>
             </div>
           </div>
-          <div class="item" style="background-image: url(images/uxcanvas.png);">
+          <div class="item">
+            <div class="hue-filter" style="z-index: 1;"></div>
+            <dotlottie-player src="https://lottie.host/29341cef-2095-47f0-9066-cc205377d5af/2F1tLxno0J.lottie" background="black" speed=".5" style="height: 100%; position: absolute; transform: scale(1.525); top: -19px;" loop pause></dotlottie-player>
             <div class="item-desc">
-              <h3>Followup</h3>
-              <p>Continuous feedback, quantifiably measured to inform the next iteration</p>
-              <p>Notes: "If the final design looked like this we were proably not doing  very good job"</p>
+              <h3>Essentialism</h3>
+              <p>By tackling only the top 10% of what truly matters, we still face more meaningful work than a lifetime can accomplish.</p>
             </div>
           </div>
         </div>
@@ -118,19 +178,20 @@
     <section class="reader" id="read">
         <div class="content">
           <div data-split aria-hidden="true">
-            The little details make a great component: Matching structure in code & Figma. Self syncing tokens. Responsive. Verrrrsatile. Attuned to your workflow.
+            I make efficient systems a catalyst for creativity, enabling teams to scale by design, not by chance.
           </div>
         </div>
         <div class="after-reader">
+            <div class="hue-filter" style="height: 99.6%!important; border-radius: 20px;"></div>
             <video autoplay muted loop class="shadow">
-              <source src="images/demoTableComponent.mp4" type="video/mp4">
+              <source src="images/v6-demo.mp4" type="video/mp4">
               Your browser does not support the video tag.
             </video>
           </div>
     </section>
     <div class="spacer"></div>
 
-    <h2 class="h2-gradient" style="padding-top: 90px; margin: 10px;">Portfolio</h2>
+    <h2 class="h2-gradient" id="work" style="padding-top: 90px; margin: 10px;">Work</h2>
 
     <section class="image-text">
         <div class="image">
@@ -139,7 +200,7 @@
         <div class="text">
             <h2>Data visualization</h2>
             <p>Capturing complex business logic on a dashboard and leveraging usability studies to improve the designs</p>
-            <a href="#" class="secondary-btn" style="padding-left: 0; margin: 0;">
+            <a href="https://www.figma.com/proto/ACKDbDQFc7OZRjWiFKgnJS/UX---Case-Studies?page-id=0%3A1&node-id=41-4505&p=f&viewport=595%2C527%2C0.03&t=Hj61QEFk0UoDdIPI-1&scaling=min-zoom&content-scaling=fixed&starting-point-node-id=41%3A4505&show-proto-sidebar=1" target="_blank" class="secondary-btn" style="padding-left: 0; margin: 0;">
                 View in Figma
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-arrow-right" viewBox="0 0 16 16">
                     <path fill-rule="evenodd" d="M10.354 3.646a.5.5 0 0 0-.708.708L12.293 7H1.5a.5.5 0 0 0 0 1h10.793l-2.647 2.646a.5.5 0 0 0 .708.708l3.5-3.5a.5.5 0 0 0 0-.708l-3.5-3.5z"/>
@@ -155,7 +216,7 @@
         <div class="text">
             <h2>Creating a SaaS product</h2>
             <p>Building a multi million dollar SaaS product on a hardware subscription model</p>
-            <a href="#" class="secondary-btn" style="padding-left: 0; margin: 0;">
+            <a href="https://www.figma.com/proto/ACKDbDQFc7OZRjWiFKgnJS/UX---Case-Studies?page-id=0%3A1&node-id=41-4505&p=f&viewport=595%2C527%2C0.03&t=Hj61QEFk0UoDdIPI-1&scaling=min-zoom&content-scaling=fixed&starting-point-node-id=41%3A4505&show-proto-sidebar=1" target="_blank" class="secondary-btn" style="padding-left: 0; margin: 0;">
                 View in Figma
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-arrow-right" viewBox="0 0 16 16">
                     <path fill-rule="evenodd" d="M10.354 3.646a.5.5 0 0 0-.708.708L12.293 7H1.5a.5.5 0 0 0 0 1h10.793l-2.647 2.646a.5.5 0 0 0 .708.708l3.5-3.5a.5.5 0 0 0 0-.708l-3.5-3.5z"/>
@@ -171,7 +232,7 @@
         <div class="text">
             <h2>Cross functional product workflow</h2>
             <p>Over the years working with XF teams we developed a robust hand-off and QA process which enables simple and effective collaboration</p>
-            <a href="#" class="secondary-btn" style="padding-left: 0; margin: 0;">
+            <a href="https://www.figma.com/proto/ACKDbDQFc7OZRjWiFKgnJS/UX---Case-Studies?page-id=0%3A1&node-id=41-4505&p=f&viewport=595%2C527%2C0.03&t=Hj61QEFk0UoDdIPI-1&scaling=min-zoom&content-scaling=fixed&starting-point-node-id=41%3A4505&show-proto-sidebar=1" target="_blank" class="secondary-btn" style="padding-left: 0; margin: 0;">
                 View in Figma
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-arrow-right" viewBox="0 0 16 16">
                     <path fill-rule="evenodd" d="M10.354 3.646a.5.5 0 0 0-.708.708L12.293 7H1.5a.5.5 0 0 0 0 1h10.793l-2.647 2.646a.5.5 0 0 0 .708.708l3.5-3.5a.5.5 0 0 0 0-.708l-3.5-3.5z"/>
@@ -182,18 +243,18 @@
 
     <div class="testimonials-wrapper">
         <div data-carousel>
-            <h2 class="h2-gradient">Don't take my word for it</h2>
+            <h2 class="h2-gradient-inverse">Don't take my word for it</h2>
             <ul class="slide__list Wallop-list">
                 <li class="slide__item Wallop-item Wallop-item--current">
                     <blockquote>
                         <p class="slide__quote">“I had the unique opportunity to collaborate with Felix on a comprehensive design system project, where his role as the UX lead was nothing short of exemplary. His approach to integrating and guiding teams across different departments was marked by empathy and a deep understanding of collaborative dynamics...His adaptability, respect for diverse viewpoints, and innovative problem-solving approach were consistently on display...”</p>
-                        <cite class="slide__cite">Eden, Senior Software Engineer - <a style="color: var(--primaryText);" href="#">Read on LinkedIn</a></cite>
+                        <cite class="slide__cite">Eden, Senior Software Engineer - <a href="https://www.linkedin.com/in/felixjanemalm/#recommendations" target="_blank">Read on LinkedIn</a></cite>
                     </blockquote>
                  </li>   
                 <li class="slide__item Wallop-item">
                         <blockquote>
                             <p class="slide__quote">"Felix is the whole package. As a leader in developing and maintaining Design Systems, Felix drives process with active listening, encouraging teams to contribute, then incorporating feedback. He has the unique ability to be creative, precise, collaborative and open-minded. His kind, generous spirit sharing his knowledge made a huge difference to our team. We miss him already. I highly recommend Felix. He will elevate your team, and company, with humility and humanity."</p>
-                            <cite class="slide__cite">Katy, Senior Designer - <a style="color: var(--primaryText);" href="#">Read on LinkedIn</a> </cite>
+                            <cite class="slide__cite">Katy, Senior Designer - <a href="https://www.linkedin.com/in/felixjanemalm/#recommendations" target="_blank">Read on LinkedIn</a> </cite>
                         </blockquote>
                 </li>
                 <li class="slide__item Wallop-item">
@@ -201,25 +262,25 @@
                         <p class="slide__quote">"Felix addresses every situation with such grace and consideration, even in the face of pigheadedness.
                             I was absolutely gobsmacked by the holism of the design he developed for the visual aspect of the corporate image - not to mention its elegance.
                             I can’t recommend him enough, and I’m so sorry not to be continuing to work with him."</p>
-                        <cite class="slide__cite">Fiona, Technical Publications Manager - <a style="color: var(--primaryText);" href="#">Read on LinkedIn</a> </cite>
+                        <cite class="slide__cite">Fiona, Technical Publications Manager - <a href="https://www.linkedin.com/in/felixjanemalm/#recommendations" target="_blank">Read on LinkedIn</a> </cite>
                     </blockquote>
                 </li>
                 <li class="slide__item Wallop-item">
                         <blockquote>
                             <p class="slide__quote">"Expert in Design Systems. Felix is a true pro - innovative, skilled, and great at sharing knowledge. His skills are top-notch, and he has a unique ability to make complex concepts accessible to everyone."</p>
-                            <cite class="slide__cite">Patryk, Principal Product Designer - <a style="color: var(--primaryText);" href="#">Read on LinkedIn</a></cite>
+                            <cite class="slide__cite">Patryk, Principal Product Designer - <a href="https://www.linkedin.com/in/felixjanemalm/#recommendations" target="_blank">Read on LinkedIn</a></cite>
                         </blockquote>
                 </li>
                 <li class="slide__item Wallop-item">
                     <blockquote>
                         <p class="slide__quote">"Felix is incredibly kind, thoughtful, and a joy to work with. He strives to produce the best designs possible and actively seeks feedback from others. In doing so, he fostered a heathy and vibrant ongoing collaboration between the UX and docs teams, and the product as a whole has been all the better for it. Any company would be lucky to have him."</p>
-                        <cite class="slide__cite">Elena, Senior Technical Writer - <a style="color: var(--primaryText);" href="#">Read on LinkedIn</a></cite>
+                        <cite class="slide__cite">Elena, Senior Technical Writer - <a href="https://www.linkedin.com/in/felixjanemalm/#recommendations" target="_blank">Read on LinkedIn</a></cite>
                     </blockquote>
                  </li>
                  <li class="slide__item Wallop-item">
                     <blockquote>
                         <p class="slide__quote">“Felix has great work ethics and passion towards his work. He has very good collaboration skills, takes feedback and incorporates it into his design...conducted usability studies with stakeholders and strives towards the constant improvement...drove meetings with different UI teams across Yubico to bring design consistency. He has enthusiasm to learn new frameworks. He has great knowledge of Figma, plugins and is always ready to share his knowledge.”</p>
-                        <cite class="slide__cite">Sree, Senior Software Engineer - <a style="color: var(--primaryText);" href="#">Read on LinkedIn</a></cite>
+                        <cite class="slide__cite">Sree, Senior Software Engineer - <a href="https://www.linkedin.com/in/felixjanemalm/#recommendations" target="_blank">Read on LinkedIn</a></cite>
                     </blockquote>
                  </li>   
             </ul>
@@ -241,7 +302,7 @@
                 <a href="mailto:hello@felixjanemalm.com">hello@felixjanemalm.com</a>
             </span>
             <span>
-                <a href="Resume.pdf" download>
+                <a href="Resume.pdf" target="_blank" download>
                     Resume.pdf
                     <svg width="18" height="22" viewBox="0 0 18 22" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M9.85 2C9.85 1.53056 9.46944 1.15 9 1.15C8.53056 1.15 8.15 1.53056 8.15 2L9.85 2ZM8.39896 17.601C8.73091 17.933 9.2691 17.933 9.60104 17.601L15.0104 12.1917C15.3424 11.8597 15.3424 11.3215 15.0104 10.9896C14.6785 10.6576 14.1403 10.6576 13.8083 10.9896L9 15.7979L4.19167 10.9896C3.85973 10.6576 3.32154 10.6576 2.98959 10.9896C2.65765 11.3215 2.65765 11.8597 2.98959 12.1917L8.39896 17.601ZM8.15 2L8.15 17L9.85 17L9.85 2L8.15 2Z" fill="currentColor"/>
@@ -250,14 +311,14 @@
                 </a>
             </span>
             <span>
-                <a href="https://www.linkedin.com" target="_blank">
+                <a href="https://www.linkedin.com/in/felixjanemalm/" target="_blank">
                     <svg width="20" height="21" viewBox="0 0 20 21" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M0 6.53138H4.42553V20.9687H0V6.53138ZM16.9787 7.4231C17.8582 7.90435 18.5816 8.63329 19.1489 9.60994C19.7163 10.5866 20 11.5845 20 12.6036V20.9687H15.5319V12.6036C15.5319 12.3771 15.4468 12.1223 15.2766 11.8392C15.1064 11.5562 14.9504 11.3721 14.8085 11.2872C14.5816 11.1457 14.2695 11.0749 13.8723 11.0749C13.4752 11.0749 13.1631 11.1315 12.9362 11.2448L11.1064 12.1365V20.9687H6.6383V6.53138H11.1064V7.21079C11.9858 6.81447 12.9787 6.63046 14.0851 6.65877C15.1915 6.68708 16.156 6.94186 16.9787 7.4231ZM2.21277 0.96875C2.83688 0.96875 3.3617 1.18106 3.78723 1.60569C4.21277 2.03032 4.42553 2.55403 4.42553 3.17682C4.42553 3.79961 4.21277 4.33039 3.78723 4.76917C3.3617 5.20796 2.83688 5.42735 2.21277 5.42735C1.58865 5.42735 1.06383 5.20796 0.638298 4.76917C0.212766 4.33039 0 3.79961 0 3.17682C0 2.55403 0.212766 2.03032 0.638298 1.60569C1.06383 1.18106 1.58865 0.96875 2.21277 0.96875Z" fill="currentColor"/>
                     </svg>          
                 </a>
             </span>
             <span>
-                <a href="" target="_blank">
+                <a href="https://maps.app.goo.gl/ar51QZTdsHNgS3Ej8" target="_blank">
                     <svg width="16" height="20" viewBox="0 0 16 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M7.77618 20C6.37306 18.8032 5.0725 17.4911 3.88809 16.0775C2.11068 13.9546 9.81645e-07 10.793 9.81645e-07 7.7803C-0.00157443 4.63378 1.89322 1.79641 4.8002 0.592222C7.70718 -0.611966 11.0534 0.0543808 13.2773 2.28032C14.7397 3.73625 15.5589 5.71671 15.5524 7.7803C15.5524 10.793 13.4417 13.9546 11.6643 16.0775C10.4799 17.4911 9.1793 18.8032 7.77618 20ZM7.77618 4.44765C6.58554 4.44765 5.48534 5.08285 4.89002 6.11398C4.2947 7.1451 4.2947 8.4155 4.89002 9.44662C5.48534 10.4777 6.58554 11.1129 7.77618 11.1129C9.61675 11.1129 11.1088 9.62087 11.1088 7.7803C11.1088 5.93973 9.61675 4.44765 7.77618 4.44765Z" fill="currentColor"/>
                     </svg>
@@ -266,7 +327,6 @@
             </span>
     </footer>
    
-    <script src="js/master.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tinycolor/1.4.2/tinycolor.min.js"></script>
     <script src="js/color-shade-calculator.js"></script>
     <script src="js/heroanimation.js"></script>
@@ -275,7 +335,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/OwlCarousel2/2.3.4/owl.carousel.min.js"></script>
     <script src="js/cards.js"></script>
+    <script src="js/header.js"></script>
+    <script src="js/drawer.js"></script>
     <script src="js/reader.js"></script>
+    <script src="js/grid.js"></script>
     <script src="https://cdn.skypack.dev/gsap@3.12.0"></script>
     <script src="https://cdn.skypack.dev/gsap@3.12.0/ScrollTrigger"></script>
 

@@ -122,18 +122,38 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function getSpectrumColor(e) {
         e.preventDefault();
-        const x = Math.min(Math.max(0, e.pageX - spectrumRect.left), spectrumRect.width);
-        const y = Math.min(Math.max(0, e.pageY - spectrumRect.top), spectrumRect.height);
+    
+        // Always get the latest bounding rect dynamically
+        const spectrumRect = spectrumCanvas.getBoundingClientRect();
+    
+        // Use clientX and clientY to ensure viewport-relative positioning
+        const x = Math.min(
+            Math.max(0, e.clientX - spectrumRect.left),
+            spectrumRect.width
+        );
+        const y = Math.min(
+            Math.max(0, e.clientY - spectrumRect.top),
+            spectrumRect.height
+        );
+    
+        // Convert mouse position into saturation and brightness
         const xRatio = x / spectrumRect.width;
         const yRatio = y / spectrumRect.height;
         const hsvValue = 1 - yRatio;
         const hsvSaturation = xRatio;
+    
+        // Convert HSV to HSL
         lightness = Math.min(Math.max(0.0001, (hsvValue / 2) * (2 - hsvSaturation)), 0.9999);
         saturation = Math.min(Math.max(0.0001, (hsvValue * hsvSaturation) / (1 - Math.abs(2 * lightness - 1))), 0.9999);
+    
+        // Generate and apply the selected color
         const color = tinycolor(`hsl(${hue}, ${saturation * 100}%, ${lightness * 100}%)`);
         setCurrentColor(color);
+        
+        // Update cursor position
         updateSpectrumCursor(x, y);
     }
+    
 
     function endGetSpectrumColor() {
         spectrumCursor.classList.remove('dragging');
@@ -259,7 +279,8 @@ function calculateShades(color) {
         strong: hslToHex(h, s, Math.max(0, l - 30)),
         default: color,
         subtle: hslToHex(h, s, Math.min(100, l + 20)),
-        tint: hslToHex(h, s, Math.min(100, l + 30))
+        tint: hslToHex(h, s, Math.min(100, l + 30)),
+        grid: hslToHex(h, s, l > 50 ? Math.min(100, l*0.6 + 10) : Math.max(8, l*1.6 + 16))
     };
 
     return shades;
@@ -308,12 +329,62 @@ function applyThemeBasedOnBrightnessAndMode(hexColor) {
     }
 }
 
+function calculateLinkColor(color) {
+    let [h, s, l] = hexToHsl(color);
+    
+    // If the color is too dark, increase lightness by a fixed amount
+    if (l < 20) {
+        l += 40; // Brighten by a fixed amount
+    }
+    
+    return hslToHex(h, s, l);
+}
+
+function calculateNeutralColor(color) {
+    let [h, s, l] = hexToHsl(color);
+    
+    // Adjust neutral color dynamically based on lightness input
+    let neutralL = l > 50 ? Math.min(98, l + 14) : Math.max(5, l - 14);
+    
+    return hslToHex(0, 0, neutralL); // Neutral color is always grayscale
+}
+
+function getComputedRGB(variableName) {
+    let rgb = getComputedStyle(document.documentElement)
+        .getPropertyValue(variableName)
+        .trim();
+
+    if (rgb.startsWith("#")) {
+        return hexToRGB(rgb); // Convert HEX to RGB
+    } else if (rgb.startsWith("rgb")) {
+        return rgb.replace(/[^\d,]/g, ""); // Extract numbers from RGB format
+    }
+    return null;
+}
+
+// Convert HEX to RGB
+function hexToRGB(hex) {
+    let c = hex.substring(1).split('');
+    if (c.length === 3) {
+        c = [c[0], c[0], c[1], c[1], c[2], c[2]];
+    }
+    c = '0x' + c.join('');
+    return [(c >> 16) & 255, (c >> 8) & 255, c & 255].join(',');
+}
+
+
 function updateColors(color) {
     const selectedColor = limitBrightness(color);
     const shades = calculateShades(selectedColor);
     const buttonColors = calculateButtonColors(selectedColor);
+    const linkColor = calculateLinkColor(shades.default); // Calculate the link color
+    const neutralColor = calculateNeutralColor(selectedColor);
     const bgStrongOpacity = hexToRgba(shades.tint, 0.9);
     const bgMediumOpacity = hexToRgba(shades.subtle, 0.4);
+    const gridOverlay = hexToRgba(shades.grid, 0.4);
+
+    const contrastRGB = getComputedRGB("--sysNeutral7");
+    document.documentElement.style.setProperty('--contrastRGB', contrastRGB);
 
     document.documentElement.style.setProperty('--primary-color', selectedColor);
     document.documentElement.style.setProperty('--sysPrimaryStrong', shades.strong);
@@ -323,8 +394,11 @@ function updateColors(color) {
     document.documentElement.style.setProperty('--button-color', buttonColors.button);
     document.documentElement.style.setProperty('--button-hover-color', buttonColors.buttonHover);
     document.documentElement.style.setProperty('--button-pressed-color', buttonColors.buttonPressed);
+    document.documentElement.style.setProperty('--link-color', linkColor); // New link color
+    document.documentElement.style.setProperty('--sysNeutral0', neutralColor); // Dynamically set neutral color
     document.documentElement.style.setProperty('--bgStrong-opacity', bgStrongOpacity);
     document.documentElement.style.setProperty('--bgMedium-opacity', bgMediumOpacity);
+    document.documentElement.style.setProperty('--gridOverlay', gridOverlay);
 
     document.getElementById('strongBox').style.backgroundColor = shades.strong;
     document.getElementById('defaultBox').style.backgroundColor = shades.default;

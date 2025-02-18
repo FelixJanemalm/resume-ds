@@ -134,6 +134,19 @@ h1 {
     padding-bottom: 10px;
 }
 
+.h2-gradient-inverse {
+    font-size: var(--h2-font-size);
+    font-weight: 600; /* semibold */
+    line-height: 1.1;
+    letter-spacing: -0.015em;
+    margin-bottom: 30px;
+    background: linear-gradient(var(--primaryText), white);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    padding-bottom: 10px;
+}
+
 .hero-subhead {
     font-size: var(--subhead-font-size);
     font-weight: 300;

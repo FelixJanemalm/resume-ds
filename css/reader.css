@@ -70,7 +70,7 @@
 
     .after-reader {
         animation: scale-up both ease-in;
-        animation-timeline: view(0vh 90vh);
+        animation-timeline: view(66vh 90vh);
         /*animation-timeline: view(200vh -180vh); */
         animation-range: enter;
         view-timeline: --after-reader block;
@@ -124,10 +124,11 @@
 
     .after-reader {
         width: calc(100vw - 40px);
+        translate: 0 calc(((var(--ppc) * var(--content-length) + (var(--pad) * var(--buffer))) * 1px) - (260px - (var(--text-container-height)/2)));
       }
     
       .spacer {
-        height: calc(40vw * 2);
+        height: calc(32.5vw * 2);
       }
 
     @keyframes scale-up {

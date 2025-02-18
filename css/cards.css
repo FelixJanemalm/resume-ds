@@ -1,10 +1,22 @@
 .card-wrapper {
     padding: 60px 0;
+
+
+
+
+    
     background: 
         linear-gradient(80deg, var(--bgStrong), var(--bg), var(--bgStrong)),
         linear-gradient(135deg, var(--bgStrong), var(--bg), var(--bgStrong)),
-        linear-gradient(195deg, var(--bgStrong), var(--bg), var(--bgStrong));
+        linear-gradient(195deg, var(--bgStrong), var(--bg), var(--bgStrong)); 
+
+        /* parralax styles 
+        transform: translateY(calc(var(--scroll) * -0.2));
+        will-change: transform;
+        z-index: 5;
+        position: relative; */
 }
+
 
 
 .background-video {
@@ -19,6 +31,10 @@
 
 .card-wrapper h2 {
     margin-bottom: 45px;
+    margin-left: auto;  /* Centers the element */
+    margin-right: auto;
+    width: calc(100% - var(--marginSides));
+    text-align: center
 }
 
 .card-wrapper .owl-stage {
