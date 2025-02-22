@@ -1,6 +1,7 @@
 document.addEventListener("DOMContentLoaded", function () {
     const header = document.querySelector("header");
     let lastScrollY = window.scrollY;
+    let timeoutId;
 
     function updateHeader() {
         const currentScrollY = window.scrollY;
@@ -26,7 +27,10 @@ document.addEventListener("DOMContentLoaded", function () {
         lastScrollY = currentScrollY;
     }
 
-    window.addEventListener("scroll", updateHeader);
+    window.addEventListener("scroll", function () {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(updateHeader, 100); // Update after a 100ms delay
+    });
     updateHeader(); // Run once on load
 });
 
