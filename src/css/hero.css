@@ -1,0 +1,431 @@
+.hero-wrapper {
+   /* min-height: 78vh; */
+    width: 100%;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+    min-height: calc(100vh - (128px + 56px - 2px));
+    position: relative;
+}
+
+.hero-bg {
+    background-color: var(--bg);
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: -2;
+}
+
+.hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 100%;
+    width: 100%;
+    max-width: 1300px;
+    padding-left: var(--marginSides);
+    padding-right: var(--marginSides);
+    padding-bottom: 80px;
+    vertical-align: middle;
+    min-height: calc(100vh - (128px + 56px - 2px));
+}
+
+.hero-subhead
+{
+    width: 80%;
+}   
+
+.hero-left {
+    flex: 2;
+    text-align: left;
+    z-index: 2;
+}
+
+.hero-right {
+    flex: 0.5;
+    margin-left: 20px;
+    margin-right: 20px;
+    display: flex;
+    justify-content: center;
+}
+
+
+/* Bg Animation */
+.container,
+.stage {
+	box-sizing: border-box;
+	min-width: 600px;
+	height: 100%;
+    width: 80%;
+}
+
+.container {
+	position: absolute;
+	top: 0;
+	right: 0;
+	perspective: 1500px;
+    z-index: 0;
+    filter: invert(var(--inversionRatio));
+    overflow: hidden;
+    height: 100%;
+    pointer-events: none;
+	
+	.stage {
+		position: absolute;
+        top: 0;
+        right: 0;
+		transform-style: preserve-3d;
+		transform-origin: 0;
+		transform: rotateX(0deg) rotateY(-10deg) rotateZ(-107deg) translate(-90%, 110%);
+		
+		.slice {
+			position: absolute;
+			height: 100vh;
+			transform-style: preserve-3d;
+			transform-origin: 0;
+			background-repeat: none;
+            top: 0;
+            right: 0;
+		}
+	}
+}
+/*
+.hue-filter {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--primary-color);
+    mix-blend-mode: hue;
+    pointer-events: none;
+    z-index: 1; 
+}
+*/
+
+
+.hue-rotate {
+    background: linear-gradient(var(--text), var(--button-color));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    padding-bottom: 20px;
+    filter: hue-rotate(30deg);
+  }
+
+
+/* Color Picker */
+.swatch {
+    width: 30px;
+    height: 30px;
+    border: none;
+    margin: 5px;
+}
+
+#color-indicator {
+    width: 100px;
+    height: 100px;
+    margin-bottom: 20px;
+}
+
+#hue-canvas {
+    margin-bottom: 10px;
+}
+
+.cursor {
+    position: absolute;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    width: 18px;
+    height: 18px;
+}
+
+#color-picker-container {
+    position: absolute; /* Change to relative, fixed, or absolute as needed */
+    top: calc(50%); /* Adjust as needed */
+    padding: 16px 24px;
+    align-self: center;
+    translate: -50% -50%;
+    text-align: left;
+}
+
+#color-picker-container p {
+    margin-top: 0px;
+    margin-bottom: 16px;
+}
+
+#hue-canvas {
+    border-radius: 8px;
+}
+
+#spectrum-canvas {
+    border-radius: 4px;
+}
+
+#hue-canvas-container {
+    position: relative;
+    height: 33px; /* Increased height for better cursor visibility */
+}
+
+#spectrum-canvas-container {
+    position: relative;
+}
+
+#hue-cursor {
+    top: 7px; /* Positioning the cursor above the hue slider */
+}
+
+.hitbox {
+    position: absolute;
+    background: transparent;
+}
+
+.hitbox:active {
+cursor: grabbing;
+}
+
+#hue-hitbox {
+    top: -10px;
+    left: -10px;
+    width: 235px; /* 215px canvas width + 20px extra for hitbox */
+    height: 32px; /* 12px canvas height + 20px extra for hitbox */
+}
+
+#spectrum-hitbox {
+    top: -10px;
+    left: -10px;
+    width: 235px; /* 215px canvas width + 20px extra for hitbox */
+    height: 146px; /* 126px canvas height + 20px extra for hitbox */
+}
+
+#grid {
+    transform: translatex(-30px);
+    z-index: 0;
+    height: 100%;
+    width: calc(100% + 90px);
+    position: absolute;
+    background: linear-gradient(90deg, var(--bgMedium-opacity) 1px, transparent 1px var(--size)) 50% 50% / var(--size) var(--size), linear-gradient(var(--bgMedium-opacity) 1px, transparent 1px var(--size)) 50% 50% / var(--size) var(--size);
+    mask: linear-gradient(-25deg, transparent 40%, white);
+    left: 0;
+    top: 0;
+    transform-style: flat;
+    pointer-events: all;
+}
+
+.hero-left,
+.hero-right,
+.hero-content {
+    pointer-events: none; /* Allows mouse events to pass through */
+}
+
+/* Re-enable pointer events for interactive elements inside */
+#color-picker-container,
+.primary-btn,
+.secondary-btn {
+    pointer-events: auto; /* Keep the color picker and buttons interactive */
+}
+
+/*
+#color-picker-arrow {
+    position: absolute;
+    top: 0;
+    left: -32px; 
+    transform: translateX(-50%) rotate(-90deg);
+    cursor: pointer;
+    animation: bounce-horizontal 1.5s infinite;
+    opacity: 0;
+    transition: opacity 0.6s ease-in-out;
+}
+
+#color-picker-arrow svg {
+    width: 30px;
+    height: 30px;
+    color: var(--text);
+}
+
+@keyframes bounce-horizontal {
+    0%, 100% {
+        transform: translateX(-50%) rotate(-62deg) translateY(0);
+        opacity: 0.8;
+    }
+    50% {
+        transform: translateX(-50%) rotate(-70deg) translateY(8px);
+        opacity: 0.2;
+    }
+}
+*/
+
+
+#scroll-down-arrow {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    cursor: pointer;
+    animation: bounce 1.5s infinite;
+    opacity: 0; /* Start fully hidden */
+    transition: opacity 0.6s ease-in-out; /* Smooth fade-in and fade-out */
+    text-decoration: none;
+    padding: 16px;
+}
+
+/* SVG Styling */
+#scroll-down-arrow svg {
+    width: 30px;
+    height: 30px;
+    color: var(--button-color);
+}
+
+#scroll-down-arrow svg:hover {
+    color: var(--text);
+}
+
+#scalability {
+    scroll-margin-top: 80px; /* Adjust based on header height */
+}
+
+.hero-wrapper dotlottie-player {
+    width: auto;
+    height: 110%;
+    position: absolute;
+    z-index: 0;
+    top:0;
+    right: 0;
+ }
+
+
+/* Subtle bounce animation */
+@keyframes bounce {
+    0%, 100% {
+        transform: translateX(-50%) translateY(0);
+    }
+    50% {
+        transform: translateX(-50%) translateY(8px);
+    }
+}
+
+
+/* Media query for big desktop (1920p and up) */
+@media (min-width: 1920px) {
+    .hero {
+        padding-left: 10vw;
+    }
+
+    .hero-left {
+        width: 100%;
+        flex: none;
+    }
+
+    #color-picker-container {
+        left: 70%; /* Adjust as needed */
+    }
+
+    .primary-btn {
+        transform: scale(1.3);
+        transform-origin: left top;
+    }
+
+}
+
+@media (min-width: 2250px) {
+    #color-picker-container {
+        left: 60%; /* Adjust as needed */
+    }
+}
+
+/* Media query for Desktop (1440p to 1900) */
+@media (max-width: 1919px) and (min-width: 1440px) {
+    #color-picker-container {
+        left: 69%; /* Adjust as needed */
+    }
+    .hero-left {
+        max-width: 780px;
+    }
+}
+
+/* Media query for tablets (768px to 1439px) */
+@media (max-width: 1439px) and (min-width: 768px) {
+    #color-picker-container {
+        left: 72%; /* Adjust as needed */
+    }
+    .hero-left {
+        max-width: 700px;
+    }
+}
+
+/* Media query for tablets (768px to 1439px) */
+@media (max-width: 1150px) and (min-width: 768px) {
+    #color-picker-container {
+        left: 82%; /* Adjust as needed */
+    }
+}
+
+/* Media query for mobile devices (up to 767px) */
+@media (max-width: 767px) {
+    .hero {
+        flex-direction: column;
+    }
+    .hero-subhead
+    {
+        width: 100%;
+    }   
+    #color-picker-container {
+        position: relative;
+        width: fit-content;
+        translate: 0 0;
+        margin-bottom: 40px;
+    }
+    
+}
+
+
+@media (max-width: 1400px) {
+    .hero-wrapper dotlottie-player {
+        width: 58%;
+        height: auto;
+    } 
+}
+
+@media (max-width: 1200px) {
+    .hero-wrapper dotlottie-player {
+        width: 70%;
+        height: auto;
+        min-width: 630px;
+        height: auto;
+        top: calc(100% - 630px);
+        right: 0;
+        transform: scaley(-1);
+    } 
+}
+
+@media (max-width: 1000px) {
+
+    .hero-wrapper dotlottie-player {
+        width: 400px;
+        top: calc(100% - 400px);
+    } 
+    .hero-subhead {
+        max-width: 400px;
+    }
+}
+
+
+@media (max-width: 756px) {
+
+    .hero-wrapper dotlottie-player {
+        width: 120%;
+        min-width: 630px;
+        height: auto;
+        top: calc(100% - 630px);
+        left: 0;
+        transform: scale(-1);
+    } 
+    .hero-subhead {
+        color: white;
+        max-width: 400px;
+    }
+}

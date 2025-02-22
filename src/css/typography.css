@@ -1,0 +1,203 @@
+@font-face {
+    font-family: 'RNSPhysis';
+    src: url('../fonts/woff2/RNSPhysis-Black.woff2') format('woff2'),
+         url('../fonts/woff/RNSPhysis-Black.woff') format('woff'),
+         url('../fonts/eot/RNSPhysis-Black.eot') format('eot');
+    font-weight: 900;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'RNSPhysis';
+    src: url('../fonts/woff2/RNSPhysis-Bold.woff2') format('woff2'),
+         url('../fonts/woff/RNSPhysis-Bold.woff') format('woff'),
+         url('../fonts/eot/RNSPhysis-Bold.eot') format('eot');
+    font-weight: 700;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'RNSPhysis';
+    src: url('../fonts/woff2/RNSPhysis-Light.woff2') format('woff2'),
+         url('../fonts/woff/RNSPhysis-Light.woff') format('woff'),
+         url('../fonts/eot/RNSPhysis-Light.eot') format('eot');
+    font-weight: 300;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'RNSPhysis';
+    src: url('../fonts/woff2/RNSPhysis-Medium.woff2') format('woff2'),
+         url('../fonts/woff/RNSPhysis-Medium.woff') format('woff'),
+         url('../fonts/eot/RNSPhysis-Medium.eot') format('eot');
+    font-weight: 500;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'RNSPhysis';
+    src: url('../fonts/woff2/RNSPhysis-Thin.woff2') format('woff2'),
+         url('../fonts/woff/RNSPhysis-Thin.woff') format('woff'),
+         url('../fonts/eot/RNSPhysis-Thin.eot') format('eot');
+    font-weight: 100;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'RNSPhysis';
+    src: url('../fonts/woff2/RNSPhysis-BlackItalic.woff2') format('woff2'),
+         url('../fonts/woff/RNSPhysis-BlackItalic.woff') format('woff'),
+         url('../fonts/eot/RNSPhysis-BlackItalic.eot') format('eot');
+    font-weight: 900;
+    font-style: italic;
+}
+
+@font-face {
+    font-family: 'RNSPhysis';
+    src: url('../fonts/woff2/RNSPhysis-BoldItalic.woff2') format('woff2'),
+         url('../fonts/woff/RNSPhysis-BoldItalic.woff') format('woff'),
+         url('../fonts/eot/RNSPhysis-BoldItalic.eot') format('eot');
+    font-weight: 700;
+    font-style: italic;
+}
+
+@font-face {
+    font-family: 'RNSPhysis';
+    src: url('../fonts/woff2/RNSPhysis-LightItalic.woff2') format('woff2'),
+         url('../fonts/woff/RNSPhysis-LightItalic.woff') format('woff'),
+         url('../fonts/eot/RNSPhysis-LightItalic.eot') format('eot');
+    font-weight: 300;
+    font-style: italic;
+}
+
+@font-face {
+    font-family: 'RNSPhysis';
+    src: url('../fonts/woff2/RNSPhysis-MediumItalic.woff2') format('woff2'),
+         url('../fonts/woff/RNSPhysis-MediumItalic.woff') format('woff'),
+         url('../fonts/eot/RNSPhysis-MediumItalic.eot') format('eot');
+    font-weight: 500;
+    font-style: italic;
+}
+
+@font-face {
+    font-family: 'RNSPhysis';
+    src: url('../fonts/woff2/RNSPhysis-ThinItalic.woff2') format('woff2'),
+         url('../fonts/woff/RNSPhysis-ThinItalic.woff') format('woff'),
+         url('../fonts/eot/RNSPhysis-ThinItalic.eot') format('eot');
+    font-weight: 100;
+    font-style: italic;
+}
+
+:root {
+    --base: calc(1em * 1); /* Base font size */
+    --h1-font-size: calc(var(--base) * 5.5); /* h1 font size based on base */
+    --subhead-font-size: calc(var(--base) * 1.4); /* Subhead font size based on base */
+    --body-font-size: calc(var(--base) * 1.2); /* Body font size based on base */
+    --cta-font-size: calc(var(--base) * 1.2); 
+    --h2-font-size: calc(var(--h1-font-size) * .5); /* h2 font size based on h1 */
+    --h3-font-size: calc(var(--h2-font-size) * .5); /* h3 font size based on h2 */
+    --h4-font-size: calc(var(--h3-font-size) * .5); /* h4 font size based on h3 */
+    --h5-font-size: calc(var(--h4-font-size) * .5); /* h5 font size based on h4 */
+}
+
+p {
+    font-weight: 300;
+}
+
+body {
+    font-family: 'RNSPhysis', Helvetica, Arial, sans-serif;
+}
+
+h1 {
+    font-size: var(--h1-font-size);
+    font-weight: 600; /* semibold */
+    line-height: 1.1;
+    letter-spacing: -0.015em;
+    margin-bottom: 30px;
+    background: linear-gradient(var(--button-color), var(--text));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    padding-bottom: 10px;
+}
+
+.h2-gradient {
+    font-size: var(--h2-font-size);
+    font-weight: 600; /* semibold */
+    line-height: 1.1;
+    letter-spacing: -0.015em;
+    margin-bottom: 30px;
+    background: linear-gradient(var(--button-color), var(--text));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    padding-bottom: 10px;
+}
+
+.h2-gradient-inverse {
+    font-size: var(--h2-font-size);
+    font-weight: 600; /* semibold */
+    line-height: 1.1;
+    letter-spacing: -0.015em;
+    margin-bottom: 30px;
+    background: linear-gradient(var(--primaryText), white);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    padding-bottom: 10px;
+}
+
+.hero-subhead {
+    font-size: var(--subhead-font-size);
+    font-weight: 300;
+}
+
+.hero-cta {
+    font-weight: 500;
+    font-size: var( --cta-font-size);
+    margin-top: 20px;
+}
+
+#color-picker-container p {
+    font-size: 24px;
+    font-weight: 300;
+}
+
+footer {
+    font-size: 18px;
+    font-weight: 400;
+}
+
+/* Media query for desktop (1440p and up) */
+@media (min-width: 1920px) {
+    :root {
+        --base: calc(1em * 1.4);
+    }
+}
+
+/* Media query for Desktop (1440p to 1900) */
+@media (max-width: 1919px) and (min-width: 1440px) {
+    :root {
+        --base: calc(1em * 1);
+    }
+}
+
+/* Media query for tablets (768px to 1439px) */
+@media (max-width: 1439px) and (min-width: 768px) {
+    :root {
+        --base: calc(1em * .9);
+    }
+}
+
+/* Media query for mobile devices (up to 767px) */
+@media (max-width: 767px) {
+    :root {
+        --base: calc(1em * .75);
+    }
+}
+
+@media (max-width: 567px) {
+    h1 {
+        font-size: calc(var(--h1-font-size) * 0.75);
+    }
+}

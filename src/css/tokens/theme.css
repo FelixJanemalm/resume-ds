@@ -1,0 +1,420 @@
+/* Sentiment based tokens used for theming usage-colors */
+
+
+:root {
+    --primary-color: hsl(200, 100%, 50%);
+    --sysPrimaryStrong: #95cce3;
+    --sysPrimaryDefault: #4faad1;
+    --sysPrimarySubtle: #0073a5;
+    --sysPrimaryTint: #004461;
+    --primaryBg: red;
+    --link-color:#4faad1;
+
+    /* Grayscale */   
+    --sysNeutral7: var(--refYdsColorNeutral900);
+    --sysNeutral6: var(--refYdsColorNeutral800);
+    --sysNeutral5: var(--refYdsColorNeutral700);
+    --sysNeutral4: var(--refYdsColorNeutral600);
+    --sysNeutral3: var(--refYdsColorNeutral300);
+    --sysNeutral2: var(--refYdsColorNeutral100);
+    --sysNeutral1: var(--refYdsColorNeutral50);
+    --sysNeutral0: var(--refYdsColorNeutralWhite);
+
+}
+
+.default-light {
+
+    --header-scrolled: rgba(0, 0, 0, 0.1);
+    --header: rgba(50, 50, 50, 0.7);
+    --header-hover: rgba(0, 0, 0, 0.7);
+    --nav-a-hover: var(--sysPrimaryDefault);
+    --glass: rgba(255, 255, 255, 0.33);
+    --text-glass: rgba(16, 16, 16, 1);
+
+    /* Grayscale */   
+    --sysNeutral7: var(--refYdsColorNeutral900);
+    --sysNeutral6: var(--refYdsColorNeutral800);
+    --sysNeutral5: var(--refYdsColorNeutral700);
+    --sysNeutral4: var(--refYdsColorNeutral600);
+    --sysNeutral3: var(--refYdsColorNeutral300);
+    --sysNeutral2: var(--refYdsColorNeutral100);
+    --sysNeutral1: var(--refYdsColorNeutral50);
+
+    /* functional colors */    
+    --sysWarningDefault: var(--refYdsColorYellow700);
+    --sysWarningSubtle: var(--refYdsColorYellow300); 
+    --sysDangerDefault: var(--refYdsColorYBookYubired);
+    --sysDangerSubtle: var(--refYdsColorRed300); 
+    --sysInfoDefault: var(--refYdsColorBlue800);
+    --sysInfoSubtle: var(--refYdsColorBlue200); 
+    --sysSuccessDefault: var(--refYdsColorLime750);
+    --sysSuccessSubtle: var(--refYdsColorLime300); 
+
+    /* Usage colors */
+
+        /* icon */ 
+        --iconInverse: var(--sysNeutral0);
+        --onprimaryIcon: var(--sysNeutral0);
+        --iconDisabled: var(--sysNeutral3);
+        --iconStrongPressed: var(--sysNeutral7);
+        --iconStrongHover: var(--sysNeutral5);
+        --iconPressed: var(--sysNeutral5);
+        --iconHover: var(--sysNeutral3);
+        --successIcon: var(--sysSuccessDefault);
+        --infoIcon: var(--sysInfoDefault);
+        --dangerIcon: var(--sysDangerDefault);
+        --warningIcon: var(--sysWarningDefault);
+        --secondaryOnContrastIcon: var(--sysSecondarySubtle);
+        --secondaryIcon: var(--sysSecondaryDefault);
+        --primaryOnContrastIcon: var(--sysPrimarySubtle);
+        --primaryIcon: var(--sysPrimaryMedium);
+        --iconStrong: var(--sysNeutral6);
+        --icon: var(--sysNeutral4);
+
+        /* border */ 
+        --borderFocus: var(--sysPrimaryDefault);
+        --warningBorder: var(--sysWarningDefault);
+        --dangerBorder: var(--sysDangerDefault);
+        --secondaryBorderSubtle: var(--sysSecondarySubtle);
+        --secondaryBorder: var(--sysSecondaryDefault);
+        --primaryBorderSubtle: var(--sysPrimarySubtle);
+        --borderSubtle: var(--sysNeutral2);
+        --border: var(--sysNeutral3);
+
+        /* background */ 
+        --contrastBg: var(--sysNeutral7);
+        --warningBg: var(--sysWarningDefault);
+        --warningBgSubtle: var(--sysWarningSubtle);
+        --dangerBg: var(--sysDangerDefault);
+        --dangerBgSubtle: var(--sysDangerSubtle);
+        --secondaryBg: var(--sysSecondaryDefault);
+        --secondaryBgSubtle: var(--sysSecondarySubtle);
+        --secondaryBgTint: var(--sysSecondaryTint);
+        --primaryBg: var(--sysPrimaryDefault);
+        --primaryBgSubtle: var(--sysPrimarySubtle);
+        --primaryBgTint: var(--sysPrimaryStrong);
+        --bgDisabled: var(--sysNeutral2);
+        --bgStrong: var(--sysNeutral2);
+        --bgMedium: var(--sysNeutral1);
+        --bg: var(--sysNeutral0);
+
+        /* text */ 
+        --textInverse: white;
+        --OnsecondaryText: var(--sysNeutral0);
+        --OnprimaryText: var(--refYdsColorNeutralWhite);
+        --linkTextPressed: var(--sysInfoDefault); /* Intended to be generated programatically into roughly #004461 */
+        --successText: var(--sysSuccessDefault);
+        --linkText: var(--sysInfoDefault);
+        --warningText: var(--sysWarningDefault);
+        --dangerText: var(--sysDangerDefault);
+        --secondaryOnContrastText: var(--sysSecondarySubtle);
+        --secondaryText: var(--sysSecondaryStrong);
+        --primaryOnContrastText: var(--sysPrimarySubtle);
+        --primaryText: var(--link-color);
+        --btnTextDisabled: var(--sysNeutral4);
+        --textDisabled: var(--sysNeutral3);
+        --textStrong: var(--sysNeutral7);
+        --textSubtle: var(--sysNeutral5);
+        --text: var(--sysNeutral6);
+
+        --inversionRatio: 1;
+
+    }
+
+.default-dark {
+
+    --header-scrolled: rgba(255, 255, 255, 0.1);
+    --header: rgba(255, 255, 255, 0.8);
+    --header-hover: rgba(255, 255, 255, 1);
+    --nav-a-hover: var(--button-color);
+    --glass: rgba(100, 100, 100, 0.15);
+    --text-glass: white;
+
+    /* Grayscale */
+    --sysNeutral7: var(--refYdsColorNeutralWhite);
+    --sysNeutral6: var(--refYdsColorNeutral50);
+    --sysNeutral5: var(--refYdsColorNeutral100);
+    --sysNeutral4: var(--refYdsColorNeutral500);
+    --sysNeutral3: var(--refYdsColorNeutral700);
+    --sysNeutral2: var(--refYdsColorNeutral800);
+    --sysNeutral1: var(--refYdsColorNeutral900);
+
+    /* Functional colors */
+    --sysWarningDefault: var(--refYdsColorYellow500);
+    --sysWarningSubtle: var(--refYdsColorYellow700); 
+    --sysDangerDefault: var(--refYdsColorRed600);
+    --sysDangerSubtle: var(--refYdsColorRed800); 
+    --sysInfoDefault: var(--refYdsColorBlue600);
+    --sysInfoSubtle: var(--refYdsColorBlue800); 
+    --sysSuccessDefault: var(--refYdsColorLime300);
+    --sysSuccessSubtle: var(--refYdsColorLime800); 
+
+    /* Usage colors */
+
+        /* icon */ 
+        --iconInverse: var(--sysNeutral0);
+        --onprimaryIcon: var(--sysNeutral0);
+        --iconDisabled: var(--sysNeutral3);
+        --iconStrongPressed: var(--sysNeutral7);
+        --iconStrongHover: var(--sysNeutral5);
+        --iconPressed: var(--sysNeutral5);
+        --iconHover: var(--sysNeutral3);
+        --successIcon: var(--sysSuccessDefault);
+        --infoIcon: var(--sysInfoDefault);
+        --dangerIcon: var(--sysDangerDefault);
+        --warningIcon: var(--sysWarningDefault);
+        --secondaryOnContrastIcon: var(--sysSecondarySubtle);
+        --secondaryIcon: var(--sysSecondaryDefault);
+        --primaryOnContrastIcon: var(--sysPrimarySubtle);
+        --primaryIcon: var(--sysPrimaryMedium);
+        --iconStrong: var(--sysNeutral6);
+        --icon: var(--sysNeutral4);
+
+        /* border */ 
+        --borderFocus: var(--sysPrimaryDefault);
+        --warningBorder: var(--sysWarningDefault);
+        --dangerBorder: var(--sysDangerDefault);
+        --secondaryBorderSubtle: var(--sysSecondarySubtle);
+        --secondaryBorder: var(--sysSecondaryDefault);
+        --primaryBorderSubtle: var(--sysPrimarySubtle);
+        --borderSubtle: var(--sysNeutral2);
+        --border: var(--sysNeutral3);
+
+        /* background */ 
+        --contrastBg: var(--sysNeutral7);
+        --warningBg: var(--sysWarningDefault);
+        --warningBgSubtle: var(--sysWarningSubtle);
+        --dangerBg: var(--sysDangerDefault);
+        --dangerBgSubtle: var(--sysDangerSubtle);
+        --secondaryBg: var(--sysSecondaryDefault);
+        --secondaryBgSubtle: var(--sysSecondarySubtle);
+        --secondaryBgTint: var(--sysSecondaryTint);
+        --primaryBg: var(--sysPrimaryDefault);
+        --primaryBgSubtle: var(--sysPrimarySubtle);
+        --primaryBgTint: var(--sysPrimaryStrong);
+        --bgDisabled: var(--sysNeutral2);
+        --bgStrong: var(--sysNeutral2);
+        --bgMedium: var(--sysNeutral1);
+        --bg: var(--sysNeutral0);
+
+        /* text */ 
+        --textInverse: black;
+        --OnsecondaryText: var(--sysNeutral0);
+        --OnprimaryText: var(--sysPrimaryStrong);
+        --linkTextPressed: var(--sysInfoDefault); /* Intended to be generated programatically into roughly #004461 */
+        --successText: var(--sysSuccessDefault);
+        --linkText: var(--sysInfoDefault);
+        --warningText: var(--sysWarningDefault);
+        --dangerText: var(--sysDangerDefault);
+        --secondaryOnContrastText: var(--sysSecondarySubtle);
+        --secondaryText: var(--sysSecondaryStrong);
+        --primaryOnContrastText: var(--sysPrimarySubtle);
+        --primaryText: var(--link-color);
+        --btnTextDisabled: var(--sysNeutral4);
+        --textDisabled: var(--sysNeutral3);
+        --textStrong: var(--sysNeutral7);
+        --textSubtle: var(--sysNeutral5);
+        --text: var(--sysNeutral6);
+
+        --inversionRatio: 0;
+        --bgGlass: var(rgba(--sysNeutral0, .9));
+    
+    }
+    
+.default-light-colorblind {
+
+    --header-scrolled: rgba(0, 0, 0, 0.1);
+    --header: rgba(50, 50, 50, 0.7);
+    --header-hover: rgba(0, 0, 0, 0.7);
+    --nav-a-hover: var(--sysPrimaryDefault);
+    --glass: rgba(255, 255, 255, 0.33);
+    --text-glass: rgba(16, 16, 16, 1);
+    
+    /* Grayscale */
+    --sysNeutral7: var(--refYdsColorNeutral900);
+    --sysNeutral6: var(--refYdsColorNeutral800);
+    --sysNeutral5: var(--refYdsColorNeutral700);
+    --sysNeutral4: var(--refYdsColorNeutral600);
+    --sysNeutral3: var(--refYdsColorNeutral300);
+    --sysNeutral2: var(--refYdsColorNeutral100);
+    --sysNeutral1: var(--refYdsColorNeutral50);
+    
+    /* Functional colors */
+    --sysWarningDefault: var(--refMuiColorAmber700);
+    --sysWarningSubtle: var(--refMuiColorAmber300); 
+    --sysDangerDefault: var(--refYdsColorOrange800);
+    --sysDangerSubtle: var(--refYdsColorOrange300); 
+    --sysInfoDefault: var(--refYdsColorBlue800);
+    --sysInfoSubtle: var(--refYdsColorBlue200); 
+    --sysSuccessDefault: var(--refMuiColorCyan800);
+    --sysSuccessSubtle: var(--refMuiColorCyan300); 
+
+    /* Usage colors */
+
+        /* icon */ 
+        --iconInverse: var(--sysNeutral0);
+        --onprimaryIcon: var(--sysNeutral0);
+        --iconDisabled: var(--sysNeutral3);
+        --iconStrongPressed: var(--sysNeutral7);
+        --iconStrongHover: var(--sysNeutral5);
+        --iconPressed: var(--sysNeutral5);
+        --iconHover: var(--sysNeutral3);
+        --successIcon: var(--sysSuccessDefault);
+        --infoIcon: var(--sysInfoDefault);
+        --dangerIcon: var(--sysDangerDefault);
+        --warningIcon: var(--sysWarningDefault);
+        --secondaryOnContrastIcon: var(--sysSecondarySubtle);
+        --secondaryIcon: var(--sysSecondaryDefault);
+        --primaryOnContrastIcon: var(--sysPrimarySubtle);
+        --primaryIcon: var(--sysPrimaryMedium);
+        --iconStrong: var(--sysNeutral6);
+        --icon: var(--sysNeutral4);
+
+        /* border */ 
+        --borderFocus: var(--sysPrimaryDefault);
+        --warningBorder: var(--sysWarningDefault);
+        --dangerBorder: var(--sysDangerDefault);
+        --secondaryBorderSubtle: var(--sysSecondarySubtle);
+        --secondaryBorder: var(--sysSecondaryDefault);
+        --primaryBorderSubtle: var(--sysPrimarySubtle);
+        --borderSubtle: var(--sysNeutral2);
+        --border: var(--sysNeutral3);
+
+        /* background */ 
+        --contrastBg: var(--sysNeutral7);
+        --warningBg: var(--sysWarningDefault);
+        --warningBgSubtle: var(--sysWarningSubtle);
+        --dangerBg: var(--sysDangerDefault);
+        --dangerBgSubtle: var(--sysDangerSubtle);
+        --secondaryBg: var(--sysSecondaryDefault);
+        --secondaryBgSubtle: var(--sysSecondarySubtle);
+        --secondaryBgTint: var(--sysSecondaryTint);
+        --primaryBg: var(--sysPrimaryDefault);
+        --primaryBgSubtle: var(--sysPrimarySubtle);
+        --primaryBgTint: var(--sysPrimaryStrong);
+        --bgDisabled: var(--sysNeutral2);
+        --bgStrong: var(--sysNeutral2);
+        --bgMedium: var(--sysNeutral1);
+        --bg: var(--sysNeutral0);
+
+        /* text */ 
+        --textInverse: white;
+        --OnsecondaryText: var(--sysNeutral0);
+        --OnprimaryText: var(--refYdsColorNeutralWhite);
+        --linkTextPressed: var(--sysInfoDefault); /* Intended to be generated programatically into roughly #004461 */
+        --successText: var(--sysSuccessDefault);
+        --linkText: var(--sysInfoDefault);
+        --warningText: var(--sysWarningDefault);
+        --dangerText: var(--sysDangerDefault);
+        --secondaryOnContrastText: var(--sysSecondarySubtle);
+        --secondaryText: var(--sysSecondaryStrong);
+        --primaryOnContrastText: var(--sysPrimarySubtle);
+        --primaryText: var(--link-color);
+        --btnTextDisabled: var(--sysNeutral4);
+        --textDisabled: var(--sysNeutral3);
+        --textStrong: var(--sysNeutral7);
+        --textSubtle: var(--sysNeutral5);
+        --text: var(--sysNeutral6);
+
+        --inversionRatio: 1;
+    
+    }
+
+.default-dark-colorblind {
+
+    --header-scrolled: rgba(255, 255, 255, 0.1);
+    --header: rgba(255, 255, 255, 0.7);
+    --header-hover: rgba(255, 255, 255, 0.9);
+    --nav-a-hover: var(--button-color);
+    --glass: rgba(100, 100, 100, 0.15);
+    --text-glass: white;
+    
+    /* Grayscale */
+    --sysNeutral7: var(--refYdsColorNeutralWhite);
+    --sysNeutral6: var(--refYdsColorNeutral50);
+    --sysNeutral5: var(--refYdsColorNeutral100);
+    --sysNeutral4: var(--refYdsColorNeutral500);
+    --sysNeutral3: var(--refYdsColorNeutral700);
+    --sysNeutral2: var(--refYdsColorNeutral800);
+    --sysNeutral1: var(--refYdsColorNeutral900);
+    
+    /* Functional colors */
+    --sysWarningDefault: var(--refMuiColorAmber300);
+    --sysWarningSubtle: var(--refMuiColorAmber700); 
+    --sysDangerDefault: var(--refYdsColorOrange600);
+    --sysDangerSubtle: var(--refYdsColorOrange800); 
+    --sysInfoDefault: var(--refYdsColorBlue600);
+    --sysInfoSubtle: var(--refYdsColorBlue800); 
+    --sysSuccessDefault: var(--refMuiColorCyan300);
+    --sysSuccessSubtle: var(--refMuiColorCyan800); 
+
+
+    /* Usage colors */
+
+        /* icon */ 
+        --iconInverse: var(--sysNeutral0);
+        --onprimaryIcon: var(--sysNeutral0);
+        --iconDisabled: var(--sysNeutral3);
+        --iconStrongPressed: var(--sysNeutral7);
+        --iconStrongHover: var(--sysNeutral5);
+        --iconPressed: var(--sysNeutral5);
+        --iconHover: var(--sysNeutral3);
+        --successIcon: var(--sysSuccessDefault);
+        --infoIcon: var(--sysInfoDefault);
+        --dangerIcon: var(--sysDangerDefault);
+        --warningIcon: var(--sysWarningDefault);
+        --secondaryOnContrastIcon: var(--sysSecondarySubtle);
+        --secondaryIcon: var(--sysSecondaryDefault);
+        --primaryOnContrastIcon: var(--sysPrimarySubtle);
+        --primaryIcon: var(--sysPrimaryMedium);
+        --iconStrong: var(--sysNeutral6);
+        --icon: var(--sysNeutral4);
+
+        /* border */ 
+        --borderFocus: var(--sysPrimaryDefault);
+        --warningBorder: var(--sysWarningDefault);
+        --dangerBorder: var(--sysDangerDefault);
+        --secondaryBorderSubtle: var(--sysSecondarySubtle);
+        --secondaryBorder: var(--sysSecondaryDefault);
+        --primaryBorderSubtle: var(--sysPrimarySubtle);
+        --borderSubtle: var(--sysNeutral2);
+        --border: var(--sysNeutral3);
+
+        /* background */ 
+        --contrastBg: var(--sysNeutral7);
+        --warningBg: var(--sysWarningDefault);
+        --warningBgSubtle: var(--sysWarningSubtle);
+        --dangerBg: var(--sysDangerDefault);
+        --dangerBgSubtle: var(--sysDangerSubtle);
+        --secondaryBg: var(--sysSecondaryDefault);
+        --secondaryBgSubtle: var(--sysSecondarySubtle);
+        --secondaryBgTint: var(--sysSecondaryTint);
+        --primaryBg: var(--sysPrimaryDefault);
+        --primaryBgSubtle: var(--sysPrimarySubtle);
+        --primaryBgTint: var(--sysPrimaryStrong);
+        --bgDisabled: var(--sysNeutral2);
+        --bgStrong: var(--sysNeutral2);
+        --bgMedium: var(--sysNeutral1);
+        --bg: var(--sysNeutral0);
+
+        /* text */ 
+        --textInverse: black;
+        --OnsecondaryText: var(--sysNeutral0);
+        --OnprimaryText: var(--sysPrimaryStrong);
+        --linkTextPressed: var(--sysInfoDefault); /* Intended to be generated programatically into roughly #004461 */
+        --successText: var(--sysSuccessDefault);
+        --linkText: var(--sysInfoDefault);
+        --warningText: var(--sysWarningDefault);
+        --dangerText: var(--sysDangerDefault);
+        --secondaryOnContrastText: var(--sysSecondarySubtle);
+        --secondaryText: var(--sysSecondaryStrong);
+        --primaryOnContrastText: var(--sysPrimarySubtle);
+        --primaryText: var(--link-color);
+        --btnTextDisabled: var(--sysNeutral4);
+        --textDisabled: var(--sysNeutral3);
+        --textStrong: var(--sysNeutral7);
+        --textSubtle: var(--sysNeutral5);
+        --text: var(--sysNeutral6);
+
+        --inversionRatio: 0;
+    }
