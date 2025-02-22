@@ -1,5 +1,18 @@
 {
+  "name": "resume_2024",
+  "version": "1.0.0",
   "dependencies": {
     "@lottiefiles/lottie-theming": "^2.0.1"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FelixJanemalm/resume-ds.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/FelixJanemalm/resume-ds/issues"
+  },
+  "description": ""
 }
