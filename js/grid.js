@@ -1,125 +1,125 @@
 document.addEventListener("DOMContentLoaded", function () {
-    const canvas = document.getElementById('grid');
-    const ctx = canvas.getContext('2d');
-  
-    function getGridColor() {
-        return getComputedStyle(document.documentElement).getPropertyValue('--gridOverlay').trim();
-    }
-  
-    let gridColor = getGridColor(); // Initial color
-  
-    function resizeCanvas() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        drawGrid();
-    }
-  
-    const gridSize = 56;
-  
-    function drawGrid() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = gridColor;
-      ctx.imageSmoothingEnabled = false;
-      
-      ctx.beginPath();
-  
-      for (let y = 0.5; y <= canvas.height; y += gridSize) {
-          ctx.moveTo(0, y);
-          ctx.lineTo(canvas.width, y);
-      }
-  
-      for (let x = 0.5; x <= canvas.width; x += gridSize) {
-          ctx.moveTo(x, 0);
-          ctx.lineTo(x, canvas.height);
-      }
-  
-      ctx.stroke();
-    }
-  
-    document.addEventListener("scroll", () => {
-        document.documentElement.style.setProperty("--scroll", window.scrollY + "px");
-    });
-  
-    // Detect mobile device
-    const isMobile = /Mobi|Android|iPhone|iPad|iPod/.test(navigator.userAgent);
+  const canvas = document.getElementById('grid');
+  const ctx = canvas.getContext('2d');
+
+  function getGridColor() {
+      return getComputedStyle(document.documentElement).getPropertyValue('--gridOverlay').trim();
+  }
+
+  let gridColor = getGridColor(); // Initial color
+
+  function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      drawGrid();
+  }
+
+  const gridSize = 56;
+
+  function drawGrid() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    if (!isMobile) {
-        const distortionStrength = 5.6;
-        const falloffFactor = 0.0025;
-  
-        function distortGrid(mouseX, mouseY) {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.beginPath();
-  
-            for (let y = 0; y <= canvas.height; y += gridSize) {
-                let startNewLine = true;
-                for (let x = 0; x <= canvas.width; x += gridSize) {
-                    const dx = mouseX - x;
-                    const dy = mouseY - y;
-                    const dist = Math.sqrt(dx * dx + dy * dy) + 0.0001;
-                    const falloff = Math.exp(-dist * falloffFactor);
-                    const offsetY = (dy / dist) * distortionStrength * falloff;
-  
-                    if (startNewLine) {
-                        ctx.moveTo(x, y + offsetY);
-                        startNewLine = false;
-                    } else {
-                        ctx.lineTo(x, y + offsetY);
-                    }
-                }
-            }
-  
-            for (let x = 0; x <= canvas.width; x += gridSize) {
-                let startNewLine = true;
-                for (let y = 0; y <= canvas.height; y += gridSize) {
-                    const dx = mouseX - x;
-                    const dy = mouseY - y;
-                    const dist = Math.sqrt(dx * dx + dy * dy) + 0.0001;
-                    const falloff = Math.exp(-dist * falloffFactor);
-                    const offsetX = (dx / dist) * distortionStrength * falloff;
-  
-                    if (startNewLine) {
-                        ctx.moveTo(x + offsetX, y);
-                        startNewLine = false;
-                    } else {
-                        ctx.lineTo(x + offsetX, y);
-                    }
-                }
-            }
-  
-            ctx.lineWidth = 1;
-            ctx.strokeStyle = gridColor;
-            ctx.stroke();
-        }
-  
-        canvas.addEventListener('mousemove', (event) => {
-            distortGrid(event.offsetX, event.offsetY);
-        });
-  
-        canvas.addEventListener('mouseout', drawGrid);
-    }
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = gridColor;
+    ctx.imageSmoothingEnabled = false;
     
-    function observeColorChanges() {
-        const observer = new MutationObserver(() => {
-            const newColor = getGridColor();
-            if (newColor !== gridColor) {
-                gridColor = newColor;
-                drawGrid(); // Redraw grid with new color
-            }
-        });
-  
-        observer.observe(document.documentElement, {
-            attributes: true,
-            attributeFilter: ['style'],
-        });
+    ctx.beginPath();
+
+    for (let y = 0.5; y <= canvas.height; y += gridSize) {
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
     }
-  
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas(); // Initial draw
-    observeColorChanges(); // Start observing changes to the CSS variable
+
+    for (let x = 0.5; x <= canvas.width; x += gridSize) {
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+    }
+
+    ctx.stroke();
+  }
+
+  document.addEventListener("scroll", () => {
+      document.documentElement.style.setProperty("--scroll", window.scrollY + "px");
   });
+
+  // Detect mobile device
+  const isMobile = /Mobi|Android|iPhone|iPad|iPod/.test(navigator.userAgent);
+  
+  if (!isMobile) {
+      const distortionStrength = 5.6;
+      const falloffFactor = 0.0025;
+
+      function distortGrid(mouseX, mouseY) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.beginPath();
+
+          for (let y = 0; y <= canvas.height; y += gridSize) {
+              let startNewLine = true;
+              for (let x = 0; x <= canvas.width; x += gridSize) {
+                  const dx = mouseX - x;
+                  const dy = mouseY - y;
+                  const dist = Math.sqrt(dx * dx + dy * dy) + 0.0001;
+                  const falloff = Math.exp(-dist * falloffFactor);
+                  const offsetY = (dy / dist) * distortionStrength * falloff;
+
+                  if (startNewLine) {
+                      ctx.moveTo(x, y + offsetY);
+                      startNewLine = false;
+                  } else {
+                      ctx.lineTo(x, y + offsetY);
+                  }
+              }
+          }
+
+          for (let x = 0; x <= canvas.width; x += gridSize) {
+              let startNewLine = true;
+              for (let y = 0; y <= canvas.height; y += gridSize) {
+                  const dx = mouseX - x;
+                  const dy = mouseY - y;
+                  const dist = Math.sqrt(dx * dx + dy * dy) + 0.0001;
+                  const falloff = Math.exp(-dist * falloffFactor);
+                  const offsetX = (dx / dist) * distortionStrength * falloff;
+
+                  if (startNewLine) {
+                      ctx.moveTo(x + offsetX, y);
+                      startNewLine = false;
+                  } else {
+                      ctx.lineTo(x + offsetX, y);
+                  }
+              }
+          }
+
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = gridColor;
+          ctx.stroke();
+      }
+
+      canvas.addEventListener('mousemove', (event) => {
+          distortGrid(event.offsetX, event.offsetY);
+      });
+
+      canvas.addEventListener('mouseout', drawGrid);
+  }
+  
+  function observeColorChanges() {
+      const observer = new MutationObserver(() => {
+          const newColor = getGridColor();
+          if (newColor !== gridColor) {
+              gridColor = newColor;
+              drawGrid(); // Redraw grid with new color
+          }
+      });
+
+      observer.observe(document.documentElement, {
+          attributes: true,
+          attributeFilter: ['style'],
+      });
+  }
+
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas(); // Initial draw
+  observeColorChanges(); // Start observing changes to the CSS variable
+});
 
 
 /*
