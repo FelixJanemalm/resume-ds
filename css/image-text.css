@@ -53,6 +53,18 @@ p {
     line-height: 1.6;
 }
 
+@media (min-width: 768px) and (max-width: 1023px) {
+    .image-text{
+        padding-left: 75px;
+        padding-right: 75px;
+        gap: 50px;
+        padding-bottom: 30px;
+    }
+    .image-text:nth-of-type(5n) {
+        padding-bottom: 120px;
+    }
+}
+
 @media (max-width: 768px) {
     .image-text {
         flex-direction: column!important;
