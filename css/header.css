@@ -105,26 +105,25 @@ a {
     transition: color 0.3s;
 }
 
-.nav-links a:hover {
-    color: var(--nav-a-hover);
+nav a:hover {
+    color: var(--nav-a-hover)!important;
 }
 
 .logo {
     font-size: 1.25rem;
-    font-weight: bold;
-    text-decoration: none;
+    padding-bottom: 4px;
 }
 
-.short-logo {
-    display: none; /* Hide 'F' by default */
+.short-logo svg {
+    height: 24px;
+    width: 24px;
+    margin-right: 4px;
+    transform: translateY(4.5px);
 }
 
 @media (max-width: 565px) {
     .full-logo {
         display: none; /* Hide full name on small screens */
-    }
-    .short-logo {
-        display: inline; /* Show 'F' on small screens */
     }
 }
 
