@@ -1,21 +1,20 @@
 document.addEventListener("DOMContentLoaded", function () {
     const header = document.querySelector("header");
     let lastScrollY = window.scrollY;
-    let timeoutId;
 
     function updateHeader() {
         const currentScrollY = window.scrollY;
 
-        if (currentScrollY === 0) {
-            // At the very top of the page
+        if (currentScrollY <= 10) {
+            // Only at the very top or within 10px
             header.classList.add("at-top");
             header.classList.remove("not-at-top", "scrolled");
         } else {
-            // Not at the top
+            // After scrolling at least 10px
             header.classList.add("not-at-top");
             header.classList.remove("at-top");
 
-            if (currentScrollY > lastScrollY && currentScrollY > 10) {
+            if (currentScrollY > lastScrollY) {
                 // Scrolling Down
                 header.classList.add("scrolled");
             } else {
@@ -27,12 +26,11 @@ document.addEventListener("DOMContentLoaded", function () {
         lastScrollY = currentScrollY;
     }
 
-    window.addEventListener("scroll", function () {
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(updateHeader, 100); // Update after a 100ms delay
-    });
+    window.addEventListener("scroll", updateHeader);
     updateHeader(); // Run once on load
 });
+
+
 
 
 document.addEventListener("DOMContentLoaded", function () {

@@ -27,6 +27,20 @@ header.not-at-top {
 }
 }
 
+/* FIX: Prevent flickering when stopping at the threshold */
+body:has(header.at-top) {
+    padding-top: 0px; /* Avoid shifting content */
+}
+
+body:has(header.not-at-top) {
+    padding-top: 22px; /* Ensures a smooth transition */
+}
+
+body:has(header.at-top),
+body:has(header.not-at-top) {
+    transition: padding-top 0s !important; /* Instant padding change */
+}
+
 header {
     margin: 0 auto;
     overflow: hidden;
