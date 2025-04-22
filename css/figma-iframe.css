@@ -1,0 +1,46 @@
+
+:root {
+    --aspect-ratio: 0.562;
+    --banner-cut-off: 50px;
+  }
+  
+  .figma-frame-wrapper {
+    width: 100%;            
+    aspect-ratio: calc(1 / var(--aspect-ratio));
+    overflow: hidden;
+    border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+    position: relative;
+  }
+  
+  .figma-frame {
+    width: 100%;
+    height: calc(100% + var(--banner-cut-off));
+    border: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+
+  .image-text:has(.figma-frame-wrapper) {
+    margin-bottom: 100px;
+  }
+
+
+  #work {
+    padding-bottom: 45px;
+}
+
+@media (min-width: 1400px) {
+
+    #work {
+        padding-bottom: 80px;
+    }
+}
+
+@media (min-width: 1830px) {
+
+    #work {
+        padding-bottom: 100px;
+    }
+}

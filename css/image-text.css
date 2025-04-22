@@ -1,9 +1,4 @@
 
-section .image img {
-    max-width: 100%;
-    height: auto;
-}
-
 section .text {
     max-width: 500px;
 }
@@ -37,10 +32,10 @@ section .text, section .image {
     padding: 0px!important;
 }
 
-.image-text:nth-of-type(2n) {
-    flex-direction: row-reverse;
-    padding-right: 120px;
-    padding-left: 120px;
+.image-text:not(:has(.figma-frame-wrapper)):nth-of-type(2n) {
+  flex-direction: row-reverse;
+  padding-right: 120px;
+  padding-left: 120px;
 }
 
 h2 {
@@ -68,7 +63,7 @@ p {
 @media (max-width: 768px) {
     .image-text {
         flex-direction: column!important;
-        gap: 0;
+        gap: 20px;
         padding-bottom: 120px;
     }
 
@@ -77,6 +72,7 @@ p {
         min-width: 75vw;
     }
     
+    /*
     .image-text:nth-of-type(1n) .image {
         margin-bottom: -75px;
     }
@@ -91,5 +87,5 @@ p {
 
     .image-text:nth-of-type(5n) {
         margin-top: -45px;
-    }
+    } */
 }
