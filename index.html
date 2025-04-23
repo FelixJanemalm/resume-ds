@@ -21,8 +21,10 @@
     <link rel="stylesheet" href="css/cards.css">
     <link rel="stylesheet" href="css/reader.css">
     <link rel="stylesheet" href="css/image-text.css">
+    <link rel="stylesheet" href="css/slideshow.css">
     <link rel="stylesheet" href="css/footer.css">
     <link rel="stylesheet" href="css/figma-iframe.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap">
     <script src="https://unpkg.com/@dotlottie/player-component@2.7.12/dist/dotlottie-player.mjs" type="module"></script>
 </head>
 <body>
@@ -214,18 +216,21 @@
           </div>
     </section>
 
-    <section class="reader2" id="read2">
+    <div class="spacer"></div>
+
+    <section class="reader2" id="read2" style="margin-top: calc(-8vh + -5vw);">
         <div class="content2">
           <div data-split aria-hidden="true">
-            Every designer should think of every design as their own, and it should still be consistent.
+            Designers should consider every design their own, and it should still be consistent.
           </div>
         </div>
     </section>
     
-    <div class="spacer"></div>
 
-    <h2 class="h2-gradient" id="work" style="padding-top: 90px; margin: 10px;">Work</h2>
+    <h2 class="h2-gradient" id="work" style="margin: 10px; margin-top: calc(-8vh + -5vw);">Work</h2>
 
+
+    <!--
     <section class="image-text">
         <div class="image">
             <div class="figma-frame-wrapper">
@@ -233,6 +238,7 @@
                   class="figma-frame"
                   src="https://embed.figma.com/deck/4FojaIUyd5mnNANQX2HSzn/A-design-system-is-born?node-id=1-57&viewport=-4221%2C-64%2C0.63&scaling=min-zoom&content-scaling=fixed&page-id=0%3A1&embed-host=share"
                   allowfullscreen
+                  loading="lazy"
                 ></iframe>
             </div>
         </div>
@@ -251,6 +257,7 @@
                   class="figma-frame"
                   src="https://embed.figma.com/deck/8S3lGNxOqd5ODFs6zCZLNR/Design-Tokens-as-a-Shared-Language?node-id=1-66&viewport=-136%2C-1126%2C0.63&scaling=min-zoom&content-scaling=fixed&page-id=0%3A1&embed-host=share"
                   allowfullscreen
+                  loading="lazy"
                 ></iframe>
             </div>
         </div>
@@ -260,20 +267,206 @@
                 It wasn't just about tokens—it was about trust. Design systems succeed when they're easy to use, hard to break, and built with empathy.
             </p>
         </div>
-    </section>
+    </section> 
 
-    <section class="image-text">
-        <div class="image">
-            <div class="figma-frame-wrapper">
-                <img src="images/case-study-coming-soon.png" alt="Dashboard">
+    -->
+
+
+   <!-- #### New stuffe #### -->
+
+
+<!-- Design System -->
+<section class="image-text">
+    <div class="image">
+        <div class="slider-container slider-design-system">
+            <!-- Fullscreen controls -->
+            <button class="slider-fullscreen-btn" aria-label="Enter fullscreen">
+                <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
+                    <path fill="currentColor" fill-rule="evenodd" d="m17 7.707-3.146 3.147a.5.5 0 0 1-.708-.708L16.293 7H13.5a.5.5 0 0 1 0-1h4a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-1 0zm-6.854 5.44a.5.5 0 0 1 .708.707L7.707 17H10.5a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5v-4a.5.5 0 0 1 1 0v2.793z" clip-rule="evenodd"></path>
+                </svg>
+            </button>
+            
+            <button class="slider-exit-fullscreen-btn" aria-label="Exit fullscreen">
+                <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
+                    <path fill="currentColor" fill-rule="evenodd" d="M17.146 6.146a.5.5 0 0 1 .708.708L14.707 10H17.5a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5v-4a.5.5 0 0 1 1 0v2.793zM6.854 17.854a.5.5 0 0 1-.708-.708L9.293 14H6.5a.5.5 0 0 1 0-1h4a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-1 0v-2.793z" clip-rule="evenodd"></path>
+                </svg>
+            </button>
+            
+            <!-- Slides -->
+            <div class="slider-slides">
+                <!-- New Case Study Slide 1 -->
+                <div class="slider-slide slider-mint active" data-index="0">
+                    <div class="slider-content">
+                        <h2 class="slider-title" style="color: black!important;">A DESIGN SYSTEM IS BORN</h2>
+                        <h2 class="slider-subtitle">UNIFYING THE COMPANY</h2>
+                    </div>
+                </div>
+
+                <!-- New Case Study Slide 2 -->
+                <div class="slider-slide" data-index="1">
+                    <div class="figma-frame-wrapper">
+                        <img style="object-fit: cover; object-position: left center;" src="images/slides/ds-01.png" alt="Dashboard">
+                    </div>
+                </div>
+
+                <!-- New Case Study Slide 3 -->
+                <div class="slider-slide" data-index="2">
+                    <div class="figma-frame-wrapper">
+                        <img style="object-fit: cover; object-position: left center;" src="images/slides/ds-02.png" alt="Dashboard">
+                    </div>
+                </div>
+
+                <!-- New Case Study Slide 4 -->
+                <div class="slider-slide" data-index="3">
+                    <div class="figma-frame-wrapper">
+                        <img style="object-fit: cover; object-position: left center;" src="images/slides/ds-03.png" alt="Dashboard">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Navigation controls -->
+            <div class="slider-controls-wrapper">
+                <div class="slider-controls">
+                    <button class="slider-btn slider-prev-btn" disabled aria-label="Previous slide">
+                        <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
+                            <path fill="currentColor" fill-rule="evenodd" d="M13.854 7.146a.5.5 0 0 1 0 .708L9.707 12l4.147 4.146a.5.5 0 0 1-.708.708l-4.5-4.5a.5.5 0 0 1 0-.708l4.5-4.5a.5.5 0 0 1 .708 0" clip-rule="evenodd"></path>
+                        </svg>
+                    </button>
+                    
+                    <div class="slider-counter">1 / 4</div>
+                    
+                    <button class="slider-btn slider-next-btn" aria-label="Next slide">
+                        <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
+                            <path fill="currentColor" fill-rule="evenodd" d="M10.146 16.854a.5.5 0 0 1 0-.708L14.293 12l-4.147-4.146a.5.5 0 0 1 .708-.708l4.5 4.5a.5.5 0 0 1 0 .708l-4.5 4.5a.5.5 0 0 1-.708 0" clip-rule="evenodd"></path>
+                        </svg>
+                    </button>
+                    
+                    <div class="slider-separator"></div>
+                    
+                    <button class="slider-btn slider-reset-btn" aria-label="Reset to first slide">
+                        <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
+                            <path fill="currentColor" fill-rule="evenodd" d="M8.854 5.854a.5.5 0 1 0-.708-.708l-3 3a.5.5 0 0 0 0 .708l3 3a.5.5 0 0 0 .708-.708L6.707 9H14a4 4 0 1 1-3.748 5.4.56.56 0 0 0-.516-.377c-.326 0-.57.3-.464.608A5.002 5.002 0 0 0 19 13a5 5 0 0 0-4.998-5H6.707z" clip-rule="evenodd"></path>
+                        </svg>
+                    </button>
+                </div>
             </div>
         </div>
-        <div class="text">
-            <h2 class="tiny-header">AI is what design systems have been waiting for</h2>
-            <p>
-                Many companies struggle to realize the full value of their design systems. By lowering the barrier of entry, AI makes design systems accessible to everyone. With AI as an active consumer and co-creator within design systems, designers step into more empowered roles to guide the technology toward humane and inspiring outcomes.</p>
+    </div>
+    <div class="text">
+        <h2 class="tiny-header">Impact</h2>
+        <p>
+            Reduced average lead time for new web pages from 2 weeks to 2 days (an 80% speed-up).
+        </p>
+    </div>
+</section>
+
+
+<!-- Design Tokens -->
+<section class="image-text">
+    <div class="image">
+        <div class="slider-container slider-tokens">
+            <!-- Fullscreen controls -->
+            <button class="slider-fullscreen-btn" aria-label="Enter fullscreen">
+                <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
+                    <path fill="currentColor" fill-rule="evenodd" d="m17 7.707-3.146 3.147a.5.5 0 0 1-.708-.708L16.293 7H13.5a.5.5 0 0 1 0-1h4a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-1 0zm-6.854 5.44a.5.5 0 0 1 .708.707L7.707 17H10.5a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5v-4a.5.5 0 0 1 1 0v2.793z" clip-rule="evenodd"></path>
+                </svg>
+            </button>
+            
+            <button class="slider-exit-fullscreen-btn" aria-label="Exit fullscreen">
+                <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
+                    <path fill="currentColor" fill-rule="evenodd" d="M17.146 6.146a.5.5 0 0 1 .708.708L14.707 10H17.5a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5v-4a.5.5 0 0 1 1 0v2.793zM6.854 17.854a.5.5 0 0 1-.708-.708L9.293 14H6.5a.5.5 0 0 1 0-1h4a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-1 0v-2.793z" clip-rule="evenodd"></path>
+                </svg>
+            </button>
+            
+            <!-- Slides -->
+            <div class="slider-slides">
+                <!-- Slide 1 -->
+                <div class="slider-slide active" data-index="0">
+                    <div class="slider-content">
+                        <h1 class="slider-title">Design Tokens as a Shared Language</h1>
+                        <h2 class="slider-subtitle">Alignment across stacks,<br>teams, and timezones</h2>
+                    </div>
+                </div>
+                
+                <!-- Slide 2 -->
+                <div class="slider-slide" data-index="1">
+                    <div class="figma-frame-wrapper">
+                        <img style="object-fit: cover; object-position: left center;" src="images/slides/tokens-01.png" alt="Dashboard">
+                    </div>
+                </div>
+        
+                <!-- Slide 3 with polaroid -->
+                <div class="slider-slide" data-index="2">
+                    <div class="figma-frame-wrapper">
+                        <img style="object-fit: cover; object-position: left center;" src="images/slides/tokens-02.png" alt="Dashboard">
+                    </div>
+                </div>
+
+                <!-- Slide 4 -->
+                <div class="slider-slide" data-index="2">
+                    <div class="figma-frame-wrapper">
+                        <img style="object-fit: cover; object-position: left center;" src="images/slides/tokens-03.png" alt="Dashboard">
+                    </div>
+                </div>
+
+                <!-- Slide 4 -->
+                <div class="slider-slide" data-index="2">
+                    <div class="figma-frame-wrapper">
+                        <img style="object-fit: cover; object-position: left center;" src="images/slides/tokens-04.png" alt="Dashboard">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Navigation controls -->
+            <div class="slider-controls-wrapper">
+                <div class="slider-controls">
+                    <button class="slider-btn slider-prev-btn" disabled aria-label="Previous slide">
+                        <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
+                            <path fill="currentColor" fill-rule="evenodd" d="M13.854 7.146a.5.5 0 0 1 0 .708L9.707 12l4.147 4.146a.5.5 0 0 1-.708.708l-4.5-4.5a.5.5 0 0 1 0-.708l4.5-4.5a.5.5 0 0 1 .708 0" clip-rule="evenodd"></path>
+                        </svg>
+                    </button>
+                    
+                    <div class="slider-counter">1 / 3</div>
+                    
+                    <button class="slider-btn slider-next-btn" aria-label="Next slide">
+                        <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
+                            <path fill="currentColor" fill-rule="evenodd" d="M10.146 16.854a.5.5 0 0 1 0-.708L14.293 12l-4.147-4.146a.5.5 0 0 1 .708-.708l4.5 4.5a.5.5 0 0 1 0 .708l-4.5 4.5a.5.5 0 0 1-.708 0" clip-rule="evenodd"></path>
+                        </svg>
+                    </button>
+                    
+                    <div class="slider-separator"></div>
+                    
+                    <button class="slider-btn slider-reset-btn" aria-label="Reset to first slide">
+                        <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
+                            <path fill="currentColor" fill-rule="evenodd" d="M8.854 5.854a.5.5 0 1 0-.708-.708l-3 3a.5.5 0 0 0 0 .708l3 3a.5.5 0 0 0 .708-.708L6.707 9H14a4 4 0 1 1-3.748 5.4.56.56 0 0 0-.516-.377c-.326 0-.57.3-.464.608A5.002 5.002 0 0 0 19 13a5 5 0 0 0-4.998-5H6.707z" clip-rule="evenodd"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
         </div>
-    </section>
+    </div>
+    <div class="text">
+        <h2 class="tiny-header">Reflection</h2>
+        <p>
+            It wasn't just about tokens—it was about trust. Design systems succeed when they're easy to use, hard to break, and built with empathy.
+        </p>
+    </div>
+</section>
+
+<section class="image-text">
+    <div class="image">
+        <div class="figma-frame-wrapper">
+            <img style="object-fit: cover; object-position: left center;" src="images/case-study-coming-soon.png" alt="Dashboard">
+        </div>
+    </div>
+    <div class="text">
+        <h2 class="tiny-header">AI is what design systems have been waiting for</h2>
+        <p>
+            Many companies struggle to redeem the full value of their design systems. AI lowers the entry barrier, making these systems accessible to all. With AI as both a consumer and co-creator, designers are empowered to elevate their role and guide technology toward humane and inspiring outcomes.</p>
+    </div>
+</section>
+
+
 
 
     <!-- Old image text section starts here
@@ -428,6 +621,7 @@
     <script src="js/grid.js"></script>
     <script src="https://cdn.skypack.dev/gsap@3.12.0"></script>
     <script src="https://cdn.skypack.dev/gsap@3.12.0/ScrollTrigger"></script>
+    <script src="js/slideshow.js"></script>
 
 
     <div class="debug">

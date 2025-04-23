@@ -1,0 +1,493 @@
+/* 
+ * Slider Component (Responsive + Container-Scaled)
+ * Typography and polaroid layout scale relative to the parent container
+ * Enhanced for consistent proportional scaling with global font multiplier
+ */
+
+ :root {
+    --slider-aspect-ratio: 16 / 9;
+    --slider-controls-height: 60px;
+    --slider-border-radius: 12px;
+    --slider-controls-bg: rgba(0, 0, 0, 0.66);
+    --slider-dark-bg: #000;
+    --slider-light-bg: #fff;
+    --slider-accent-bg: #C5D9D2;
+    --slider-border-color: #F5F5F5;
+    
+    /* Base scale for container-based sizing */
+    --container-scale: 1;
+    
+    /* Global font size multiplier - adjust this to scale all text at once */
+    --font-size-multiplier: 1.5;
+  }
+  
+  .slider-container * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  
+  .slider-container {
+    width: 100%;
+    margin: 0 auto;
+    position: relative;
+    aspect-ratio: var(--slider-aspect-ratio);
+    border-radius: var(--slider-border-radius);
+    overflow: hidden;
+    background-color: var(--slider-dark-bg);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border: 8px solid var(--slider-border-color);
+    /* min-height: 300px; */
+    
+    /* Base font size that scales with viewport width but has reasonable limits */
+    font-size: clamp(14px, calc(1.5rem + 0.5vw), 24px);
+    
+    /* Calculate container scale based on width for internal element scaling */
+    --container-scale: clamp(0.7, calc(100vw / 1200), 1.2);
+    
+    /* Default font size multiplier for desktop */
+    --font-size-multiplier: 1.05;
+  }
+  
+  /* Typography (scales via container-font-size and global multiplier) */
+  .slider-title {
+    font-weight: 900;
+    line-height: 1.2;
+    margin-bottom: .25em;
+    
+    /* Prevent title from getting too small on narrow viewports */
+    font-size: clamp(1.8rem, calc(4em * var(--container-scale) * var(--font-size-multiplier)), 5rem);
+  }
+  
+  .slider-subtitle {
+    font-weight: 300;
+    line-height: 1.4;
+    margin-bottom: .5em;
+    /* Prevent subtitle from getting too small */
+    font-size: clamp(1.2rem, calc(2.5em * var(--container-scale) * var(--font-size-multiplier)), 3rem);
+  }
+  
+  .slider-eyebrow {
+    margin-bottom: 0.25em;
+    margin-top: 1em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: clamp(.5rem, calc(1.7em * var(--container-scale) * var(--font-size-multiplier)), 1.2rem);
+  }
+  
+  .slider-body {
+    font-size: clamp(.5rem, calc(1.7em * var(--container-scale) * var(--font-size-multiplier)), 1.2rem);
+    line-height: 1.5;
+    margin-bottom: .5em;
+  }
+  
+  .slider-counter {
+    font-size: calc(1em * var(--container-scale) * var(--font-size-multiplier));
+  }
+  
+  .slider-polaroid-caption {
+    font-family: 'Permanent Marker', cursive, sans-serif;
+    font-size: clamp(.5rem, calc(.9em * var(--container-scale) * var(--font-size-multiplier)), 1.2rem);
+    font-weight: bold;
+    text-align: center;
+    margin-top: 0.8em;
+    line-height: 1.2;
+    color: #000;
+  }
+  
+  /* Slide container */
+  .slider-slides {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+  }
+  
+  .slider-slide {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    transition: opacity 0.5s ease-in-out;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .slider-slide.active {
+    opacity: 1;
+    z-index: 1;
+    display: flex;
+  }
+  
+  .slider-content {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    
+    /* Scale padding based on container size */
+    padding: 0 calc(4% * var(--container-scale)) 16px calc(4% * var(--container-scale)) ;
+  }
+  
+  /* Theme styles */
+  .slider-dark {
+    background-color: var(--slider-dark-bg);
+    color: var(--slider-light-bg);
+  }
+  
+  .slider-light {
+    background-color: var(--slider-light-bg);
+    color: var(--slider-dark-bg);
+  }
+  
+  .slider-mint {
+    background-color: var(--slider-accent-bg);
+    color: var(--slider-dark-bg);
+  }
+  
+  /* Control buttons with improved scaling */
+  .slider-fullscreen-btn,
+  .slider-exit-fullscreen-btn {
+    position: absolute;
+    top: calc(30px * var(--container-scale));
+    left: calc(100% - 50px * var(--container-scale));
+    width: calc(40px * var(--container-scale));
+    height: calc(40px * var(--container-scale));
+    min-width: 30px;
+    min-height: 30px;
+    background-color: var(--slider-controls-bg);
+    color: var(--slider-light-bg);
+    border-radius: 4px;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 20;
+  }
+
+  .slider-reset-btn {
+    scale: 0.85;
+  }
+  
+  .slider-exit-fullscreen-btn {
+    display: none;
+  }
+  
+  .slider-controls-wrapper {
+    position: absolute;
+    bottom: 4px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    z-index: 10;
+  }
+  
+  .slider-controls:hover,
+  .slider-fullscreen-btn:hover,
+  .slider-exit-fullscreen-btn:hover {
+    background-color: rgba(0, 0, 0, 1);
+    transition: 0.3s;
+  }
+  
+  .slider-controls {
+    display: flex;
+    align-items: center;
+    background-color: var(--slider-controls-bg);
+    border-radius: 8px;
+    height: calc(40px * var(--container-scale));
+    min-height: 32px;
+  }
+  
+  .slider-btn {
+    background: transparent;
+    color: var(--slider-light-bg);
+    border: none;
+    width: calc(40px * var(--container-scale));
+    height: calc(40px * var(--container-scale));
+    min-width: 32px;
+    min-height: 32px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  
+  .slider-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  .slider-btn:focus {
+    opacity: 1;
+  }
+  
+  .slider-btn:hover {
+    color: var(--nav-a-hover, #f5f5f5);
+  }
+  
+  .slider-separator {
+    width: 1px;
+    height: calc(24px * var(--container-scale));
+    background-color: rgba(255, 255, 255, 0.33);
+    margin: 0 5px;
+  }
+  
+  /* Fullscreen mode */
+  .slider-container.is-fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    max-width: none;
+    z-index: 9999;
+    border-radius: 0;
+    margin: 0;
+    border: none;
+    
+    /* Adjust scale for fullscreen mode */
+    --container-scale: 1.2;
+    /* Increase font size in fullscreen mode */
+    --font-size-multiplier: 1.1;
+    font-size: 20px;
+  }
+  
+  /* SVG sizing */
+  .slider-container svg {
+    width: calc(32px * var(--container-scale));
+    height: calc(32px * var(--container-scale));
+    min-width: 30px;
+    min-height: 30px;
+    fill: currentColor;
+  }
+  
+  /* Polaroid layout */
+  .slider-with-polaroid {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: calc(5% * var(--container-scale));
+    flex-direction: row;
+  }
+
+  
+  .slider-text-block {
+    width: 70%;
+    font-size: calc(1em * var(--container-scale) * var(--font-size-multiplier));
+  }
+  
+  .slider-polaroid {
+    width: 20%;
+    min-width: 80px;
+    padding: 2% 1%;
+    transform: rotate(8.5deg);
+    background-color: white;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23);
+  }
+  
+  .slider-polaroid-img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  
+  /* Feature list styling */
+  .feature-list {
+    font-size: clamp(.5rem, calc(1.7em * var(--container-scale) * var(--font-size-multiplier)), 1.2rem);
+    list-style-type: none;
+    margin-left: 0;
+    margin-top: .5em;
+    padding-left: .9em;
+    width: 100%;
+  }
+  
+  .feature-list li {
+    position: relative;
+    margin-bottom: 0.5em;
+    padding-left: 1.2em;
+  }
+  
+  .feature-list li:before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    color: inherit;
+  }
+
+  /* Stats highlight for new case study */
+  .slider-stats {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 2rem;
+  }
+
+  .stat-highlight {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 1rem;
+    text-align: center;
+  }
+
+  .stat-number {
+    font-size: clamp(2rem, calc(5em * var(--container-scale) * var(--font-size-multiplier)), 6rem);
+    font-weight: 900;
+    line-height: 1;
+    color: #4CAF50;
+  }
+
+  .stat-label {
+    font-size: clamp(.8rem, calc(1.2em * var(--container-scale) * var(--font-size-multiplier)), 1.5rem);
+    margin-top: 0.5rem;
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+
+    .slider-container svg {
+        min-width: 40px;
+        min-height: 40px;
+      }
+
+    .slider-body {
+        margin-bottom: .5em;
+      }
+
+    .feature-list {
+        width: 66%;
+      }
+
+    .slider-container {
+      /* aspect-ratio: 1 / 1; More vertical space on mobile 
+      min-height: 350px; */
+      --container-scale: clamp(0.6, calc(100vw / 500), 0.9);
+      /* Adjust global font size for tablet */
+      --font-size-multiplier: 1;
+      font-size: 16px;
+    }
+  
+    .slider-title {
+      font-size: calc(4em * var(--container-scale) * var(--font-size-multiplier));
+    }
+  
+    .slider-subtitle {
+      font-size: calc(1.3em * var(--container-scale) * var(--font-size-multiplier));
+    }
+  
+    .slider-polaroid-caption {
+      font-size: clamp(.5rem, calc(.8em * var(--container-scale) * var(--font-size-multiplier)), 2rem);
+    }
+  
+    .slider-slide {
+      position: relative;
+      /* min-height: 300px; */
+    }
+  
+    .slider-content {
+      padding: calc(7% * var(--container-scale));
+    }
+  
+    .slider-with-polaroid {
+      flex-direction: column;
+      gap: 4px;
+    }
+  
+    .slider-polaroid {
+      width: 32%;
+      flex: none;
+      margin-left: -30%;
+      margin-top: 50%;
+    }
+  
+    .slider-text-block {
+      width: 98%;
+      flex: none;
+    }
+  
+    .slider-polaroid {
+      align-self: center;
+      margin-bottom: calc(20px * var(--container-scale));
+      max-width: 250px;
+    }
+  }
+
+  @media (min-width: 768px) and (max-width: 1150px) {
+    .slider-container {
+      --font-size-multiplier: .5!important;
+    }
+  }
+
+  @media (min-width: 545px) and (max-width: 768px) {
+    .slider-container {
+      --font-size-multiplier: 1.15;
+    }
+  }
+
+  @media (min-width: 480px) and (max-width: 545px) {
+    .slider-container {
+      --font-size-multiplier: 1.05;
+    }
+    .feature-list {
+        width: 70%;
+      }
+  }
+  
+  /* Small mobile devices */
+  @media (max-width: 400px) {
+
+
+    .feature-list {
+        width: 66%;
+      }
+
+    .slider-container {
+      /* aspect-ratio: 5 / 6; */
+      --container-scale: 0.6;
+      /* Further reduce global font size for mobile */
+      --font-size-multiplier: .95;
+      font-size: 14px;
+      border-width: 4px;
+    }
+
+    .slider-polaroid {
+        margin-left: -30%;
+      }
+    
+    .slider-title {
+      font-size: calc(3.2em * var(--container-scale) * var(--font-size-multiplier));
+    }
+    
+    .slider-controls {
+      transform: scale(0.9);
+    }
+  }
+  
+  /* Extra small devices */
+  @media (max-width: 360px) {
+    .slider-container {
+      --container-scale: 0.5;
+      /* Even smaller font size for very small screens */
+      --font-size-multiplier: 1;
+    }
+  }
+      /* Extra small devices */
+      @media (max-width: 360px) {
+        .slider-container {
+          --container-scale: 0.5;
+          /* Even smaller font size for very small screens */
+          --font-size-multiplier: .95;
+          padding-bottom: 16px;
+          /* aspect-ratio: 4 / 6; */
+        }
+      }

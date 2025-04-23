@@ -15,11 +15,12 @@ section .text, section .image {
 .image-text{
     display: flex;
     align-items: center;
-    justify-content: space-between;
     text-align: left;
     padding-left: 120px;
     padding-right: 120px;
     gap: 60px;
+    padding-top: 50px;
+    padding-bottom: 50px;
 }
 
 .image-text {
@@ -32,11 +33,12 @@ section .text, section .image {
     padding: 0px!important;
 }
 
+/*
 .image-text:not(:has(.figma-frame-wrapper)):nth-of-type(2n) {
   flex-direction: row-reverse;
   padding-right: 120px;
   padding-left: 120px;
-}
+} */
 
 h2 {
     font-size: 2em;
@@ -52,24 +54,33 @@ p {
     .image-text{
         padding-left: 75px;
         padding-right: 75px;
-        gap: 50px;
+        gap: 40px;
         padding-bottom: 30px;
+        padding-top: 30px;
     }
     .image-text:nth-of-type(5n) {
-        padding-bottom: 120px;
+        padding-bottom: 50px;
+    }
+    .image-text .image {
+        max-width: 480px;
     }
 }
 
 @media (max-width: 768px) {
     .image-text {
         flex-direction: column!important;
-        gap: 20px;
-        padding-bottom: 120px;
+        gap: 10px;
+        padding-bottom: 40px;
+    }
+
+    .image-text .text p {
+        margin-top: 8px;
+
     }
 
     .image-text .text, .image-text .image {
         max-width: calc(100vw - 40px);
-        min-width: 75vw;
+        min-width: calc(100vw - 60px);
     }
     
     /*

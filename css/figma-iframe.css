@@ -44,3 +44,63 @@
         padding-bottom: 100px;
     }
 }
+
+@media (min-width: 768px) {
+    /*.figma-frame-wrapper {
+        min-width: 370px;
+    } */
+}
+
+@media (max-width: 768px) {
+    .figma-frame-wrapper {
+        width: auto;            
+        aspect-ratio: unset;
+        height: auto;
+        /*min-height: 265px; */
+        max-width: calc(100vw - 60px); aspect-ratio: 16/9!important; height: auto!important;
+    }
+    
+    .figma-frame {
+        position: relative;
+        height: 100%;
+    }
+    
+    .figma-presentation-wrapper {
+        height: auto;
+        min-height: 300px;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .figma-presentation-slide {
+        height: auto;
+        min-height: 300px;
+    }
+    
+    .figma-presentation-content {
+        padding: 20px;
+        height: auto;
+    }
+    
+    .image-text:has(.figma-frame-wrapper) {
+        margin-bottom: 50px;
+    }
+    
+    /* Adjust polaroid for better mobile display */
+    .figma-presentation-content.with-polaroid {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 30px;
+    }
+    
+    .content-text, .polaroid {
+        width: 100%;
+        flex: none;
+    }
+    
+    .polaroid {
+        align-self: center;
+        max-width: 220px;
+        margin-bottom: 20px;
+    }
+}
