@@ -193,6 +193,7 @@
     display: flex;
     justify-content: center;
     z-index: 10;
+    color: #fff;
   }
 
   .slider-container.is-fullscreen .slider-controls-wrapper {

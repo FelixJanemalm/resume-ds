@@ -284,6 +284,13 @@ h1 {
     padding-bottom: 10px;
 }
 
+.gradient-inverse {
+  background: linear-gradient(var(--button-color), white);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
 .hero-subhead {
     font-size: var(--subhead-font-size);
     font-weight: 300;
