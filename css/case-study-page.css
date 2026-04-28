@@ -2079,8 +2079,8 @@ body:has(.cs-page) {
     overflow: hidden;
     background: var(--bg);
     box-shadow:
-        0 1px 0 color-mix(in srgb, var(--text) 8%, transparent),
-        0 24px 48px color-mix(in srgb, var(--text) 18%, transparent);
+        0 0 0 1px var(--cs-accent-border),
+        0 24px 48px -16px var(--cs-accent-glow);
 }
 
 /* Reserve space to limit CLS; letterboxing matches page bg */
