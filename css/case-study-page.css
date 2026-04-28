@@ -775,6 +775,56 @@ body:has(.cs-page) {
     border-top: 1px solid var(--borderSubtle);
 }
 
+/* ─── Mobile scroll-affordance: swipe-hint pill + scroll-frame fade ──────── */
+/* Generic ".cs-swipe-hint" reads as "← swipe to explore →" inline below a
+   scrollable element. Pages may override positioning (e.g., overlay on a tall
+   diagram). Dismissed via .is-dismissed on first scroll of its data-scroll-target
+   (handled by js/case-study-swipe-hint.js). */
+.cs-swipe-hint {
+    display: none;
+    margin: 12px 1rem 0;
+    text-align: center;
+    font-size: 0.78rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    color: color-mix(in srgb, var(--text) 50%, transparent);
+    transition: opacity 0.4s ease;
+}
+.cs-swipe-hint__icon {
+    display: inline-block;
+    margin: 0 0.4em;
+    font-size: 0.95rem;
+    opacity: 0.85;
+}
+.cs-swipe-hint.is-dismissed {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Generic frame wrapping a horizontally-scrolling element. Provides a
+   positioning context for the right-edge fade-out gradient on mobile. */
+.cs-scroll-frame {
+    position: relative;
+}
+@media (max-width: 768px) {
+    .cs-swipe-hint { display: block; }
+    .cs-scroll-frame::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 36px;
+        background: linear-gradient(
+            to right,
+            transparent,
+            color-mix(in srgb, var(--bg) 92%, transparent)
+        );
+        pointer-events: none;
+        z-index: 2;
+    }
+}
+
 .cs-summary-brief__intro-main .cs-section-text a {
     color: var(--link-color, var(--sysPrimaryDefault));
     text-decoration: underline;

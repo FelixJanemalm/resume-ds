@@ -1,5 +1,14 @@
 html {
     scroll-behavior: smooth;
+    /* Apply the overflow-x safety net to the viewport scroll container too.
+       `overflow-x: clip` on <body> alone does NOT propagate to the viewport
+       (only `hidden` / `visible` propagate per spec), so any element that
+       extends a hair past the viewport — full-bleed bands, off-screen drawer,
+       sub-pixel rounding from `calc(50% - 50vw)` break-outs — would still let
+       the page scroll horizontally on mobile. `clip` doesn't create a scroll
+       container, so the sticky header still works. */
+    overflow-x: hidden;
+    overflow-x: clip;
 }
 
 body {
@@ -8,9 +17,6 @@ body {
     text-align: center;
     margin: 0px;
     transition: 2s cubic-bezier(0.215, 0.610, 0.355, 1);
-    /* Site-wide horizontal-overflow safety net. `clip` is preferred over `hidden`
-       because it doesn't create a scroll container (which breaks position: sticky).
-       `hidden` is a fallback for browsers that don't support `clip` yet. */
     overflow-x: hidden;
     overflow-x: clip;
 }

@@ -45,11 +45,34 @@
             flex-shrink: 0;
         }
 
-        /* ─── Challenge: narrow reading-width text, full-width Sankey below ─── */
+        /* ─── Challenge: text + video side-by-side intro; full-width Sankey below.
+               Stacks on tablet/mobile so the text stays the reading focus. ─── */
+        .cs-section--challenge__intro {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
+            gap: clamp(var(--cs-rhythm-lg), 4vw, 3rem);
+            align-items: start;
+            margin-bottom: clamp(1.5rem, 3vw, 2.25rem);
+        }
         .cs-section--challenge__text {
             max-width: min(40rem, 100%);
-            margin-inline: auto;
-            margin-bottom: clamp(1.5rem, 3vw, 2.25rem);
+            margin: 0;
+        }
+        .cs-section--challenge__intro .cs-media--brown-bag-video {
+            margin: 0;
+        }
+        @media (max-width: 1023px) {
+            .cs-section--challenge__intro {
+                grid-template-columns: 1fr;
+                gap: clamp(1rem, 3vw, 1.75rem);
+            }
+            .cs-section--challenge__text {
+                margin-inline: auto;
+            }
+            /* Exception for this section only: video stacks ABOVE the text on mobile/tablet */
+            .cs-section--challenge__intro .cs-media--brown-bag-video {
+                order: -1;
+            }
         }
 
         /* ─── Overview: text on left, bullets on right; atlas full-width below ─── */
@@ -481,31 +504,9 @@
         .sankey-node-rect { cursor: pointer; }
         .sankey-node-rect:hover rect { filter: brightness(1.2); }
         .sankey-link { cursor: pointer; }
-        /* Swipe hint label below the Sankey on mobile.
-           Hidden by default; only shown on small screens. Fades out after first scroll. */
-        .cs-swipe-hint {
-            display: none;
-            margin: 12px 1rem 0;
-            text-align: center;
-            font-size: 0.78rem;
-            font-weight: 500;
-            letter-spacing: 0.04em;
-            color: color-mix(in srgb, var(--text) 50%, transparent);
-            transition: opacity 0.4s ease;
-        }
-        .cs-swipe-hint__icon {
-            display: inline-block;
-            margin: 0 0.4em;
-            font-size: 0.95rem;
-            opacity: 0.85;
-        }
-        .cs-swipe-hint.is-dismissed {
-            opacity: 0;
-            pointer-events: none;
-        }
+        /* Generic .cs-swipe-hint base styles + mobile show rule live in
+           css/case-study-page.css. Sankey-specific overlay variant follows below. */
         @media (max-width: 768px) {
-            .cs-swipe-hint { display: block; }
-
             /* Sankey-context: overlay floating ON the diagram (top is set by JS to land
                just inside the top of the Sankey canvas with a comfortable margin). Pill
                style so it reads as a floating tooltip. Lower bg opacity so the diagram
@@ -768,16 +769,23 @@
 
             <!-- CHALLENGE -->
             <div class="cs-section cs-section--wide cs-section--challenge">
-                <div class="cs-section--challenge__text">
-                    <div class="cs-section-label">Challenge</div>
-                    <h2 class="cs-section-title">Scan the tag. See where your garment came from.</h2>
-                    <p class="cs-section-text">Supply chain transparency is a core brand promise for fashion startup Los Telos. But garments have a complex chain of custody: fibers from all over the world, through various suppliers, get blended into various textiles, different transportation methods affect the carbon footprint for each leg. Existing solutions assume:</p>
-                    <ul class="cs-constraint-tags" role="list">
-                        <li>large teams</li>
-                        <li>manual data entry</li>
-                        <li>expensive compliance platforms</li>
-                    </ul>
-                    <p class="cs-section-text">The raw data could be anything from a photo of a swatch in the warehouse to a note in an email. Our goal was to convert this into something customers could easily understand with just 1 scan.</p>
+                <div class="cs-section--challenge__intro">
+                    <div class="cs-section--challenge__text">
+                        <div class="cs-section-label">Challenge</div>
+                        <h2 class="cs-section-title">Scan the tag. See where your garment came from.</h2>
+                        <p class="cs-section-text">Supply chain transparency is a core brand promise for fashion startup Los Telos. But garments have a complex chain of custody: fibers from all over the world, through various suppliers, get blended into various textiles, different transportation methods affect the carbon footprint for each leg. Existing solutions assume:</p>
+                        <ul class="cs-constraint-tags" role="list">
+                            <li>large teams</li>
+                            <li>manual data entry</li>
+                            <li>expensive compliance platforms</li>
+                        </ul>
+                        <p class="cs-section-text">The raw data could be anything from a photo of a swatch in the warehouse to a note in an email. Our goal was to convert this into something customers could easily understand with just 1 scan.</p>
+                    </div>
+                    <div class="cs-media cs-media--brown-bag-video cs-media--natural-ratio">
+                        <video autoplay muted loop playsinline preload="metadata" aria-label="Customer-facing garment story page built from a real batch — Sankey of materials, world map of the journey, certifications, and CO₂ footprint">
+                            <source src="../images/case-studies/sourcing-garment-story.mp4" type="video/mp4">
+                        </video>
+                    </div>
                 </div>
                 <div class="cs-demo-wrapper">
                     <div class="cs-demo-header">
@@ -805,13 +813,13 @@
                         <h2 class="cs-section-title">One pipeline. End to end.</h2>
                         <p class="cs-section-text">Every step removed a job the team would otherwise have to do.</p>
                         <p class="cs-section-text">No spreadsheets. No manual tracking. No gaps.</p>
-                        <p class="cs-section-text">If it didn't have zero overhead, we didn't ship it.</p>
+                        <p class="cs-section-text">If it had overhead, we didn't ship it.</p>
                     </div>
                     <ul class="cs-goals-list cs-goals-list--cards cs-section--overview__bullets" role="list">
                         <li>Ingest raw vendor data automatically</li>
                         <li>Structure it into a relational model</li>
-                        <li>Lock production into immutable records</li>
-                        <li>Generate transparency directly from those records</li>
+                        <li>Save a snapshot for each batch at the time of production</li>
+                        <li>Display those records in a user-friendly interface</li>
                     </ul>
                 </div>
 
@@ -1114,6 +1122,7 @@
     <!-- ─── Scripts ─── -->
     <script src="../js/header.js"></script>
     <script src="../js/drawer.js"></script>
+    <script src="../js/case-study-swipe-hint.js"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -1501,16 +1510,7 @@
         });
     }
 
-    // ─── Generic swipe-hint dismissal: fade out after first scroll of target ──
-    function initSwipeHints() {
-        document.querySelectorAll('.cs-swipe-hint[data-scroll-target]').forEach((hint) => {
-            const scroll = document.querySelector(hint.dataset.scrollTarget);
-            if (!scroll) return;
-            scroll.addEventListener('scroll', () => {
-                hint.classList.add('is-dismissed');
-            }, { passive: true, once: true });
-        });
-    }
+    // (Generic swipe-hint dismissal lives in js/case-study-swipe-hint.js)
 
     // ─── Sankey-context overlay: anchor the hint pill just inside the top of the
     // SVG canvas (legend wraps differently per width, so measuring is more reliable
@@ -1531,7 +1531,6 @@
     document.addEventListener('DOMContentLoaded', () => {
         initSankey();
         initBounceVideos();
-        initSwipeHints();
         positionSankeySwipeHint();
         window._sankeyInitialized = true;
     });
