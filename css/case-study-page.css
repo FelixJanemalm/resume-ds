@@ -2450,7 +2450,10 @@ body:has(.cs-page) {
         flex-wrap: nowrap;
         gap: var(--cs-rhythm-smd);
         overflow-x: auto;
-        padding-block: 6px;
+        /* Generous vertical padding so the horizontal-swipe hitbox extends well
+           above and below the cards — the user can start a swipe anywhere in
+           the section, not only on a card itself. */
+        padding-block: clamp(20px, 5vw, 32px);
         padding-inline: max(var(--cs-rhythm-md), env(safe-area-inset-left), env(safe-area-inset-right));
         box-sizing: border-box;
         -webkit-overflow-scrolling: touch;
@@ -2461,5 +2464,29 @@ body:has(.cs-page) {
         flex: 0 0 min(31%, 112px);
         min-width: 92px;
         scroll-snap-align: start;
+    }
+
+    /* Overlay the swipe-to-explore pill on the cards area so it doesn't add to
+       the section's vertical footprint. When dismissed it fades out without
+       leaving a gap (no flow contribution either way). */
+    .cs-summary-brief__did {
+        position: relative;
+    }
+    .cs-summary-brief__did .cs-swipe-hint {
+        position: absolute;
+        left: 50%;
+        bottom: -16px;
+        transform: translateX(-50%);
+        margin: 0;
+        padding: 4px 12px;
+        white-space: nowrap;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--bg) 70%, transparent);
+        border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        z-index: 3;
+        pointer-events: none;
+        font-size: 0.72rem;
     }
 }

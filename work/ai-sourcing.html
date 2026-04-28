@@ -1222,6 +1222,17 @@
         };
         const hideTip = () => tooltip.classList.remove('visible');
 
+        // Global dismissal: the tooltip is position:fixed, so on mobile (where
+        // mouseout rarely fires after a tap) it would otherwise stick to the
+        // screen as the user scrolls or taps elsewhere on the page.
+        window.addEventListener('scroll', hideTip, { passive: true });
+        document.addEventListener('touchstart', (e) => {
+            if (!container.contains(e.target)) hideTip();
+        }, { passive: true });
+        document.addEventListener('click', (e) => {
+            if (!container.contains(e.target)) hideTip();
+        });
+
         // SVG container
         const svgWrap = document.createElement('div');
         svgWrap.className = 'sankey-svg-container';
@@ -1532,6 +1543,9 @@
         initSankey();
         initBounceVideos();
         positionSankeySwipeHint();
+        // Re-run swipe-hint wiring now that initSankey has rendered the Sankey's
+        // scroll container; the shared script ran before that element existed.
+        if (typeof window.initSwipeHints === 'function') window.initSwipeHints();
         window._sankeyInitialized = true;
     });
     </script>
