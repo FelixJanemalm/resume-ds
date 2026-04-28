@@ -1,4 +1,22 @@
+var PRINCIPLES_NEXT_HINT_KEY = "portfolio-principles-next-hint-dismissed";
+
+function dismissPrinciplesNextHint() {
+    var section = document.getElementById("scalability");
+    if (section) {
+        section.classList.add("card-wrapper--hint-dismissed");
+    }
+    try {
+        sessionStorage.setItem(PRINCIPLES_NEXT_HINT_KEY, "1");
+    } catch (e) { /* private mode */ }
+}
+
 $(document).ready(function () {
+    try {
+        if (sessionStorage.getItem(PRINCIPLES_NEXT_HINT_KEY) === "1") {
+            dismissPrinciplesNextHint();
+        }
+    } catch (e) { /* ignore */ }
+
     // Initialize Owl Carousel
     const carousel = $(".custom-carousel");
     carousel.owlCarousel({
@@ -64,6 +82,7 @@ $(document).ready(function () {
         $(".custom-carousel .item").removeClass("active");
 
         if (!isActive) {
+            dismissPrinciplesNextHint();
             $(this).addClass("active");
             updateMedia();
 

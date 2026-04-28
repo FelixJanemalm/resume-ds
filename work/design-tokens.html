@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Case study: How Felix Janemalm built a design token system where one change in Figma automatically updates colors, spacing, and typography across six platforms.">
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+    <title>One Color Change, Six Platforms Updated – Felix Janemalm</title>
+    <link rel="preload" href="../fonts/woff2/RNSPhysis-Medium.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="../fonts/woff2/RNSPhysis-Light.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="../css/tokens/Ref/yds.css">
+    <link rel="stylesheet" href="../css/tokens/Ref/mui.css">
+    <link rel="stylesheet" href="../css/tokens/theme.css">
+    <link rel="stylesheet" href="../css/master.css">
+    <link rel="stylesheet" href="../css/typography.css">
+    <link rel="stylesheet" href="../css/materials.css">
+    <link rel="stylesheet" href="../css/header.css">
+    <link rel="stylesheet" href="../css/drawer.css">
+    <link rel="stylesheet" href="../css/case-study-page.css">
+    <link rel="stylesheet" href="../css/footer.css">
+</head>
+<body>
+
+    <header>
+        <nav>
+            <div class="logo">
+                <a href="../index.html#home">
+                    <span class="short-logo">
+                        <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <g filter="url(#filter0_dd_357_229)">
+                            <path d="M107.098 139.927H161.976C161.976 117.976 175.878 99.6829 202.22 99.6829C227.982 99.6829 271 99.9268 289.293 99.6829V50.6585H194.902C146.61 50.6585 107.098 86.5122 107.098 139.927Z" fill="currentColor"/>
+                            <path d="M91 175.049H243.195C243.195 200.659 233.683 228.463 186.854 228.463C156.994 228.463 118.317 228.707 91 228.463V175.049Z" fill="currentColor"/>
+                            <path d="M409.292 175.049V338.951C409.292 409.195 347.829 464.805 261.488 464.805C167.829 464.805 107.829 401.143 107.829 341.878V261.393H161.243V326.512C161.243 382.854 211 411.39 261.488 411.39C311.976 411.39 356.61 382.854 356.61 326.512C356.61 266.22 356.61 263.832 356.61 265.052V175.78L409.292 175.049Z" fill="currentColor"/>
+                            <path d="M421 85.0488C421 106.063 403.965 123.098 382.951 123.098C361.937 123.098 344.902 106.063 344.902 85.0488C344.902 64.035 361.937 47 382.951 47C403.965 47 421 64.035 421 85.0488Z" fill="currentColor"/>
+                            </g>
+                            <defs>
+                            <filter id="filter0_dd_357_229" x="83.6829" y="42.6098" width="347.561" height="435.366" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+                            <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+                            <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+                            <feOffset dx="1.46341" dy="4.39024"/>
+                            <feGaussianBlur stdDeviation="4.39024"/>
+                            <feComposite in2="hardAlpha" operator="out"/>
+                            <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/>
+                            <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_357_229"/>
+                            <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+                            <feOffset dy="5.85366"/>
+                            <feGaussianBlur stdDeviation="2.92683"/>
+                            <feComposite in2="hardAlpha" operator="out"/>
+                            <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/>
+                            <feBlend mode="normal" in2="effect1_dropShadow_357_229" result="effect2_dropShadow_357_229"/>
+                            <feBlend mode="normal" in="SourceGraphic" in2="effect2_dropShadow_357_229" result="shape"/>
+                            </filter>
+                            </defs>
+                        </svg>
+                    </span>
+                    <span class="full-logo">
+                        Felix Janemalm
+                    </span>
+                </a>
+            </div>
+            <ul class="nav-links">
+                <li><a href="../index.html#work">Work</a></li>
+                <li><a href="../Resume.pdf" target="_blank">Resume.pdf</a></li>
+                <li><a href="#contact" id="contactBtn">Contact</a></li>
+            </ul>
+        </nav>
+        <div id="progress-bar"></div>
+    </header>
+    <div id="overlay" class="overlay"></div>
+
+    <div id="drawer" class="drawer">
+        <div class="drawer-content">
+          <nav class="nav-links">
+            <span>
+                <a href="mailto:hello@felixjanemalm.com">
+                    <svg width="16" height="16" viewBox="0 0 140 112" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;">
+                            <path d="M118.666 0H20.9411C15.3872 0 10.0607 2.20629 6.1335 6.1335C2.20629 10.0607 0 15.3872 0 20.9411V90.7446C0 96.2986 2.20629 101.625 6.1335 105.552C10.0607 109.479 15.3872 111.686 20.9411 111.686H118.666C124.22 111.686 129.546 109.479 133.474 105.552C137.401 101.625 139.607 96.2986 139.607 90.7446V20.9411C139.607 15.3872 137.401 10.0607 133.474 6.1335C129.546 2.20629 124.22 0 118.666 0ZM118.666 13.9607L73.2938 45.1629C72.2326 45.7756 71.0289 46.0981 69.8036 46.0981C68.5783 46.0981 67.3745 45.7756 66.3134 45.1629L20.9411 13.9607H118.666Z" fill="currentColor"/>
+                        </svg>
+                    hello@felixjanemalm.com</a>
+             </span>
+            <a href="https://www.linkedin.com/in/felixjanemalm/" target="_blank">
+                <svg width="16" height="16" viewBox="0 0 20 21" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;">
+                <path d="M0 6.53138H4.42553V20.9687H0V6.53138ZM16.9787 7.4231C17.8582 7.90435 18.5816 8.63329 19.1489 9.60994C19.7163 10.5866 20 11.5845 20 12.6036V20.9687H15.5319V12.6036C15.5319 12.3771 15.4468 12.1223 15.2766 11.8392C15.1064 11.5562 14.9504 11.3721 14.8085 11.2872C14.5816 11.1457 14.2695 11.0749 13.8723 11.0749C13.4752 11.0749 13.1631 11.1315 12.9362 11.2448L11.1064 12.1365V20.9687H6.6383V6.53138H11.1064V7.21079C11.9858 6.81447 12.9787 6.63046 14.0851 6.65877C15.1915 6.68708 16.156 6.94186 16.9787 7.4231ZM2.21277 0.96875C2.83688 0.96875 3.3617 1.18106 3.78723 1.60569C4.21277 2.03032 4.42553 2.55403 4.42553 3.17682C4.42553 3.79961 4.21277 4.33039 3.78723 4.76917C3.3617 5.20796 2.83688 5.42735 2.21277 5.42735C1.58865 5.42735 1.06383 5.20796 0.638298 4.76917C0.212766 4.33039 0 3.79961 0 3.17682C0 2.55403 0.212766 2.03032 0.638298 1.60569C1.06383 1.18106 1.58865 0.96875 2.21277 0.96875Z" fill="currentColor"/>
+                </svg>
+                /felixjanemalm</a>
+          </nav>
+        </div>
+    </div>
+
+    <div class="cs-page">
+
+        <a href="../index.html#work" class="cs-back">&larr; All Work</a>
+
+        <div class="cs-hero">
+            <div class="cs-hero__surface">
+                <video autoplay muted loop playsinline>
+                    <source src="../images/tokens-v3-export.mp4" type="video/mp4">
+                </video>
+            </div>
+        </div>
+
+        <div class="cs-intro">
+            <div class="cs-meta">
+                <span>Yubico</span>
+                <span class="cs-meta-sep">/</span>
+                <span>Design Systems</span>
+                <span class="cs-meta-sep">/</span>
+                <span>~9 months</span>
+            </div>
+            <h1 class="cs-title">One change updates 6 platforms — adding $6M to YoY pipeline</h1>
+            <p class="cs-description">When a designer changed a color in Figma, engineers had to manually update it in CSS, Tailwind, MUI, SwiftUI, Android XML, and email templates. I built a token system that makes those changes once, automatically — across every platform, including light mode, dark mode, and responsive sizing.</p>
+        </div>
+
+        <div class="cs-metrics-strip">
+        <div class="cs-metrics">
+            <div class="cs-metric">
+                <div class="cs-metric-value">6</div>
+                <div class="cs-metric-label">platforms updated from a single design change</div>
+            </div>
+            <div class="cs-metric">
+                <div class="cs-metric-value">0</div>
+                <div class="cs-metric-label">manual steps between a design change and code</div>
+            </div>
+            <div class="cs-metric">
+                <div class="cs-metric-value">4</div>
+                <div class="cs-metric-label">theme dimensions: brand, light/dark, density, screen size</div>
+            </div>
+            <div class="cs-metric">
+                <div class="cs-metric-value">100%</div>
+                <div class="cs-metric-label">of token changes pass automated contrast checks</div>
+            </div>
+        </div>
+        </div>
+        
+        <div class="cs-content">
+
+            <div class="cs-section cs-section--wide cs-section--summary-brief">
+                <div class="cs-summary-brief__layout">
+                    <div class="cs-summary-brief__intro">
+                        <div class="cs-summary-brief__intro-main">
+                            <div class="cs-section-label">Summary</div>
+                            <h2 class="cs-section-title">What I did</h2>
+                            <p class="cs-section-text">I designed the token architecture end-to-end: picked Tokens Studio as the design-owned source of truth (keeping engineers out of the critical path), built the CI pipeline that exports, runs WCAG contrast checks, and publishes to CSS, Tailwind, MUI, SwiftUI, Android XML, and email in a single PR. I also structured Figma variables so designers could preview responsive breakpoints and theme switches live — no resizing, no hand-off delays.</p>
+                        </div>
+                        <aside class="cs-summary-brief__context" aria-label="Team">
+                            <div class="cs-context-card" role="group" aria-labelledby="tokens-team-title">
+                                <div class="cs-context-card__header" id="tokens-team-title">Team</div>
+                                <div class="cs-context-card__body">
+                                    <p>DS / tokens · Me 🧑‍💼</p>
+                                    <p>Designers · x3 (adoption, feedback)</p>
+                                    <p>Engineers · x5 (integration review)</p>
+                                    <p>QA &amp; accessibility · Shared</p>
+                                    <p>Stakeholders: PMs · Tech docs · 3 eng teams · 2 design teams</p>
+                                </div>
+                            </div>
+                        </aside>
+                    </div>
+                    <div class="cs-summary-brief__did">
+                        <div class="cs-token-atlas" aria-label="Token pipeline: design source to six code outputs">
+                            <p class="cs-token-atlas__kicker">Where the story lands</p>
+                            <div class="cs-token-atlas__flow">
+                                <div class="cs-token-atlas__lane cs-token-atlas__lane--source">
+                                    <span class="cs-token-atlas__lane-kicker">Design source</span>
+                                    <div class="cs-token-atlas__sources">
+                                        <span class="cs-token-atlas__node cs-token-atlas__node--figma">Figma</span>
+                                        <span class="cs-token-atlas__join" aria-hidden="true">+</span>
+                                        <span class="cs-token-atlas__node cs-token-atlas__node--tool">Tokens Studio</span>
+                                    </div>
+                                </div>
+                                <div class="cs-token-atlas__arrow" aria-hidden="true">
+                                    <span class="cs-token-atlas__arrow-line"></span>
+                                    <svg class="cs-token-atlas__arrow-head" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                                </div>
+                                <div class="cs-token-atlas__lane cs-token-atlas__lane--gate">
+                                    <span class="cs-token-atlas__lane-kicker">Automation</span>
+                                    <ul class="cs-token-atlas__pipeline" role="list" aria-label="Automation: export, checks, publish">
+                                        <li>Export → PR</li>
+                                        <li>WCAG in CI</li>
+                                        <li>Publish</li>
+                                    </ul>
+                                </div>
+                                <div class="cs-token-atlas__arrow" aria-hidden="true">
+                                    <span class="cs-token-atlas__arrow-line"></span>
+                                    <svg class="cs-token-atlas__arrow-head" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                                </div>
+                                <div class="cs-token-atlas__lane cs-token-atlas__lane--out">
+                                    <span class="cs-token-atlas__lane-kicker">Six platform outputs</span>
+                                    <ul class="cs-token-atlas__targets" role="list">
+                                        <li>CSS</li>
+                                        <li>Tailwind</li>
+                                        <li>MUI</li>
+                                        <li>Swift</li>
+                                        <li>Android</li>
+                                        <li>Email</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <p class="cs-token-atlas__footnote">Those same decisions also power live previews across <strong>brand</strong>, <strong>light / dark</strong>, <strong>density</strong>, and <strong>breakpoint</strong> — the four theme switches designers toggle in Figma before code ships.</p>
+                        </div>
+                    </div>
+                    <div class="cs-summary-brief__quote-break">
+                        <div class="cs-summary-brief__quote-break-rule" aria-hidden="true"></div>
+                        <p class="cs-summary-brief__quote-break-eyebrow">From a collaborator</p>
+                        <blockquote class="cs-summary-brief__testimonial cs-summary-brief__testimonial--break" cite="https://www.linkedin.com/in/felixjanemalm/">
+                            <p class="cs-summary-brief__testimonial-quote">“Felix is the whole package. As a leader in developing and maintaining Design Systems, Felix drives process with active listening, encouraging teams to contribute, then incorporating feedback. He has the unique ability to be creative, precise, collaborative and open-minded. His kind, generous spirit sharing his knowledge made a huge difference to our team. We miss him already. I highly recommend Felix. He will elevate your team, and company, with humility and humanity.”</p>
+                            <cite class="cs-summary-brief__testimonial-cite">Katy, Senior Designer — <a href="https://www.linkedin.com/in/felixjanemalm/#recommendations" target="_blank" rel="noopener noreferrer">Read on LinkedIn</a></cite>
+                        </blockquote>
+                    </div>
+                </div>
+            </div>
+
+            <div class="cs-section cs-section--wide cs-section--challenge-goals">
+                <div class="cs-section--challenge-goals__grid">
+                    <div class="cs-section--challenge-goals__challenge">
+                        <div class="cs-section-label">Challenge</div>
+                        <h2 class="cs-section-title">Design said "blue," engineering had three different values</h2>
+                        <p class="cs-section-text">Colors, spacing, and typography lived in scattered files — Figma styles, CSS variables, Tailwind configs — and none of them agreed. Dark mode was bolted on after the fact. Responsive sizing was handled differently in every codebase.</p>
+                        <p class="cs-section-text">A rebrand was about to land. Without a shared system, each team would interpret it independently — multiplying the inconsistencies. Theming a new brand meant weeks of manual find-and-replace across codebases.</p>
+                    </div>
+                    <div class="cs-section--challenge-goals__goals">
+                        <div class="cs-section-label">Goals</div>
+                        <h2 class="cs-section-title">Done right: designers own the tokens, engineers never touch them</h2>
+                        <ul class="cs-goals-list cs-goals-list--cards" role="list">
+                            <li>One source of truth for all design decisions — colors, spacing, typography, motion</li>
+                            <li>Automated pipeline: a change in Figma should update code with zero manual steps</li>
+                            <li>Support for brand, light/dark mode, density, and screen size from the same source</li>
+                            <li>Every color combination passes contrast checks automatically, before code ships</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="cs-section cs-section--split cs-section--architecture">
+                <div class="cs-token-diagram-wrap">
+                    <div class="cs-token-hierarchy" id="cs-token-hierarchy" role="region" aria-label="Token layers diagram with theme switch">
+                        <div class="cs-token-hierarchy__toggle-bar">
+                            <button type="button" class="cs-token-hierarchy__toggle-label is-active" id="cs-th-lbl-light">Light</button>
+                            <button type="button" class="cs-token-hierarchy__switch" id="cs-th-switch" role="switch" aria-checked="false" aria-label="Color mode: light. Switch to dark mode.">
+                                <span class="cs-token-hierarchy__switch-thumb" aria-hidden="true"></span>
+                            </button>
+                            <button type="button" class="cs-token-hierarchy__toggle-label" id="cs-th-lbl-dark">Dark</button>
+                        </div>
+                        <p class="cs-token-hierarchy__hint">Same token names — different resolved values when you switch themes. This is how products with very different needs could share a common language.</p>
+                        <div class="cs-token-hierarchy__scene light" id="cs-th-scene">
+                            <svg class="cs-token-hierarchy__overlay" id="cs-th-svg" aria-hidden="true"></svg>
+                            <div class="cs-token-hierarchy__tier">
+                                <div class="cs-token-hierarchy__tier-label">Raw value</div>
+                                <div class="cs-token-hierarchy__tier-content">
+                                    <div class="cs-token-hierarchy__chip" id="cs-th-c-val"><div class="cs-token-hierarchy__dot" id="cs-th-d-val"></div><span id="cs-th-t-val">#5C8211</span></div>
+                                </div>
+                            </div>
+                            <hr class="cs-token-hierarchy__divider">
+                            <div class="cs-token-hierarchy__tier">
+                                <div class="cs-token-hierarchy__tier-label">Reference</div>
+                                <div class="cs-token-hierarchy__tier-content">
+                                    <div class="cs-token-hierarchy__chip" id="cs-th-c-ref"><div class="cs-token-hierarchy__dot" id="cs-th-d-ref"></div><span id="cs-th-t-ref">lime-750</span></div>
+                                </div>
+                            </div>
+                            <hr class="cs-token-hierarchy__divider">
+                            <div class="cs-token-hierarchy__tier">
+                                <div class="cs-token-hierarchy__tier-label">System</div>
+                                <div class="cs-token-hierarchy__tier-content">
+                                    <div class="cs-token-hierarchy__chip" id="cs-th-c-sys"><div class="cs-token-hierarchy__dot" id="cs-th-d-sys"></div><span id="cs-th-t-sys">success-strong</span></div>
+                                </div>
+                            </div>
+                            <hr class="cs-token-hierarchy__divider cs-token-hierarchy__divider--before-intent">
+                            <div class="cs-token-hierarchy__tier">
+                                <div class="cs-token-hierarchy__tier-label">Intent</div>
+                                <div class="cs-token-hierarchy__tier-content cs-token-hierarchy__tier-content--pair">
+                                    <div class="cs-token-hierarchy__chip" id="cs-th-c-u1"><div class="cs-token-hierarchy__dot" id="cs-th-d-u1"></div><span id="cs-th-t-u1">success-bg-strong</span></div>
+                                    <div class="cs-token-hierarchy__chip" id="cs-th-c-u2"><div class="cs-token-hierarchy__dot" id="cs-th-d-u2"></div><span id="cs-th-t-u2">success-text</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="cs-architecture__copy">
+                    <div class="cs-section-label">Architecture</div>
+                    <h2 class="cs-section-title">Four layers from raw values to platform-ready code</h2>
+                    <p class="cs-section-text">At the bottom raw values are organized — a color ramp, a spacing scale, a type scale. Just numbers, no meaning attached. The next layer assigns purpose: "this is the primary brand color," "this is the default body text size." The third layer captures roles that work across any brand: "headline color," "interactive background."</p>
+                    <p class="cs-section-text">As a final step, those choices are compiled into the format each platform actually uses — scoped so every consumer only sees what's relevant to them.</p>
+                </div>
+            </div>
+
+            <div class="cs-section cs-section--split">
+                <div class="cs-media">
+                    <img src="../images/slides/tokens-figma-color-styles.png" alt="Figma Color styles menu: semantic text tokens such as text, text-subtle, text-strong, and primary-text instead of raw color values">
+                </div>
+                <div>
+                    <div class="cs-section-label">Naming</div>
+                    <h2 class="cs-section-title">Names describe purpose, not appearance</h2>
+                    <p class="cs-section-text">A token called "blue-500" tells you nothing about when to use it. A token called "text-subtle" tells you exactly what it's for. We treated naming as a design decision — every name communicates a role, so a rebrand only changes the values, never the structure. This is what made it possible to swap an entire brand palette in hours instead of weeks.</p>
+                </div>
+            </div>
+
+            <div class="cs-section cs-section--split cs-section--reverse">
+                <div class="cs-media cs-media--pipeline-logos">
+                    <div class="cs-pipeline-logos cs-pipeline-logos--constellation" role="img" aria-label="Tokens Studio, Style Dictionary, and Git">
+                        <img class="cs-pipeline-logos__logo cs-pipeline-logos__logo--ts" src="../images/logos/pipeline-tokens-studio.png" width="128" height="128" alt="" loading="lazy">
+                        <img class="cs-pipeline-logos__logo cs-pipeline-logos__logo--sd" src="../images/logos/pipeline-style-dictionary.png" width="128" height="128" alt="" loading="lazy">
+                        <img class="cs-pipeline-logos__logo cs-pipeline-logos__logo--git" src="../images/logos/pipeline-git.svg" width="24" height="24" alt="" loading="lazy">
+                    </div>
+                </div>
+                <div>
+                    <div class="cs-section-label">Pipeline</div>
+                    <h2 class="cs-section-title">Designers change a value, code updates automatically</h2>
+                    <p class="cs-section-text">Designers edit tokens directly in Figma using Tokens Studio and see changes preview live. Style Dictionary turns exports into platform-ready files. When ready, changes land as a pull request in Git. Automated checks verify every color combination meets contrast requirements. Only then does the change publish to all six platform targets.</p>
+                    <p class="cs-section-text">This removed the back-and-forth where designers would spec a value and engineers would implement something slightly different. It also had an unexpected benefit: engineers started reviewing design PRs, which deepened their understanding of design intent.</p>
+                </div>
+            </div>
+
+            <div class="cs-section cs-section--split cs-section--learn-outro cs-section--no-chapter-tint">
+                <div class="cs-learn-outro__col cs-learn-outro__col--copy">
+                    <div class="cs-learn-outro__copy">
+                        <div class="cs-section-label">Built for Speed</div>
+                        <h2 class="cs-section-title">Breakpoints handled before you even think to ask</h2>
+                        <p class="cs-section-text">Figma doesn't support percentage-based layouts. We worked around this by creating size tokens that mirror the exact responsive math used in code — column gaps, container widths, margin sizes. A designer creates one frame, toggles a "screen size" theme, and instantly sees how the layout looks at every breakpoint. No manual resizing, no guessing.</p>
+                        <p class="cs-section-text">We also connected component properties to theme variables. A horizontal button group on desktop automatically stacks vertically on mobile — one toggle changes the entire composition. Designers set the intent and the layout adapts. They stop thinking in pixels and start thinking in decisions.</p>
+                    </div>
+                </div>
+                <div class="cs-media cs-media--learn-outro">
+                    <video autoplay muted loop playsinline preload="auto" poster="../images/case-studies/tokens-yubico-full-page-figma.png" aria-label="Figma: Yubico full-page frame in the editor">
+                        <source src="../images/case-studies/tokens-learn-outro.mp4" type="video/mp4">
+                    </video>
+                </div>
+            </div>
+
+            <div class="cs-section cs-section--wide cs-section--delivery-bridge">
+                <div class="cs-section-label">Easy adoption</div>
+                <h2 class="cs-section-title">New designs inherit responsive behavior automatically</h2>
+                <p class="cs-section-text cs-section--delivery-bridge__lead">Because every element down to the layout is wired to size tokens on an atomic level, any new design already knows how to behave at every breakpoint. No redesigning for mobile — just switch and preview.</p>
+                <div class="cs-media cs-media--brown-bag-video cs-media--natural-ratio">
+                    <video controls autoplay muted loop playsinline preload="metadata" aria-label="Demo: assembling a module from components in Figma, then previewing all breakpoints with a single theme toggle">
+                        <source src="../images/slides/tokens-theme-size-export.mp4" type="video/mp4">
+                    </video>
+                </div>
+            </div>
+
+            <div class="cs-section cs-section--split cs-section--revenue-impact">
+                <div class="cs-revenue-chart">
+                    <div class="cs-revenue-chart__legend" aria-hidden="true">
+                        <span class="cs-revenue-chart__legend-item">
+                            <span class="cs-revenue-chart__swatch cs-revenue-chart__swatch--original"></span>
+                            Original timeline
+                        </span>
+                        <span class="cs-revenue-chart__legend-item">
+                            <span class="cs-revenue-chart__swatch cs-revenue-chart__swatch--accelerated"></span>
+                            Accelerated timeline
+                        </span>
+                    </div>
+                    <div class="cs-revenue-chart__canvas-wrap">
+                        <canvas id="cs-revenue-pipeline-chart" role="img" aria-label="Chart comparing cumulative pipeline in millions over 12 months: accelerated timeline vs original timeline"></canvas>
+                    </div>
+                </div>
+                <div>
+                    <div class="cs-section-label">Bottom Line</div>
+                    <h2 class="cs-section-title">Moving faster added $6M to the pipeline</h2>
+                    <p class="cs-section-text">The business projected $15M in additional pipeline from improving the website — conversion rates, engagement, compounding over the year.</p>
+                    <p class="cs-section-text">The gap between the two lines in the chart is the value of moving faster. The adjusted timeline generates an additional $5.83 million in pipeline compared to the original timeline over the 12-month period.</p>
+                </div>
+            </div>
+
+            <div class="cs-section cs-section--no-chapter-tint">
+                <div class="cs-section-label">What I learned</div>
+                <h2 class="cs-section-title">The hardest part wasn't the architecture — it was the trust</h2>
+                <p class="cs-section-text">Engineers needed to believe the token values would be correct. Designers needed to believe their intent would survive the automated pipeline. PMs needed to believe that theming wouldn't slow down delivery.</p>
+                <p class="cs-section-text">Early on, I made the mistake of presenting the token architecture as a finished plan. Engineers pushed back — not on the idea, but because they hadn't been involved in the decisions. I shifted to sharing the architecture as a proposal and running joint sessions where engineers could stress-test the naming and layering against their actual codebases. Adoption accelerated once people felt they'd shaped the system, not just received it.</p>
+            </div>
+
+        </div>
+
+        <div class="cs-next">
+            <div class="cs-next-label">Next Project</div>
+            <a href="ai-sourcing.html" class="cs-next-link">
+                Built the sourcing OS — from vendor inbox to AI-queryable supply chain <span class="cs-next-arrow">&rarr;</span>
+            </a>
+        </div>
+
+    </div>
+
+    <footer>
+            <span>
+                <a href="mailto:hello@felixjanemalm.com">hello@felixjanemalm.com</a>
+            </span>
+            <span>
+                <a href="../Resume.pdf" target="_blank" download>
+                    Resume.pdf
+                    <svg width="18" height="22" viewBox="0 0 18 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9.85 2C9.85 1.53056 9.46944 1.15 9 1.15C8.53056 1.15 8.15 1.53056 8.15 2L9.85 2ZM8.39896 17.601C8.73091 17.933 9.2691 17.933 9.60104 17.601L15.0104 12.1917C15.3424 11.8597 15.3424 11.3215 15.0104 10.9896C14.6785 10.6576 14.1403 10.6576 13.8083 10.9896L9 15.7979L4.19167 10.9896C3.85973 10.6576 3.32154 10.6576 2.98959 10.9896C2.65765 11.3215 2.65765 11.8597 2.98959 12.1917L8.39896 17.601ZM8.15 2L8.15 17L9.85 17L9.85 2L8.15 2Z" fill="currentColor"/>
+                        <path d="M1.21094 20.9688H17.0004" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                    </svg>
+                </a>
+            </span>
+            <span>
+                <a href="https://www.linkedin.com/in/felixjanemalm/" target="_blank">
+                    <svg width="20" height="21" viewBox="0 0 20 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M0 6.53138H4.42553V20.9687H0V6.53138ZM16.9787 7.4231C17.8582 7.90435 18.5816 8.63329 19.1489 9.60994C19.7163 10.5866 20 11.5845 20 12.6036V20.9687H15.5319V12.6036C15.5319 12.3771 15.4468 12.1223 15.2766 11.8392C15.1064 11.5562 14.9504 11.3721 14.8085 11.2872C14.5816 11.1457 14.2695 11.0749 13.8723 11.0749C13.4752 11.0749 13.1631 11.1315 12.9362 11.2448L11.1064 12.1365V20.9687H6.6383V6.53138H11.1064V7.21079C11.9858 6.81447 12.9787 6.63046 14.0851 6.65877C15.1915 6.68708 16.156 6.94186 16.9787 7.4231ZM2.21277 0.96875C2.83688 0.96875 3.3617 1.18106 3.78723 1.60569C4.21277 2.03032 4.42553 2.55403 4.42553 3.17682C4.42553 3.79961 4.21277 4.33039 3.78723 4.76917C3.3617 5.20796 2.83688 5.42735 2.21277 5.42735C1.58865 5.42735 1.06383 5.20796 0.638298 4.76917C0.212766 4.33039 0 3.79961 0 3.17682C0 2.55403 0.212766 2.03032 0.638298 1.60569C1.06383 1.18106 1.58865 0.96875 2.21277 0.96875Z" fill="currentColor"/>
+                    </svg>
+                </a>
+            </span>
+            <span>
+                <a href="https://maps.app.goo.gl/ar51QZTdsHNgS3Ej8" target="_blank">
+                    <svg width="16" height="20" viewBox="0 0 16 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7.77618 20C6.37306 18.8032 5.0725 17.4911 3.88809 16.0775C2.11068 13.9546 9.81645e-07 10.793 9.81645e-07 7.7803C-0.00157443 4.63378 1.89322 1.79641 4.8002 0.592222C7.70718 -0.611966 11.0534 0.0543808 13.2773 2.28032C14.7397 3.73625 15.5589 5.71671 15.5524 7.7803C15.5524 10.793 13.4417 13.9546 11.6643 16.0775C10.4799 17.4911 9.1793 18.8032 7.77618 20ZM7.77618 4.44765C6.58554 4.44765 5.48534 5.08285 4.89002 6.11398C4.2947 7.1451 4.2947 8.4155 4.89002 9.44662C5.48534 10.4777 6.58554 11.1129 7.77618 11.1129C9.61675 11.1129 11.1088 9.62087 11.1088 7.7803C11.1088 5.93973 9.61675 4.44765 7.77618 4.44765Z" fill="currentColor"/>
+                    </svg>
+                    Los Angeles
+                </a>
+            </span>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tinycolor/1.4.2/tinycolor.min.js"></script>
+    <script src="../js/color-shade-calculator.js"></script>
+    <script src="../js/header.js"></script>
+    <script src="../js/drawer.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="../js/revenue-impact-chart.js"></script>
+    <script src="../js/token-hierarchy-diagram.js"></script>
+    <script>
+        (function () {
+            var v = document.querySelector('.cs-media--learn-outro video');
+            if (!v) return;
+            function tryPlay() {
+                var p = v.play();
+                if (p && typeof p.catch === 'function') p.catch(function () {});
+            }
+            if (v.readyState >= 2) tryPlay();
+            else v.addEventListener('canplay', tryPlay, { once: true });
+        })();
+    </script>
+
+</body>
+</html>

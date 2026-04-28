@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A supply chain you can scan. The sourcing OS behind a co-founded fashion startup where transparency is the product — specialist AI agents, a graph-shaped database, and a QR code on every garment, three years ahead of EU regulation.">
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+    <title>Built the Sourcing OS – Felix Janemalm</title>
+    <link rel="preload" href="../fonts/woff2/RNSPhysis-Medium.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="../fonts/woff2/RNSPhysis-Light.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="../css/tokens/Ref/yds.css">
+    <link rel="stylesheet" href="../css/tokens/Ref/mui.css">
+    <link rel="stylesheet" href="../css/tokens/theme.css">
+    <link rel="stylesheet" href="../css/master.css">
+    <link rel="stylesheet" href="../css/typography.css">
+    <link rel="stylesheet" href="../css/materials.css">
+    <link rel="stylesheet" href="../css/header.css">
+    <link rel="stylesheet" href="../css/drawer.css">
+    <link rel="stylesheet" href="../css/case-study-page.css">
+    <link rel="stylesheet" href="../css/footer.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        /* ─── Rejected-constraint list (things the solution does NOT assume) ─── */
+        .cs-constraint-tags {
+            list-style: none;
+            padding: 0;
+            margin: 0.6rem 0 1.15rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        .cs-constraint-tags li {
+            display: flex;
+            align-items: baseline;
+            gap: 0.55rem;
+            color: color-mix(in srgb, var(--text) 55%, transparent);
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+        .cs-constraint-tags li::before {
+            content: "×";
+            font-weight: 600;
+            font-size: 0.95em;
+            color: color-mix(in srgb, var(--text) 40%, transparent);
+            flex-shrink: 0;
+        }
+
+        /* ─── Challenge: narrow reading-width text, full-width Sankey below ─── */
+        .cs-section--challenge__text {
+            max-width: min(40rem, 100%);
+            margin-inline: auto;
+            margin-bottom: clamp(1.5rem, 3vw, 2.25rem);
+        }
+
+        /* ─── Overview: text on left, bullets on right; atlas full-width below ─── */
+        .cs-section--overview__split {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: clamp(1.5rem, 4vw, 2.75rem);
+            align-items: start;
+            margin-bottom: clamp(1.5rem, 3vw, 2.25rem);
+        }
+        .cs-section--overview__bullets {
+            margin-top: 0;
+        }
+        @media (max-width: 1023px) {
+            .cs-section--overview__split {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ─── Pipeline-at-a-glance graph (4 stages: inputs → AI pipeline → graph-shaped DB → capabilities) ─── */
+        .cs-pipeline-graph {
+            background: color-mix(in srgb, var(--text) 4%, transparent);
+            border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+            border-radius: 16px;
+            padding: clamp(1.25rem, 3vw, 2rem);
+            margin-top: 2rem;
+        }
+        .cs-pipeline-graph__kicker {
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: color-mix(in srgb, var(--text) 50%, transparent);
+            margin-bottom: 1.25rem;
+        }
+        .cs-pipeline-graph__scroll {
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            /* Flip the overflow container so the horizontal scrollbar renders at the top */
+            transform: rotateX(180deg);
+            scrollbar-width: thin;
+            scrollbar-color: color-mix(in srgb, var(--text) 28%, transparent) transparent;
+        }
+        .cs-pipeline-graph__scroll > * {
+            /* Flip content back to normal orientation */
+            transform: rotateX(180deg);
+        }
+        .cs-pipeline-graph__scroll::-webkit-scrollbar { height: 8px; }
+        .cs-pipeline-graph__scroll::-webkit-scrollbar-track {
+            background: color-mix(in srgb, var(--text) 5%, transparent);
+            border-radius: 4px;
+            margin: 0 12px;
+        }
+        .cs-pipeline-graph__scroll::-webkit-scrollbar-thumb {
+            background: color-mix(in srgb, var(--text) 25%, transparent);
+            border-radius: 4px;
+        }
+        .cs-pipeline-graph__scroll::-webkit-scrollbar-thumb:hover {
+            background: color-mix(in srgb, var(--text) 40%, transparent);
+        }
+        .cs-pipeline-graph__svg {
+            display: block;
+            width: 100%;
+            min-width: 760px;
+            height: auto;
+            color: var(--text);
+        }
+        .cs-pipeline-graph__stage-label {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            fill: color-mix(in srgb, var(--text) 55%, transparent);
+        }
+        .cs-pipeline-graph__box {
+            fill: color-mix(in srgb, var(--text) 5%, var(--bg));
+            stroke: color-mix(in srgb, var(--text) 22%, transparent);
+            stroke-width: 1;
+        }
+        .cs-pipeline-graph__box--input {
+            fill: color-mix(in srgb, #3b82f6 10%, var(--bg));
+            stroke: color-mix(in srgb, #3b82f6 38%, transparent);
+        }
+        .cs-pipeline-graph__box--pipeline {
+            fill: color-mix(in srgb, #CB945C 10%, var(--bg));
+            stroke: color-mix(in srgb, #CB945C 35%, transparent);
+        }
+        .cs-pipeline-graph__pill {
+            fill: color-mix(in srgb, var(--text) 6%, var(--bg));
+            stroke: color-mix(in srgb, var(--text) 25%, transparent);
+            stroke-width: 1;
+        }
+        .cs-pipeline-graph__pill--hub {
+            fill: color-mix(in srgb, #2f8112 15%, var(--bg));
+            stroke: color-mix(in srgb, #2f8112 48%, transparent);
+        }
+        .cs-pipeline-graph__pill--lock {
+            fill: color-mix(in srgb, #CB945C 15%, var(--bg));
+            stroke: color-mix(in srgb, #CB945C 48%, transparent);
+        }
+        .cs-pipeline-graph__pill--meta {
+            stroke-dasharray: 3 3;
+            stroke: color-mix(in srgb, #9333ea 55%, transparent);
+            fill: color-mix(in srgb, #9333ea 7%, var(--bg));
+        }
+        .cs-pipeline-graph__feature {
+            fill: color-mix(in srgb, #9333ea 8%, var(--bg));
+            stroke: color-mix(in srgb, #9333ea 35%, transparent);
+            stroke-width: 1;
+        }
+        .cs-pipeline-graph__label {
+            font-size: 12.5px;
+            font-weight: 700;
+            fill: var(--text);
+        }
+        .cs-pipeline-graph__sub {
+            font-size: 10.5px;
+            font-weight: 500;
+            fill: color-mix(in srgb, var(--text) 60%, transparent);
+        }
+        .cs-pipeline-graph__pill-label {
+            font-size: 11px;
+            font-weight: 600;
+            fill: var(--text);
+        }
+        .cs-pipeline-graph__edges {
+            stroke-width: 1;
+            opacity: 0.28;
+        }
+        .cs-pipeline-graph__embeddings-rays {
+            stroke-width: 1;
+            stroke-linecap: round;
+            stroke-dasharray: 1 4;
+            opacity: 0.5;
+        }
+        .cs-pipeline-graph__footnote {
+            margin-top: 1rem;
+            font-size: 0.8rem;
+            color: color-mix(in srgb, var(--text) 55%, transparent);
+            line-height: 1.5;
+            border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+            padding-top: 0.75rem;
+        }
+
+        /* ─── Sourcing pipeline atlas (extends token atlas) ─── */
+        .cs-sourcing-atlas {
+            background: color-mix(in srgb, var(--text) 4%, transparent);
+            border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+            border-radius: 16px;
+            padding: clamp(1.25rem, 3vw, 2rem);
+        }
+        .cs-sourcing-atlas__kicker {
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: color-mix(in srgb, var(--text) 50%, transparent);
+            margin-bottom: 1.25rem;
+        }
+        .cs-sourcing-atlas__flow {
+            display: flex;
+            align-items: center;
+            gap: clamp(0.5rem, 2vw, 1rem);
+            flex-wrap: wrap;
+        }
+        .cs-sourcing-atlas__lane {
+            flex: 1;
+            min-width: 100px;
+        }
+        .cs-sourcing-atlas__lane-kicker {
+            display: block;
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: color-mix(in srgb, var(--text) 45%, transparent);
+            margin-bottom: 0.5rem;
+        }
+        .cs-sourcing-atlas__node {
+            display: inline-block;
+            padding: 0.3em 0.7em;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            border: 1px solid color-mix(in srgb, var(--text) 15%, transparent);
+            background: color-mix(in srgb, var(--text) 5%, transparent);
+        }
+        .cs-sourcing-atlas__node--email { background: color-mix(in srgb, #3b82f6 15%, transparent); border-color: color-mix(in srgb, #3b82f6 30%, transparent); }
+        .cs-sourcing-atlas__node--n8n   { background: color-mix(in srgb, #CB945C 15%, transparent); border-color: color-mix(in srgb, #CB945C 30%, transparent); }
+        .cs-sourcing-atlas__sources { display: flex; flex-direction: column; gap: 0.4rem; }
+        .cs-sourcing-atlas__join { font-weight: 700; color: color-mix(in srgb, var(--text) 40%, transparent); font-size: 0.8rem; padding: 0 0.15rem; }
+        .cs-sourcing-atlas__pipeline {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        .cs-sourcing-atlas__pipeline li {
+            padding: 0.25em 0.6em;
+            background: color-mix(in srgb, var(--text) 5%, transparent);
+            border-radius: 4px;
+            border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+        }
+        .cs-sourcing-atlas__targets {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.3rem;
+            font-size: 0.78rem;
+            font-weight: 500;
+        }
+        .cs-sourcing-atlas__targets li {
+            padding: 0.25em 0.5em;
+            background: color-mix(in srgb, var(--text) 5%, transparent);
+            border-radius: 4px;
+            border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+            text-align: center;
+        }
+        .cs-sourcing-atlas__arrow {
+            display: flex;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        .cs-sourcing-atlas__arrow-line {
+            display: block;
+            width: clamp(12px, 2vw, 24px);
+            height: 1.5px;
+            background: color-mix(in srgb, var(--text) 25%, transparent);
+        }
+        .cs-sourcing-atlas__arrow-head {
+            color: color-mix(in srgb, var(--text) 35%, transparent);
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+        }
+        .cs-sourcing-atlas__footnote {
+            margin-top: 1rem;
+            font-size: 0.8rem;
+            color: color-mix(in srgb, var(--text) 55%, transparent);
+            line-height: 1.5;
+            border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+            padding-top: 0.75rem;
+        }
+
+        /* ─── Console tabs diagram ─── */
+        .cs-console-tabs {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        .cs-console-tab {
+            background: color-mix(in srgb, var(--text) 4%, transparent);
+            border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+            border-radius: 12px;
+            padding: 1.1rem 1rem;
+        }
+        .cs-console-tab__name {
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: color-mix(in srgb, var(--text) 50%, transparent);
+            margin-bottom: 0.4rem;
+        }
+        .cs-console-tab__title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            line-height: 1.3;
+        }
+        .cs-console-tab__desc {
+            font-size: 0.8rem;
+            color: color-mix(in srgb, var(--text) 60%, transparent);
+            line-height: 1.5;
+        }
+        .cs-console-tab--proposals { border-top: 3px solid #3b82f6; }
+        .cs-console-tab--actions   { border-top: 3px solid #CB945C; }
+        .cs-console-tab--styles    { border-top: 3px solid #2f8112; }
+        .cs-console-tab--inventory { border-top: 3px solid #9333ea; }
+
+        /* ─── Live demo wrapper (QR section) ─── */
+        .cs-demo-wrapper {
+            background: color-mix(in srgb, var(--text) 3%, transparent);
+            border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+            border-radius: 20px;
+            overflow: hidden;
+            margin-top: clamp(1.5rem, 3vw, 2.5rem);
+        }
+        .cs-demo-header {
+            padding: 1rem 1.5rem;
+            background: color-mix(in srgb, var(--text) 5%, transparent);
+            border-bottom: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            font-size: 0.78rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: color-mix(in srgb, var(--text) 50%, transparent);
+        }
+        .cs-demo-header__dot {
+            width: 8px; height: 8px;
+            background: #2f8112;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .cs-demo-body { padding: clamp(1.25rem, 3vw, 2rem); }
+
+        /* ─── Sankey (ported from batch-story) ─── */
+        :root {
+            --sankey-primary: #CB945C;
+            --sankey-bg-secondary: color-mix(in srgb, var(--text) 4%, transparent);
+            --sankey-bg-tertiary: color-mix(in srgb, var(--text) 7%, transparent);
+            --sankey-border: color-mix(in srgb, var(--text) 12%, transparent);
+            --sankey-text-primary: var(--text);
+            --sankey-text-secondary: color-mix(in srgb, var(--text) 55%, transparent);
+        }
+        .sankey-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            padding: 0 0 24px 0;
+        }
+        .sankey-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--sankey-text-secondary);
+        }
+        .sankey-legend-color {
+            width: 14px; height: 14px;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+        .sankey-tooltip {
+            position: fixed;
+            background: color-mix(in srgb, var(--text) 6%, var(--bg));
+            color: color-mix(in srgb, var(--text) 80%, transparent);
+            border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+            padding: 8px 11px;
+            border-radius: 8px;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s;
+            z-index: 1000;
+            max-width: 240px;
+            line-height: 1.5;
+            box-shadow: 0 4px 14px color-mix(in srgb, var(--text) 8%, transparent);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+        }
+        .sankey-tooltip.visible { opacity: 1; }
+        .sankey-tooltip-title { font-weight: 600; margin-bottom: 2px; color: var(--text); }
+        .sankey-tooltip-detail { font-size: 11.5px; opacity: 0.7; }
+        .sankey-svg-container {
+            background: linear-gradient(135deg, color-mix(in srgb, var(--text) 4%, transparent) 0%, color-mix(in srgb, var(--text) 6%, transparent) 100%);
+            border-radius: 12px;
+            padding: 32px 16px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            /* Flip the overflow container so the horizontal scrollbar renders at the top */
+            transform: rotateX(180deg);
+            scrollbar-width: thin;
+            scrollbar-color: color-mix(in srgb, var(--text) 28%, transparent) transparent;
+        }
+        .sankey-svg-container > * {
+            /* Flip content back to normal orientation */
+            transform: rotateX(180deg);
+        }
+        .sankey-svg-container svg { display: block; margin: 0 auto; }
+        .sankey-svg-container svg text { pointer-events: none; }
+        .sankey-svg-container::-webkit-scrollbar { height: 8px; }
+        .sankey-svg-container::-webkit-scrollbar-track {
+            background: color-mix(in srgb, var(--text) 5%, transparent);
+            border-radius: 4px;
+            margin: 0 12px;
+        }
+        .sankey-svg-container::-webkit-scrollbar-thumb {
+            background: color-mix(in srgb, var(--text) 25%, transparent);
+            border-radius: 4px;
+        }
+        .sankey-svg-container::-webkit-scrollbar-thumb:hover {
+            background: color-mix(in srgb, var(--text) 40%, transparent);
+        }
+        .sankey-node-rect { cursor: pointer; }
+        .sankey-node-rect:hover rect { filter: brightness(1.2); }
+        .sankey-link { cursor: pointer; }
+        @media (max-width: 768px) {
+            .sankey-svg-container { padding: 16px 8px; }
+        }
+
+        /* ─── Material tree (ported from batch-story) ─── */
+        .tree-container { margin-top: 1.5rem; }
+        .tree-node {
+            border: 1px solid var(--sankey-border);
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin-bottom: 6px;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+            background: color-mix(in srgb, var(--text) 3%, transparent);
+        }
+        .tree-node:hover { border-color: #CB945C; background: color-mix(in srgb, #CB945C 5%, transparent); }
+        .tree-level-1 { margin-left: 0; border-left: 3px solid #CB945C; }
+        .tree-level-2 { margin-left: 20px; border-left: 3px solid #2f8112; }
+        .tree-level-3 { margin-left: 40px; border-left: 3px solid #3b82f6; }
+        .tree-node-title { font-weight: 600; font-size: 0.9rem; margin-bottom: 4px; }
+        .tree-node-subtitle { font-size: 0.8rem; color: var(--sankey-text-secondary); }
+        .tree-node-details { display: none; margin-top: 10px; font-size: 0.82rem; line-height: 1.6; }
+        .tree-node.expanded .tree-node-details { display: block; }
+        .tree-badge {
+            display: inline-block;
+            background: color-mix(in srgb, #2f8112 15%, transparent);
+            color: #2f8112;
+            border: 1px solid color-mix(in srgb, #2f8112 30%, transparent);
+            border-radius: 4px;
+            padding: 1px 7px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            margin: 2px;
+        }
+        .tree-expand-hint {
+            font-size: 0.72rem;
+            color: var(--sankey-text-secondary);
+            margin-top: 4px;
+            font-style: italic;
+        }
+
+        /* ─── Journey map ─── */
+        .map-container {
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 1.5rem;
+            border: 1px solid var(--sankey-border);
+        }
+        #cs-journey-map {
+            height: 380px;
+            width: 100%;
+        }
+        .leaflet-container { background: color-mix(in srgb, var(--text) 8%, transparent) !important; }
+
+        /* ─── Demo section tabs ─── */
+        .cs-demo-tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+            margin-bottom: 1.5rem;
+            overflow-x: auto;
+        }
+        .cs-demo-tab-btn {
+            padding: 0.65rem 1.1rem;
+            font-size: 0.82rem;
+            font-weight: 600;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            color: color-mix(in srgb, var(--text) 50%, transparent);
+            white-space: nowrap;
+            transition: color 0.2s, border-color 0.2s;
+        }
+        .cs-demo-tab-btn:hover { color: var(--text); }
+        .cs-demo-tab-btn.active { color: var(--text); border-bottom-color: #CB945C; }
+        .cs-demo-tab-panel { display: none; }
+        .cs-demo-tab-panel.active { display: block; }
+
+        /* ─── Stats bar in QR section ─── */
+        .cs-qr-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+        .cs-qr-stat {
+            background: color-mix(in srgb, var(--text) 4%, transparent);
+            border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+            border-radius: 10px;
+            padding: 0.85rem 0.75rem;
+            text-align: center;
+        }
+        .cs-qr-stat__value { font-size: 1.4rem; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+        .cs-qr-stat__label { font-size: 0.72rem; color: color-mix(in srgb, var(--text) 55%, transparent); line-height: 1.3; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <nav>
+            <div class="logo">
+                <a href="../index.html#home">
+                    <span class="short-logo">
+                        <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <g filter="url(#filter0_dd_357_229)">
+                            <path d="M107.098 139.927H161.976C161.976 117.976 175.878 99.6829 202.22 99.6829C227.982 99.6829 271 99.9268 289.293 99.6829V50.6585H194.902C146.61 50.6585 107.098 86.5122 107.098 139.927Z" fill="currentColor"/>
+                            <path d="M91 175.049H243.195C243.195 200.659 233.683 228.463 186.854 228.463C156.994 228.463 118.317 228.707 91 228.463V175.049Z" fill="currentColor"/>
+                            <path d="M409.292 175.049V338.951C409.292 409.195 347.829 464.805 261.488 464.805C167.829 464.805 107.829 401.143 107.829 341.878V261.393H161.243V326.512C161.243 382.854 211 411.39 261.488 411.39C311.976 411.39 356.61 382.854 356.61 326.512C356.61 266.22 356.61 263.832 356.61 265.052V175.78L409.292 175.049Z" fill="currentColor"/>
+                            <path d="M421 85.0488C421 106.063 403.965 123.098 382.951 123.098C361.937 123.098 344.902 106.063 344.902 85.0488C344.902 64.035 361.937 47 382.951 47C403.965 47 421 64.035 421 85.0488Z" fill="currentColor"/>
+                            </g>
+                            <defs>
+                            <filter id="filter0_dd_357_229" x="83.6829" y="42.6098" width="347.561" height="435.366" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+                            <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+                            <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+                            <feOffset dx="1.46341" dy="4.39024"/>
+                            <feGaussianBlur stdDeviation="4.39024"/>
+                            <feComposite in2="hardAlpha" operator="out"/>
+                            <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/>
+                            <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_357_229"/>
+                            <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+                            <feOffset dy="5.85366"/>
+                            <feGaussianBlur stdDeviation="2.92683"/>
+                            <feComposite in2="hardAlpha" operator="out"/>
+                            <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/>
+                            <feBlend mode="normal" in2="effect1_dropShadow_357_229" result="effect2_dropShadow_357_229"/>
+                            <feBlend mode="normal" in="SourceGraphic" in2="effect2_dropShadow_357_229" result="shape"/>
+                            </filter>
+                            </defs>
+                        </svg>
+                    </span>
+                    <span class="full-logo">Felix Janemalm</span>
+                </a>
+            </div>
+            <ul class="nav-links">
+                <li><a href="../index.html#work">Work</a></li>
+                <li><a href="../Resume.pdf" target="_blank">Resume.pdf</a></li>
+                <li><a href="#contact" id="contactBtn">Contact</a></li>
+            </ul>
+        </nav>
+        <div id="progress-bar"></div>
+    </header>
+    <div id="overlay" class="overlay"></div>
+
+    <div id="drawer" class="drawer">
+        <div class="drawer-content">
+          <nav class="nav-links">
+            <span>
+                <a href="mailto:hello@felixjanemalm.com">
+                    <svg width="16" height="16" viewBox="0 0 140 112" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;"><path d="M118.666 0H20.9411C15.3872 0 10.0607 2.20629 6.1335 6.1335C2.20629 10.0607 0 15.3872 0 20.9411V90.7446C0 96.2986 2.20629 101.625 6.1335 105.552C10.0607 109.479 15.3872 111.686 20.9411 111.686H118.666C124.22 111.686 129.546 109.479 133.474 105.552C137.401 101.625 139.607 96.2986 139.607 90.7446V20.9411C139.607 15.3872 137.401 10.0607 133.474 6.1335C129.546 2.20629 124.22 0 118.666 0ZM118.666 13.9607L73.2938 45.1629C72.2326 45.7756 71.0289 46.0981 69.8036 46.0981C68.5783 46.0981 67.3745 45.7756 66.3134 45.1629L20.9411 13.9607H118.666Z" fill="currentColor"/></svg>
+                    hello@felixjanemalm.com</a>
+             </span>
+            <a href="https://www.linkedin.com/in/felixjanemalm/" target="_blank">
+                <svg width="16" height="16" viewBox="0 0 20 21" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;"><path d="M0 6.53138H4.42553V20.9687H0V6.53138ZM16.9787 7.4231C17.8582 7.90435 18.5816 8.63329 19.1489 9.60994C19.7163 10.5866 20 11.5845 20 12.6036V20.9687H15.5319V12.6036C15.5319 12.3771 15.4468 12.1223 15.2766 11.8392C15.1064 11.5562 14.9504 11.3721 14.8085 11.2872C14.5816 11.1457 14.2695 11.0749 13.8723 11.0749C13.4752 11.0749 13.1631 11.1315 12.9362 11.2448L11.1064 12.1365V20.9687H6.6383V6.53138H11.1064V7.21079C11.9858 6.81447 12.9787 6.63046 14.0851 6.65877C15.1915 6.68708 16.156 6.94186 16.9787 7.4231ZM2.21277 0.96875C2.83688 0.96875 3.3617 1.18106 3.78723 1.60569C4.21277 2.03032 4.42553 2.55403 4.42553 3.17682C4.42553 3.79961 4.21277 4.33039 3.78723 4.76917C3.3617 5.20796 2.83688 5.42735 2.21277 5.42735C1.58865 5.42735 1.06383 5.20796 0.638298 4.76917C0.212766 4.33039 0 3.79961 0 3.17682C0 2.55403 0.212766 2.03032 0.638298 1.60569C1.06383 1.18106 1.58865 0.96875 2.21277 0.96875Z" fill="currentColor"/></svg>
+                /felixjanemalm</a>
+          </nav>
+        </div>
+    </div>
+
+    <div class="cs-page">
+
+        <a href="../index.html#work" class="cs-back">&larr; All Work</a>
+
+        <div class="cs-hero">
+            <div class="cs-hero__surface">
+                <video autoplay muted loop playsinline>
+                    <source src="../images/case-studies/sourcing-platform-overview.mp4" type="video/mp4">
+                </video>
+            </div>
+        </div>
+
+        <div class="cs-intro">
+            <div class="cs-meta">
+                <span>Startup</span>
+                <span class="cs-meta-sep">/</span>
+                <span>Solo Build</span>
+                <span class="cs-meta-sep">/</span>
+                <span>4 months</span>
+            </div>
+            <h1 class="cs-title">AI-powered supply chain traceability</h1>
+            <p class="cs-description">Built a system that makes full transparency possible for a two-person fashion startup.</p>
+        </div>
+
+        <div class="cs-metrics-strip">
+        <div class="cs-metrics">
+            <div class="cs-metric">
+                <div class="cs-metric-value">20+</div>
+                <div class="cs-metric-label">specialist AI agents replace manual sourcing ops</div>
+            </div>
+            <div class="cs-metric">
+                <div class="cs-metric-value">100%</div>
+                <div class="cs-metric-label">of sustainability claims tied to verifiable records</div>
+            </div>
+            <div class="cs-metric">
+                <div class="cs-metric-value">1 scan</div>
+                <div class="cs-metric-label">from garment tag to the full, verified supply chain.</div>
+            </div>
+            <div class="cs-metric">
+                <div class="cs-metric-value">2027</div>
+                <div class="cs-metric-label">EU Digital Product Passport — shipped 3 years early</div>
+            </div>
+        </div>
+        </div>
+
+        <div class="cs-content">
+
+            <!-- CHALLENGE -->
+            <div class="cs-section cs-section--wide cs-section--challenge">
+                <div class="cs-section--challenge__text">
+                    <div class="cs-section-label">Challenge</div>
+                    <h2 class="cs-section-title">Scan the tag. See where your garment came from.</h2>
+                    <p class="cs-section-text">Supply chain transparency was a core brand promise. But garments have a complex chain of custody: fibers from all over the world, through various suppliers, get blended into various textiles, different transportation methods affect the carbon footprint for each leg. Existing solutions assume:</p>
+                    <ul class="cs-constraint-tags" role="list">
+                        <li>large teams</li>
+                        <li>manual data entry</li>
+                        <li>expensive compliance platforms</li>
+                    </ul>
+                    <p class="cs-section-text">The raw data could be anything from a photo of a swatch in the warehouse to a note in an email. Our goal was to convert this into something customers could easily understand with just 1 scan.</p>
+                </div>
+                <div class="cs-demo-wrapper">
+                    <div class="cs-demo-header">
+                        <div class="cs-demo-header__dot"></div>
+                        Men's Moto Pant — real data from a shipped batch
+                    </div>
+                    <div class="cs-demo-body">
+                        <div id="cs-sankey-diagram">
+                            <div style="text-align:center;padding:40px;opacity:0.5;">Initializing supply chain flow diagram…</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- OVERVIEW -->
+            <div class="cs-section cs-section--wide cs-section--overview">
+                <div class="cs-section--overview__split">
+                    <div class="cs-section--overview__text">
+                        <div class="cs-section-label">Overview</div>
+                        <h2 class="cs-section-title">One pipeline. End to end.</h2>
+                        <p class="cs-section-text">Every step removed a job the team would otherwise have to do.</p>
+                        <p class="cs-section-text">No spreadsheets. No manual tracking. No gaps.</p>
+                        <p class="cs-section-text">If it couldn't scale to zero overhead, it didn't ship.</p>
+                    </div>
+                    <ul class="cs-goals-list cs-goals-list--cards cs-section--overview__bullets" role="list">
+                        <li>Ingest raw vendor data automatically</li>
+                        <li>Structure it into a relational model</li>
+                        <li>Lock production into immutable records</li>
+                        <li>Generate transparency directly from those records</li>
+                    </ul>
+                </div>
+
+                <div class="cs-pipeline-graph" aria-label="Four-stage pipeline: inputs, AI pipeline, graph-shaped database, consumer + operational outputs">
+                    <p class="cs-pipeline-graph__kicker">The pipeline at a glance</p>
+                    <div class="cs-pipeline-graph__scroll">
+                        <svg viewBox="0 0 920 382" class="cs-pipeline-graph__svg" role="img" aria-label="End-to-end pipeline diagram">
+                            <!-- Stage column labels -->
+                            <g class="cs-pipeline-graph__stage-label">
+                                <text x="100" y="20" text-anchor="middle">Inputs</text>
+                                <text x="295" y="20" text-anchor="middle">AI pipeline</text>
+                                <text x="545" y="20" text-anchor="middle">Graph database</text>
+                                <text x="820" y="20" text-anchor="middle">Capabilities</text>
+                            </g>
+
+                            <!-- Inter-stage arrows: single stroked chevron (line + head in one path) -->
+                            <g class="cs-pipeline-graph__stage-arrow" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.5">
+                                <path d="M 180 160 L 204 160 M 198.5 155 L 204 160 L 198.5 165"/>
+                                <path d="M 383 160 L 407 160 M 401.5 155 L 407 160 L 401.5 165"/>
+                                <path d="M 714 160 L 738 160 M 732.5 155 L 738 160 L 732.5 165"/>
+                            </g>
+
+                            <!-- Graph-DB internal edges — consistent cubic-bezier formula so all curves share the same geometry family -->
+                            <g class="cs-pipeline-graph__edges" fill="none" stroke="currentColor">
+                                <!-- Materials → Styles (cx,cy of each node; curve: M A C midX,Ay midX,By B) -->
+                                <path d="M 461 81  C 513.5 81,  513.5 160, 566 160"/>
+                                <path d="M 556 69  C 561 69,    561 160,   566 160"/>
+                                <path d="M 641 95  C 603.5 95,  603.5 160, 566 160"/>
+                                <path d="M 478 143 C 522 143,   522 160,   566 160"/>
+                                <!-- Dyes ↔ Fibers, Dyes ↔ Fabrics (dyes can be applied to fibers or fabrics) -->
+                                <path d="M 641 95  C 551 95,    551 81,    461 81"/>
+                                <path d="M 641 95  C 598.5 95,  598.5 69,  556 69"/>
+                                <!-- Styles → Batches; Styles → Orders; Batches → Orders -->
+                                <path d="M 566 160 C 608.5 160, 608.5 191, 651 191"/>
+                                <path d="M 566 160 C 571 160,   571 238,   576 238"/>
+                                <path d="M 651 191 C 613.5 191, 613.5 238, 576 238"/>
+                                <!-- Suppliers → each material -->
+                                <path d="M 465 211 C 463 211,   463 81,    461 81"/>
+                                <path d="M 465 211 C 510.5 211, 510.5 69,  556 69"/>
+                                <path d="M 465 211 C 553 211,   553 95,    641 95"/>
+                                <path d="M 465 211 C 471.5 211, 471.5 143, 478 143"/>
+                                <!-- Certifications → Suppliers + every material -->
+                                <path d="M 488 278 C 476.5 278, 476.5 211, 465 211"/>
+                                <path d="M 488 278 C 474.5 278, 474.5 81,  461 81"/>
+                                <path d="M 488 278 C 522 278,   522 69,   556 69"/>
+                                <path d="M 488 278 C 564.5 278, 564.5 95, 641 95"/>
+                                <path d="M 488 278 C 483 278,   483 143,  478 143"/>
+                                <!-- Orders → Suppliers + every orderable material -->
+                                <path d="M 576 238 C 520.5 238, 520.5 211, 465 211"/>
+                                <path d="M 576 238 C 518.5 238, 518.5 81,  461 81"/>
+                                <path d="M 576 238 C 566 238,   566 69,   556 69"/>
+                                <path d="M 576 238 C 608.5 238, 608.5 95, 641 95"/>
+                                <path d="M 576 238 C 527 238,   527 143,  478 143"/>
+                                <!-- Batches → everything that's part of the locked snapshot -->
+                                <path d="M 651 191 C 558 191,   558 211,  465 211"/>
+                                <path d="M 651 191 C 556 191,   556 81,   461 81"/>
+                                <path d="M 651 191 C 603.5 191, 603.5 69, 556 69"/>
+                                <path d="M 651 191 C 646 191,   646 95,   641 95"/>
+                                <path d="M 651 191 C 564.5 191, 564.5 143, 478 143"/>
+                                <path d="M 651 191 C 569.5 191, 569.5 278, 488 278"/>
+                            </g>
+
+                            <!-- Embeddings layer rays — project up from the layer pill to every entity (vertical-tangent S-curves) -->
+                            <g class="cs-pipeline-graph__embeddings-rays" fill="none" stroke="#9333ea">
+                                <path d="M 560 310 C 560 195.5, 461 195.5, 461 81"/>
+                                <path d="M 560 310 C 560 189.5, 556 189.5, 556 69"/>
+                                <path d="M 560 310 C 560 202.5, 641 202.5, 641 95"/>
+                                <path d="M 560 310 C 560 226.5, 478 226.5, 478 143"/>
+                                <path d="M 560 310 C 560 235,   566 235,   566 160"/>
+                                <path d="M 560 310 C 560 260.5, 465 260.5, 465 211"/>
+                                <path d="M 560 310 C 560 250.5, 651 250.5, 651 191"/>
+                                <path d="M 560 310 C 560 274,   576 274,   576 238"/>
+                                <path d="M 560 310 C 560 294,   488 294,   488 278"/>
+                            </g>
+
+                            <!-- Stage 1: Inputs (compact pills, hugging label) -->
+                            <g class="cs-pipeline-graph__nodes">
+                                <g transform="translate(46, 107)">
+                                    <rect width="108" height="26" rx="13" class="cs-pipeline-graph__box cs-pipeline-graph__box--input"/>
+                                    <text x="54" y="18" text-anchor="middle" class="cs-pipeline-graph__pill-label">Vendor emails</text>
+                                </g>
+                                <g transform="translate(62, 147)">
+                                    <rect width="76" height="26" rx="13" class="cs-pipeline-graph__box cs-pipeline-graph__box--input"/>
+                                    <text x="38" y="18" text-anchor="middle" class="cs-pipeline-graph__pill-label">Invoices</text>
+                                </g>
+                                <g transform="translate(43, 187)">
+                                    <rect width="115" height="26" rx="13" class="cs-pipeline-graph__box cs-pipeline-graph__box--input"/>
+                                    <text x="57.5" y="18" text-anchor="middle" class="cs-pipeline-graph__pill-label">Certifications</text>
+                                </g>
+                            </g>
+
+                            <!-- Stage 2: AI pipeline (compact pills, hugging label) -->
+                            <g class="cs-pipeline-graph__nodes">
+                                <g transform="translate(222, 87)">
+                                    <rect width="146" height="26" rx="13" class="cs-pipeline-graph__box cs-pipeline-graph__box--pipeline"/>
+                                    <text x="73" y="18" text-anchor="middle" class="cs-pipeline-graph__pill-label">Route to specialist</text>
+                                </g>
+                                <g transform="translate(225, 127)">
+                                    <rect width="140" height="26" rx="13" class="cs-pipeline-graph__box cs-pipeline-graph__box--pipeline"/>
+                                    <text x="70" y="18" text-anchor="middle" class="cs-pipeline-graph__pill-label">Extract + validate</text>
+                                </g>
+                                <g transform="translate(231, 167)">
+                                    <rect width="128" height="26" rx="13" class="cs-pipeline-graph__box cs-pipeline-graph__box--pipeline"/>
+                                    <text x="64" y="18" text-anchor="middle" class="cs-pipeline-graph__pill-label">Queue for review</text>
+                                </g>
+                                <g transform="translate(241, 207)">
+                                    <rect width="108" height="26" rx="13" class="cs-pipeline-graph__box cs-pipeline-graph__box--pipeline"/>
+                                    <text x="54" y="18" text-anchor="middle" class="cs-pipeline-graph__pill-label">Save to graph</text>
+                                </g>
+                            </g>
+
+                            <!-- Stage 3: Graph-shaped DB (table pills in a web) -->
+                            <g class="cs-pipeline-graph__nodes">
+                                <g transform="translate(425, 68)">
+                                    <rect width="72" height="26" rx="13" class="cs-pipeline-graph__pill"/>
+                                    <text x="36" y="18" text-anchor="middle" class="cs-pipeline-graph__pill-label">Fibers</text>
+                                </g>
+                                <g transform="translate(520, 56)">
+                                    <rect width="72" height="26" rx="13" class="cs-pipeline-graph__pill"/>
+                                    <text x="36" y="18" text-anchor="middle" class="cs-pipeline-graph__pill-label">Fabrics</text>
+                                </g>
+                                <g transform="translate(605, 82)">
+                                    <rect width="72" height="26" rx="13" class="cs-pipeline-graph__pill"/>
+                                    <text x="36" y="18" text-anchor="middle" class="cs-pipeline-graph__pill-label">Dyes</text>
+                                </g>
+                                <g transform="translate(442, 130)">
+                                    <rect width="72" height="26" rx="13" class="cs-pipeline-graph__pill"/>
+                                    <text x="36" y="18" text-anchor="middle" class="cs-pipeline-graph__pill-label">Trims</text>
+                                </g>
+                                <g transform="translate(530, 147)">
+                                    <rect width="72" height="26" rx="13" class="cs-pipeline-graph__pill cs-pipeline-graph__pill--hub"/>
+                                    <text x="36" y="18" text-anchor="middle" class="cs-pipeline-graph__pill-label">Styles</text>
+                                </g>
+                                <g transform="translate(425, 198)">
+                                    <rect width="80" height="26" rx="13" class="cs-pipeline-graph__pill"/>
+                                    <text x="40" y="18" text-anchor="middle" class="cs-pipeline-graph__pill-label">Suppliers</text>
+                                </g>
+                                <g transform="translate(615, 178)">
+                                    <rect width="72" height="26" rx="13" class="cs-pipeline-graph__pill cs-pipeline-graph__pill--lock"/>
+                                    <text x="36" y="18" text-anchor="middle" class="cs-pipeline-graph__pill-label">Batches</text>
+                                </g>
+                                <g transform="translate(540, 225)">
+                                    <rect width="72" height="26" rx="13" class="cs-pipeline-graph__pill"/>
+                                    <text x="36" y="18" text-anchor="middle" class="cs-pipeline-graph__pill-label">Orders</text>
+                                </g>
+                                <g transform="translate(445, 265)">
+                                    <rect width="86" height="26" rx="13" class="cs-pipeline-graph__pill"/>
+                                    <text x="43" y="18" text-anchor="middle" class="cs-pipeline-graph__pill-label">Certifications</text>
+                                </g>
+                            </g>
+
+                            <!-- Embeddings layer pill — sits beneath the cluster; rays project up to every entity -->
+                            <g class="cs-pipeline-graph__nodes">
+                                <g transform="translate(440, 310)">
+                                    <rect width="240" height="26" rx="13" class="cs-pipeline-graph__pill cs-pipeline-graph__pill--meta"/>
+                                    <text x="120" y="18" text-anchor="middle" class="cs-pipeline-graph__pill-label">Vector index</text>
+                                </g>
+                            </g>
+
+                            <!-- Stage 4: Capabilities (compact pills, hugging label) -->
+                            <g class="cs-pipeline-graph__nodes">
+                                <g transform="translate(785, 107)">
+                                    <rect width="70" height="26" rx="13" class="cs-pipeline-graph__feature"/>
+                                    <text x="35" y="18" text-anchor="middle" class="cs-pipeline-graph__pill-label">AI chat</text>
+                                </g>
+                                <g transform="translate(756, 147)">
+                                    <rect width="128" height="26" rx="13" class="cs-pipeline-graph__feature"/>
+                                    <text x="64" y="18" text-anchor="middle" class="cs-pipeline-graph__pill-label">QR garment story</text>
+                                </g>
+                                <g transform="translate(766, 187)">
+                                    <rect width="108" height="26" rx="13" class="cs-pipeline-graph__feature"/>
+                                    <text x="54" y="18" text-anchor="middle" class="cs-pipeline-graph__pill-label">Ops autopilot</text>
+                                </g>
+                            </g>
+                        </svg>
+                    </div>
+                    <p class="cs-pipeline-graph__footnote">Every write to the DB syncs an embedding automatically, so the chat, the QR page, and the ops autopilot all reason from the same single source of truth.</p>
+                </div>
+            </div>
+
+            <!-- INGESTION PIPELINE -->
+            <div class="cs-section cs-section--split cs-section--reverse">
+                <div class="cs-media">
+                    <img src="../images/case-studies/sourcing-agents.png" alt="n8n workflow: a Router agent fans out via a Switch node to specialist extraction agents — Supplier, Fiber, Material, Dye, etc. — backed by OpenRouter, Local AI, and Ollama models with a Structured Output Parser">
+                </div>
+                <div>
+                    <div class="cs-section-label">Ingestion</div>
+                    <h2 class="cs-section-title">Specialized AI agents</h2>
+                    <p class="cs-section-text">Vendor emails, PDFs, and invoices land in n8n and route by domain — to one of 20+ specialist agents. Each owns a single table: fibers, dyes, fabrics, trims, suppliers, or the relationships between them. Each knows its schema, respects existing naming conventions, and cross-references the database before proposing any change. Local Ollama models keep vendor data on the machine.</p>
+                    <p class="cs-section-text">Why specialists? Because one model trying to do everything produces average results everywhere. Ten models each doing one thing get very good at exactly that.</p>
+                </div>
+            </div>
+
+            <!-- HUMAN IN THE LOOP -->
+            <div class="cs-section cs-section--split cs-section--reverse">
+                <div class="cs-media">
+                    <video autoplay muted loop playsinline preload="metadata" aria-label="Proposals review screen: AI-proposed database changes shown as side-by-side diffs (current vs. proposed) for human approval, with confidence score and source document reference">
+                        <source src="../images/case-studies/sourcing-proposals.mp4" type="video/mp4">
+                    </video>
+                </div>
+                <div>
+                    <div class="cs-section-label">Training</div>
+                    <h2 class="cs-section-title">Human in the loop</h2>
+                    <p class="cs-section-text">Nothing critical reaches the database without approval. Each proposed change surfaces as a side-by-side diff — current value, proposed value, source document. We click through the queue daily.</p>
+                    <p class="cs-section-text">The review is also the training loop. Approvals reinforce correct extractions. Rejections teach the model where it misread. The queue shrinks month over month as the agents learn our vocabulary — our suppliers, our naming, our edge cases. Real operational decisions, not generic training.</p>
+                </div>
+            </div>
+
+            <!-- TRACEABILITY -->
+            <div class="cs-section cs-section--split cs-section--reverse cs-section--no-chapter-tint">
+                <div class="cs-media">
+                    <img src="../images/case-studies/sourcing-batch-lock.png" alt="Styles overview showing multiple production batches (Womens Lounge Pant, Mens Moto Pant, Womens Tank Top), each with manufacturing, fabrics, dyes, and trim details. A zoomed callout highlights the 'Lock QR Code' action — the moment a batch becomes an immutable record.">
+                </div>
+                <div>
+                    <div class="cs-section-label">Traceability</div>
+                    <h2 class="cs-section-title">Permanent records, a checkpoint in time</h2>
+                    <p class="cs-section-text">Any fiber, fabric, dye, trim, or supplier can be assigned to a garment style. When a production run starts, that configuration locks into a batch — a timestamped, write-once snapshot of exactly what went in.</p>
+                    <p class="cs-section-text">Immutability is what makes the record defensible. Every public claim is anchored to a specific batch record. Not a live database. Not a marketing story. A record that existed the moment the run began.</p>
+                </div>
+            </div>
+
+            <!-- MAGIC -->
+            <div class="cs-section cs-section--wide cs-section--delivery-bridge">
+                <div class="cs-section-label">Magic</div>
+                <h2 class="cs-section-title">Messy data made useful</h2>
+                <p class="cs-section-text cs-section--delivery-bridge__lead">Locking a batch generates a QR code. Scan it, and the page builds itself from the batch record. A Sankey of every material that flowed in. A world map of the journey. A family tree of materials with certifications. A CO₂ footprint calculated from the batch itself. It also conforms to the EU Digital Product Passport format — three years before 2027 makes it mandatory.</p>
+                <div class="cs-media cs-media--brown-bag-video cs-media--natural-ratio">
+                    <video autoplay muted loop playsinline preload="metadata" aria-label="Customer-facing garment story page built from a real batch — Sankey of materials, world map of the journey, certifications, and CO₂ footprint">
+                        <source src="../images/case-studies/sourcing-garment-story.mp4" type="video/mp4">
+                    </video>
+                </div>
+            </div>
+
+            <!-- AI LAYER (sticky + video) -->
+            <div class="cs-section cs-section--split cs-section--learn-outro cs-section--no-chapter-tint">
+                <div class="cs-learn-outro__col cs-learn-outro__col--copy">
+                    <div class="cs-learn-outro__copy">
+                        <div class="cs-section-label">Intelligence</div>
+                        <h2 class="cs-section-title">Operations on autopilot</h2>
+                        <p class="cs-section-text">Most AI features fall apart the moment you ask them a real question about your business. Ours doesn't. Because the schema was designed for reasoning.</p>
+                        <p class="cs-section-text">Fibers link to dyes. Suppliers to processes. Materials to the batches they ended up in. The supply chain lives as a graph, not a flat table. Every write vectorizes automatically. Ask about a supplier's GOTS status, or which batches ever used a specific dye — the answer comes from actual records.</p>
+                        <p class="cs-section-text">The same intelligence runs outside of chat. Agents draft vendor replies with thread context. They create action items as production advances. They push to the Kanban board live — each change surfacing as a toast.</p>
+                    </div>
+                </div>
+                <div class="cs-media cs-media--learn-outro">
+                    <video autoplay muted loop playsinline preload="auto" aria-label="AI chat interface querying the sourcing knowledge base — answers come from actual records, not hallucinations">
+                        <source src="../images/case-studies/sourcing-ai-chat.mp4" type="video/mp4">
+                    </video>
+                </div>
+            </div>
+
+            <!-- WHAT I LEARNED -->
+            <div class="cs-section cs-section--no-chapter-tint">
+                <div class="cs-section-label">Outcome</div>
+                <h2 class="cs-section-title">Transparency as infrastructure, not marketing.</h2>
+                <p class="cs-section-text">Most sustainability lives downstream — a report, a hang tag, a line of copy. This is upstream. A data model where every record carries its own provenance. A pipeline that keeps it that way without human effort.</p>
+                <p class="cs-section-text">The QR on the garment is the visible part. The part that matters is that transparency is now a property of how the company operates, not a claim made about it.</p>
+                <p class="cs-section-text">The bigger bet: make proof this cheap and opacity stops paying. The more brands lead with it, the more consumers come to expect it. Transparency becomes the default.</p>
+            </div>
+
+        </div>
+
+        <div class="cs-next">
+            <div class="cs-next-label">Next Project</div>
+            <a href="design-system.html" class="cs-next-link">
+                Reclaimed $3M+ annually by unifying 5 products under one design system <span class="cs-next-arrow">&rarr;</span>
+            </a>
+        </div>
+
+    </div>
+
+    <footer>
+        <span><a href="mailto:hello@felixjanemalm.com">hello@felixjanemalm.com</a></span>
+        <span>
+            <a href="../Resume.pdf" target="_blank" download>
+                Resume.pdf
+                <svg width="18" height="22" viewBox="0 0 18 22" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9.85 2C9.85 1.53056 9.46944 1.15 9 1.15C8.53056 1.15 8.15 1.53056 8.15 2L9.85 2ZM8.39896 17.601C8.73091 17.933 9.2691 17.933 9.60104 17.601L15.0104 12.1917C15.3424 11.8597 15.3424 11.3215 15.0104 10.9896C14.6785 10.6576 14.1403 10.6576 13.8083 10.9896L9 15.7979L4.19167 10.9896C3.85973 10.6576 3.32154 10.6576 2.98959 10.9896C2.65765 11.3215 2.65765 11.8597 2.98959 12.1917L8.39896 17.601ZM8.15 2L8.15 17L9.85 17L9.85 2L8.15 2Z" fill="currentColor"/><path d="M1.21094 20.9688H17.0004" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+            </a>
+        </span>
+        <span>
+            <a href="https://www.linkedin.com/in/felixjanemalm/" target="_blank">
+                <svg width="20" height="21" viewBox="0 0 20 21" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0 6.53138H4.42553V20.9687H0V6.53138ZM16.9787 7.4231C17.8582 7.90435 18.5816 8.63329 19.1489 9.60994C19.7163 10.5866 20 11.5845 20 12.6036V20.9687H15.5319V12.6036C15.5319 12.3771 15.4468 12.1223 15.2766 11.8392C15.1064 11.5562 14.9504 11.3721 14.8085 11.2872C14.5816 11.1457 14.2695 11.0749 13.8723 11.0749C13.4752 11.0749 13.1631 11.1315 12.9362 11.2448L11.1064 12.1365V20.9687H6.6383V6.53138H11.1064V7.21079C11.9858 6.81447 12.9787 6.63046 14.0851 6.65877C15.1915 6.68708 16.156 6.94186 16.9787 7.4231ZM2.21277 0.96875C2.83688 0.96875 3.3617 1.18106 3.78723 1.60569C4.21277 2.03032 4.42553 2.55403 4.42553 3.17682C4.42553 3.79961 4.21277 4.33039 3.78723 4.76917C3.3617 5.20796 2.83688 5.42735 2.21277 5.42735C1.58865 5.42735 1.06383 5.20796 0.638298 4.76917C0.212766 4.33039 0 3.79961 0 3.17682C0 2.55403 0.212766 2.03032 0.638298 1.60569C1.06383 1.18106 1.58865 0.96875 2.21277 0.96875Z" fill="currentColor"/></svg>
+            </a>
+        </span>
+        <span>
+            <a href="https://maps.app.goo.gl/ar51QZTdsHNgS3Ej8" target="_blank">
+                <svg width="16" height="20" viewBox="0 0 16 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.77618 20C6.37306 18.8032 5.0725 17.4911 3.88809 16.0775C2.11068 13.9546 9.81645e-07 10.793 9.81645e-07 7.7803C-0.00157443 4.63378 1.89322 1.79641 4.8002 0.592222C7.70718 -0.611966 11.0534 0.0543808 13.2773 2.28032C14.7397 3.73625 15.5589 5.71671 15.5524 7.7803C15.5524 10.793 13.4417 13.9546 11.6643 16.0775C10.4799 17.4911 9.1793 18.8032 7.77618 20ZM7.77618 4.44765C6.58554 4.44765 5.48534 5.08285 4.89002 6.11398C4.2947 7.1451 4.2947 8.4155 4.89002 9.44662C5.48534 10.4777 6.58554 11.1129 7.77618 11.1129C9.61675 11.1129 11.1088 9.62087 11.1088 7.7803C11.1088 5.93973 9.61675 4.44765 7.77618 4.44765Z" fill="currentColor"/></svg>
+                Los Angeles
+            </a>
+        </span>
+    </footer>
+
+    <!-- ─── Scripts ─── -->
+    <script src="../js/header.js"></script>
+    <script src="../js/drawer.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+    // ─── Demo tab switcher ────────────────────────────────────────────────────
+    function switchDemoTab(name, btn) {
+        document.querySelectorAll('.cs-demo-tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.cs-demo-tab-panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('demo-' + name).classList.add('active');
+        if (name === 'map' && !window._mapInitialized) initJourneyMap();
+        if (name === 'sankey' && !window._sankeyInitialized) initSankey();
+    }
+
+    // ─── Supply chain Sankey (static demo data from real batches) ────────────
+    function initSankey() {
+        window._sankeyInitialized = true;
+        const container = document.getElementById('cs-sankey-diagram');
+        container.innerHTML = '';
+
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
+            || window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+        // Real supply chain nodes — mirrors batch-story-v3 batch 75e11a7f-5a40-48b6-979a-cce4e5577439
+        const nodes = [
+            // Raw materials (left column)
+            { name: 'Organic Cotton 232g',          subtitle: 'GOTS certified farming · India',                          location: 'India',                  category: 'fiber' },
+            { name: 'Tencel Lyocell 589g',          subtitle: 'FSC certified, closed-loop · Lenzing, Austria',           location: 'Lenzing, Austria',        category: 'fiber' },
+            { name: 'Corn Feedstock 7g',            subtitle: 'USDA-certified · Đồng Nai, Vietnam',                      location: 'Đồng Nai, Vietnam',       category: 'fiber' },
+            { name: 'Fossil Materials 18g',         subtitle: 'Monomers, solvents & additives',                          location: '',                       category: 'fiber' },
+            { name: 'Natural Rubber 41g',           subtitle: 'FSC forest-grown · Thailand/Vietnam',                     location: 'Thailand/Vietnam',        category: 'fiber' },
+            { name: 'Tencel Lyocell 41g',           subtitle: 'Lenzing plant · Prachinburi, Thailand',                   location: 'Prachinburi, Thailand',   category: 'fiber' },
+            // Yarn/processing
+            { name: 'Cotton & Tencel Yarn',         subtitle: 'Low-waste spinning · Lenzing, Austria',                   location: 'Lenzing, Austria',        category: 'yarn'  },
+            { name: 'Creora regen BIO',             subtitle: '30% bio-based elastane · Hyosung, Vietnam',               location: 'Vietnam',                 category: 'yarn'  },
+            { name: 'Tencel Yarn',                  subtitle: 'Lenzing-approved · Guangzhou, China',                     location: 'Guangzhou, China',        category: 'yarn'  },
+            // Fabric / component
+            { name: 'Knitted Fabric',               subtitle: 'Circular knitting, no chemical treatments · Los Angeles, USA', location: 'Los Angeles, USA',    category: 'fabric' },
+            { name: 'Elastic Waistband',            subtitle: 'Knitting, no chemical treatments · Meizhou, China',       location: 'Meizhou, China',          category: 'component' },
+            // Assembly & final
+            { name: 'Cut & Sewn',                   subtitle: 'Hand Sewn, Fair wages · Los Angeles, USA',                location: 'Los Angeles, USA',        category: 'assembly' },
+            { name: 'Garment Dyed',                 subtitle: 'Botanical, non-toxic · Los Angeles, USA',                 location: 'Los Angeles, USA',        category: 'final' },
+        ];
+
+        const links = [
+            // Fibers → Cotton & Tencel Yarn
+            { source: 0,  target: 6,  value: 232, label: '232g' },
+            { source: 1,  target: 6,  value: 589, label: '589g' },
+            // Cotton & Tencel Yarn → Knitted Fabric
+            { source: 6,  target: 9,  value: 821, label: '821g' },
+            // Corn Feedstock + Fossil Materials → Creora regen BIO (~3% of fabric)
+            { source: 2,  target: 7,  value: 7,   label: '7g'   },
+            { source: 3,  target: 7,  value: 18,  label: '18g'  },
+            // Creora regen BIO → Knitted Fabric
+            { source: 7,  target: 9,  value: 25,  label: '25g'  },
+            // Knitted Fabric → Cut & Sewn
+            { source: 9,  target: 11, value: 846, label: '846g' },
+            // Tencel Lyocell 41g → Tencel Yarn → Elastic Waistband
+            { source: 5,  target: 8,  value: 41,  label: '41g'  },
+            { source: 8,  target: 10, value: 41,  label: '41g'  },
+            // Natural Rubber → Elastic Waistband
+            { source: 4,  target: 10, value: 41,  label: '41g'  },
+            // Elastic Waistband → Cut & Sewn
+            { source: 10, target: 11, value: 82,  label: '82g'  },
+            // Cut & Sewn → Garment Dyed
+            { source: 11, target: 12, value: 928, label: '928g' },
+        ];
+
+        const colorScale = d3.scaleOrdinal()
+            .domain(['fiber', 'yarn', 'fabric', 'component', 'assembly', 'final'])
+            .range(['#CB945C', '#2f8112', '#2f8112', '#2f8112', '#3b82f6', '#9333ea']);
+
+        // Legend
+        const legend = document.createElement('div');
+        legend.className = 'sankey-legend';
+        legend.innerHTML = [
+            ['#CB945C', 'Raw Materials'],
+            ['#2f8112', 'Processing'],
+            ['#3b82f6', 'Assembly'],
+            ['#9333ea', 'Finished'],
+        ].map(([c, l]) => `
+            <div class="sankey-legend-item">
+                <div class="sankey-legend-color" style="background:${c}"></div>
+                <span>${l}</span>
+            </div>`).join('');
+
+        // Tooltip
+        const tooltip = document.createElement('div');
+        tooltip.className = 'sankey-tooltip';
+        document.body.appendChild(tooltip);
+        const showTip = (e, html) => {
+            tooltip.innerHTML = html;
+            tooltip.classList.add('visible');
+            tooltip.style.left = (e.clientX + 14) + 'px';
+            tooltip.style.top  = (e.clientY - 10) + 'px';
+        };
+        const hideTip = () => tooltip.classList.remove('visible');
+
+        // SVG container
+        const svgWrap = document.createElement('div');
+        svgWrap.className = 'sankey-svg-container';
+
+        container.appendChild(legend);
+        container.appendChild(svgWrap);
+
+        const isMobile = window.innerWidth < 768;
+        const width = Math.max(1000, (svgWrap.offsetWidth || window.innerWidth * 0.9) - 40);
+        const height = 680;
+        const margin = isMobile
+            ? { top: 20, right: 20, bottom: 20, left: 20 }
+            : { top: 40, right: 40, bottom: 40, left: 40 };
+
+        const svg = d3.select(svgWrap)
+            .append('svg')
+            .attr('width', width)
+            .attr('height', height)
+            .attr('viewBox', [0, 0, width, height]);
+
+        const sankey = d3.sankey()
+            .nodeWidth(22)
+            .nodePadding(60)
+            .extent([[margin.left, margin.top], [width - margin.right, height - margin.bottom]])
+            .nodeSort((a, b) => nodes.findIndex(n => n.name === a.name) - nodes.findIndex(n => n.name === b.name));
+
+        const { nodes: sNodes, links: sLinks } = sankey({
+            nodes: nodes.map(d => Object.assign({}, d)),
+            links: links.map(d => Object.assign({}, d)),
+        });
+
+        // Manual nudge: ensure Cut & Sewn's top sits clearly below Knitted Fabric's so their labels don't collide on the same horizontal line
+        (function ensureCutSewnVerticalGap() {
+            const cutSewn = sNodes.find(n => n.name === 'Cut & Sewn');
+            const knitFab = sNodes.find(n => n.name === 'Knitted Fabric');
+            if (!cutSewn || !knitFab) return;
+            const minTopOffset = 30; // px
+            const requiredY0 = knitFab.y0 + minTopOffset;
+            if (cutSewn.y0 < requiredY0) {
+                const shift = requiredY0 - cutSewn.y0;
+                cutSewn.y0 += shift;
+                cutSewn.y1 += shift;
+                sLinks.forEach((link) => {
+                    if (link.target === cutSewn) link.y1 += shift;
+                    if (link.source === cutSewn) link.y0 += shift;
+                });
+            }
+        })();
+
+        // Gradient defs
+        const defs = svg.append('defs');
+        sLinks.forEach((link, i) => {
+            const g = defs.append('linearGradient')
+                .attr('id', `cs-sg-${i}`)
+                .attr('gradientUnits', 'userSpaceOnUse')
+                .attr('x1', link.source.x1).attr('x2', link.target.x0);
+            g.append('stop').attr('offset', '0%').attr('stop-color', colorScale(link.source.category)).attr('stop-opacity', 0.55);
+            g.append('stop').attr('offset', '100%').attr('stop-color', colorScale(link.target.category)).attr('stop-opacity', 0.55);
+        });
+
+        // Links
+        svg.append('g').attr('fill', 'none')
+            .selectAll('path').data(sLinks).join('path')
+            .attr('d', d3.sankeyLinkHorizontal())
+            .attr('stroke', (d, i) => `url(#cs-sg-${i})`)
+            .attr('stroke-width', d => Math.max(2, d.width))
+            .style('stroke-opacity', 0.5)
+            .on('mouseover', function(e, d) {
+                d3.select(this).style('stroke-opacity', 0.85);
+                showTip(e, `<div class="sankey-tooltip-title">${d.source.name} → ${d.target.name}</div><div class="sankey-tooltip-detail">${d.label} of material flow</div>`);
+            })
+            .on('mousemove', e => { tooltip.style.left=(e.clientX+14)+'px'; tooltip.style.top=(e.clientY-10)+'px'; })
+            .on('mouseout', function() { d3.select(this).style('stroke-opacity', 0.5); hideTip(); });
+
+        // Nodes
+        const ng = svg.append('g').selectAll('g').data(sNodes).join('g');
+        ng.append('rect')
+            .attr('x', d => d.x0).attr('y', d => d.y0)
+            .attr('height', d => d.y1 - d.y0).attr('width', d => d.x1 - d.x0)
+            .attr('fill', d => colorScale(d.category))
+            .attr('rx', 5)
+            .style('filter', 'drop-shadow(0 2px 6px rgba(0,0,0,0.2))')
+            .on('mouseover', function(e, d) {
+                d3.select(this).style('filter', 'drop-shadow(0 4px 12px rgba(0,0,0,0.35)) brightness(1.1)');
+                showTip(e, `<div class="sankey-tooltip-title">${d.name}</div><div class="sankey-tooltip-detail">📍 ${d.location}</div>${d.subtitle ? `<div class="sankey-tooltip-detail" style="margin-top:4px">${d.subtitle}</div>` : ''}`);
+            })
+            .on('mousemove', e => { tooltip.style.left=(e.clientX+14)+'px'; tooltip.style.top=(e.clientY-10)+'px'; })
+            .on('mouseout', function() { d3.select(this).style('filter','drop-shadow(0 2px 6px rgba(0,0,0,0.2))'); hideTip(); });
+
+        // Labels
+        const textColor = isDark ? '#f0f0f0' : '#1D1D1F';
+        const subColor  = isDark ? '#b0b0b0' : '#555555';
+        const labelG = svg.append('g').style('font-family', 'system-ui, -apple-system, sans-serif');
+        sNodes.forEach(d => {
+            const isLeft = d.x0 < width / 2;
+            const xPos = isLeft ? d.x1 + 10 : d.x0 - 10;
+            const yMid = (d.y0 + d.y1) / 2;
+            const anchor = isLeft ? 'start' : 'end';
+            const t = labelG.append('text').attr('x', xPos).attr('y', yMid - 4).attr('text-anchor', anchor);
+            t.append('tspan').attr('x', xPos).attr('dy', 0).text(d.name)
+                .style('font-size', '12px').style('font-weight', '700').style('fill', textColor);
+            if (d.subtitle) {
+                // wrap subtitle at ~28 chars
+                const words = d.subtitle.split(' ');
+                let line = ''; let first = true;
+                words.forEach(w => {
+                    if ((line + ' ' + w).trim().length > 28 && line) {
+                        t.append('tspan').attr('x', xPos).attr('dy', first ? '1.15em' : '1.1em').text(line)
+                            .style('font-size', '10px').style('font-weight', '400').style('fill', subColor);
+                        line = w; first = false;
+                    } else { line = (line ? line + ' ' : '') + w; }
+                });
+                if (line) t.append('tspan').attr('x', xPos).attr('dy', first ? '1.15em' : '1.1em').text(line)
+                    .style('font-size', '10px').style('font-weight', '400').style('fill', subColor);
+            }
+        });
+    }
+
+    // ─── Material family tree (static demo data) ─────────────────────────────
+    function initMaterialTree() {
+        const c = document.getElementById('cs-material-tree');
+        c.innerHTML = `
+        <div class="tree-node tree-level-1" onclick="this.classList.toggle('expanded')">
+            <div class="tree-node-title">🧥 Garment Construction</div>
+            <div class="tree-node-subtitle">3 materials · 5 fiber sources · 6 certifications</div>
+            <div class="tree-expand-hint">Click to expand</div>
+            <div class="tree-node-details">
+                <span class="tree-badge">✓ GOTS</span>
+                <span class="tree-badge">✓ FSC</span>
+                <span class="tree-badge">✓ OEKO-TEX</span>
+                <span class="tree-badge">✓ Bluesign</span>
+                <p style="font-size:13px;margin-top:8px;opacity:0.7;">Materials that make up the garment itself — traced to fiber level</p>
+            </div>
+        </div>
+
+        <div class="tree-node tree-level-2" onclick="this.classList.toggle('expanded')">
+            <div class="tree-node-title">📦 Rib Knit Fabric — Main Body</div>
+            <div class="tree-node-subtitle">Primary fabric · Colorway: Sand · 0.42 kg CO₂e</div>
+            <div class="tree-expand-hint">Click to expand</div>
+            <div class="tree-node-details">
+                <p style="font-size:13px;margin-bottom:6px;"><strong>🏭 Mill:</strong> Certified knit fabric manufacturer</p>
+                <p style="font-size:13px;margin-bottom:6px;">📍 Portugal</p>
+                <p style="font-size:13px;margin-bottom:6px;"><strong>Quantity:</strong> ~2 yards per garment</p>
+                <p style="font-size:13px;margin-bottom:6px;"><strong>🌍 Origin:</strong> Portugal</p>
+                <p style="font-size:13px;margin-bottom:6px;"><strong>🔍 Traced to:</strong> Fiber level</p>
+                <span class="tree-badge">✓ OEKO-TEX 100</span>
+                <span class="tree-badge">✓ Bluesign</span>
+            </div>
+        </div>
+
+        <div class="tree-node tree-level-3" onclick="this.classList.toggle('expanded')">
+            <div class="tree-node-title">🧵 Organic Cotton (66%) · 0.28 kg CO₂e</div>
+            <div class="tree-node-subtitle">Certified organic farming · India</div>
+            <div class="tree-expand-hint">Click to expand</div>
+            <div class="tree-node-details">
+                <p style="font-size:13px;margin-bottom:6px;">📍 Gujarat, India — regional cotton mills</p>
+                <p style="font-size:13px;margin-bottom:6px;">🔍 Traced to: farm region</p>
+                <span class="tree-badge">✓ GOTS certified</span>
+            </div>
+        </div>
+
+        <div class="tree-node tree-level-3" onclick="this.classList.toggle('expanded')">
+            <div class="tree-node-title">🧵 Tencel™ Lyocell (26%) · 0.09 kg CO₂e</div>
+            <div class="tree-node-subtitle">FSC certified closed-loop · Lenzing, Austria</div>
+            <div class="tree-expand-hint">Click to expand</div>
+            <div class="tree-node-details">
+                <p style="font-size:13px;margin-bottom:6px;">📍 Lenzing, Austria — Lenzing AG</p>
+                <p style="font-size:13px;margin-bottom:6px;">🔍 Traced to: manufacturing facility</p>
+                <p style="font-size:13px;margin-bottom:6px;">Produced in a closed-loop process — 99% of solvent recovered and reused</p>
+                <span class="tree-badge">✓ FSC certified</span>
+                <span class="tree-badge">✓ EU Ecolabel</span>
+            </div>
+        </div>
+
+        <div class="tree-node tree-level-3" onclick="this.classList.toggle('expanded')">
+            <div class="tree-node-title">🧵 Creora® Spandex (8%) · 0.05 kg CO₂e</div>
+            <div class="tree-node-subtitle">30% bio-based · Đồng Nai, Vietnam</div>
+            <div class="tree-expand-hint">Click to expand</div>
+            <div class="tree-node-details">
+                <p style="font-size:13px;margin-bottom:6px;">📍 Đồng Nai Province, Vietnam — Hyosung</p>
+                <p style="font-size:13px;margin-bottom:6px;">🔍 Traced to: manufacturing facility</p>
+                <p style="font-size:13px;margin-bottom:6px;">30% bio-based corn content reduces fossil fuel dependency</p>
+            </div>
+        </div>
+
+        <div class="tree-node tree-level-2" onclick="this.classList.toggle('expanded')">
+            <div class="tree-node-title">📦 Elastic Waistband</div>
+            <div class="tree-node-subtitle">Waistband component · Natural rubber + Tencel + Cotton · 0.18 kg CO₂e</div>
+            <div class="tree-expand-hint">Click to expand</div>
+            <div class="tree-node-details">
+                <p style="font-size:13px;margin-bottom:6px;"><strong>🏭 Manufacturer:</strong> Dyreko Limited</p>
+                <p style="font-size:13px;margin-bottom:6px;">📍 Meizhou, Guangdong, China</p>
+                <p style="font-size:13px;margin-bottom:6px;"><strong>🌍 Traced to:</strong> Component manufacturer</p>
+                <span class="tree-badge">✓ FSC (rubber)</span>
+            </div>
+        </div>
+
+        <div class="tree-node tree-level-3" onclick="this.classList.toggle('expanded')">
+            <div class="tree-node-title">🧵 Natural Rubber — Yulex (50%)</div>
+            <div class="tree-node-subtitle">FSC certified hevea rubber · Thailand / Vietnam</div>
+            <div class="tree-expand-hint">Click to expand</div>
+            <div class="tree-node-details">
+                <p style="font-size:13px;margin-bottom:6px;">📍 Thailand / Vietnam — Yulex Corporation</p>
+                <p style="font-size:13px;margin-bottom:6px;">🔍 Traced to: plantation level</p>
+                <span class="tree-badge">✓ FSC certified</span>
+            </div>
+        </div>
+
+        <div class="tree-node tree-level-1 dashed-border" onclick="this.classList.toggle('expanded')">
+            <div class="tree-node-title">📦 Packaging</div>
+            <div class="tree-node-subtitle">2 items · Recyclable / compostable materials</div>
+            <div class="tree-expand-hint">Click to expand</div>
+            <div class="tree-node-details">
+                <p style="font-size:13px;opacity:0.7;">Hang tag (recycled paper) and shipping mailer (compostable) — both sourced to reduce end-of-life impact</p>
+            </div>
+        </div>
+        `;
+    }
+
+    // ─── Journey map ─────────────────────────────────────────────────────────
+    function initJourneyMap() {
+        window._mapInitialized = true;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
+            || window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+        const map = L.map('cs-journey-map', { scrollWheelZoom: false }).setView([30, 60], 2);
+        L.tileLayer(
+            isDark
+                ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+                : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+            { attribution: '© OpenStreetMap contributors © CARTO', maxZoom: 10 }
+        ).addTo(map);
+
+        const stops = [
+            { latlng: [20.59, 78.96],   label: '1. India',           detail: 'Organic Cotton — GOTS certified farming',      color: '#CB945C' },
+            { latlng: [48.00, 13.80],   label: '2. Lenzing, Austria', detail: 'Tencel Lyocell production — FSC certified',    color: '#CB945C' },
+            { latlng: [10.96, 107.00],  label: '3. Vietnam',          detail: 'Creora® Spandex — 30% bio-based',             color: '#CB945C' },
+            { latlng: [14.06, 100.40],  label: '4. Thailand',         detail: 'Natural Rubber (Yulex) — FSC certified',      color: '#CB945C' },
+            { latlng: [23.13, 113.26],  label: '5. Guangzhou, China', detail: 'Tencel yarn production for elastic',          color: '#2f8112' },
+            { latlng: [24.29, 116.12],  label: '6. Meizhou, China',   detail: 'Elastic waistband — Dyreko Limited',          color: '#2f8112' },
+            { latlng: [39.40, -8.22],   label: '7. Portugal',         detail: 'Knitting + Cut & Sew Assembly + Dyeing',      color: '#3b82f6' },
+            { latlng: [37.09, -95.71],  label: '8. United States',    detail: 'Warehouse → Consumer',                       color: '#9333ea' },
+        ];
+
+        const icon = color => L.divIcon({
+            html: `<div style="width:12px;height:12px;background:${color};border:2px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.4)"></div>`,
+            iconSize: [12, 12], iconAnchor: [6, 6], className: ''
+        });
+
+        stops.forEach(s => {
+            L.marker(s.latlng, { icon: icon(s.color) })
+                .addTo(map)
+                .bindPopup(`<strong>${s.label}</strong><br>${s.detail}`, { maxWidth: 200 });
+        });
+
+        // Draw route lines
+        const coords = stops.map(s => s.latlng);
+        L.polyline(coords, { color: '#CB945C', weight: 1.5, opacity: 0.5, dashArray: '5,6' }).addTo(map);
+    }
+
+    // ─── Bounce-loop playback for [data-bounce] videos ────────────────────────
+    // Plays forward → on `ended`, reverse-steps via rAF back to start → forward again, ad infinitum.
+    // rAF stepping is used because most browsers clamp negative playbackRate to 0 (no native reverse).
+    function initBounceVideos() {
+        document.querySelectorAll('video[data-bounce]').forEach((video) => {
+            const FPS = 30;
+            const STEP = 1 / FPS;
+            let reversing = false;
+
+            function reverseStep() {
+                if (!reversing) return;
+                video.currentTime = Math.max(0, video.currentTime - STEP);
+                if (video.currentTime <= 0.02) {
+                    reversing = false;
+                    video.play().catch(() => {});
+                    return;
+                }
+                requestAnimationFrame(reverseStep);
+            }
+
+            video.addEventListener('ended', () => {
+                reversing = true;
+                video.pause();
+                requestAnimationFrame(reverseStep);
+            });
+        });
+    }
+
+    // ─── Init on load ─────────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+        initSankey();
+        initBounceVideos();
+        window._sankeyInitialized = true;
+    });
+    </script>
+
+</body>
+</html>

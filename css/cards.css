@@ -67,6 +67,7 @@
   width: 500px;
   box-shadow: 12px 40px 40px rgba(0, 0, 0, 0.25);
   -webkit-box-shadow: 12px 40px 40px rgba(0, 0, 0, 0.25);
+  animation: none;
 }
 .card-wrapper .item:after {
   content: "";
@@ -76,7 +77,9 @@
   width: 100%;
   left: 0;
   top: 0;
+  border-radius: inherit;
   background-image: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 1));
+  transition: box-shadow 0.3s ease;
 }
 .card-wrapper .item-desc {
   padding: 0 24px 12px;
@@ -84,8 +87,8 @@
   position: relative;
   z-index: 1;
   overflow: hidden;
-  transform: translateY(calc(100% - 72px));
-  -webkit-transform: translateY(calc(100% - 72px));
+  transform: translateY(calc(100% - 76px));
+  -webkit-transform: translateY(calc(100% - 76px));
   transition: all 0.4s ease-in-out;
   -webkit-transition: all 0.4s ease-in-out;
 }
@@ -93,17 +96,64 @@
   transform: none;
   -webkit-transform: none;
 }
+
+/* Body text hidden when collapsed, revealed on active */
 .card-wrapper .item-desc p {
   opacity: 0;
-  -webkit-transform: translateY(32px);
-  transform: translateY(32px);
-  transition: all 0.4s ease-in-out 0.2s;
-  -webkit-transition: all 0.4s ease-in-out 0.2s;
+  transform: translateY(20px);
+  -webkit-transform: translateY(20px);
+  transition: all 0.4s ease-in-out 0.15s;
+  -webkit-transition: all 0.4s ease-in-out 0.15s;
 }
 .card-wrapper .item.active .item-desc p {
   opacity: 1;
-  -webkit-transform: translateY(0);
   transform: translateY(0);
+  -webkit-transform: translateY(0);
+}
+
+/* Centered chevron below title on collapsed cards */
+.card-wrapper .item-desc h3::after {
+  content: '';
+  display: block;
+  width: 7px;
+  height: 7px;
+  margin: 6px auto 12px;
+  border-right: 1.5px solid rgba(255, 255, 255, 0.55);
+  border-bottom: 1.5px solid rgba(255, 255, 255, 0.55);
+  transform: rotate(45deg);
+  transition: opacity 0.3s ease, height 0.3s ease, margin 0.3s ease;
+}
+.card-wrapper .item.active .item-desc h3::after {
+  opacity: 0;
+  height: 0;
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+/* Inset accent ring on hover — collapsed and expanded cards (active included) */
+@media (hover: hover) {
+  .card-wrapper .item:hover::after {
+    box-shadow: inset 0 0 0 2px var(--primary-color, hsl(200, 100%, 50%));
+  }
+}
+
+/* Looping pulse on the next card — only until user opens another card (see js/cards.js + .card-wrapper--hint-dismissed) */
+.card-wrapper:not(.card-wrapper--hint-dismissed) .owl-item:has(.item.active) + .owl-item .item:not(.active)::after {
+  animation: card-pulse 2.2s ease-in-out infinite;
+}
+@media (hover: hover) {
+  .card-wrapper:not(.card-wrapper--hint-dismissed) .owl-item:has(.item.active) + .owl-item .item:not(.active):hover::after {
+    animation: none;
+  }
+}
+
+@keyframes card-pulse {
+  0%, 100% {
+    box-shadow: inset 0 0 0 2px transparent;
+  }
+  50% {
+    box-shadow: inset 0 0 0 2px var(--primary-color, hsl(200, 100%, 50%));
+  }
 }
 .card-wrapper .owl-theme.custom-carousel .owl-dots {
   margin-top: -20px;
@@ -144,8 +194,8 @@
     width: 400px;
   }
   .card-wrapper .item-desc {
-    transform: translateY(calc(100% - 68px));
-    -webkit-transform: translateY(calc(100% - 68px));
+    transform: translateY(calc(100% - 72px));
+    -webkit-transform: translateY(calc(100% - 72px));
   }
 }
 
@@ -162,8 +212,8 @@
     width: 360px;
   }
   .card-wrapper .item-desc {
-    transform: translateY(calc(100% - 64px));
-    -webkit-transform: translateY(calc(100% - 64px));
+    transform: translateY(calc(100% - 70px));
+    -webkit-transform: translateY(calc(100% - 70px));
   }
 }
 
@@ -183,8 +233,13 @@
   }
   .card-wrapper .item-desc {
     padding: 0 14px 5px;
-    transform: translateY(calc(100% - 64px));
-    -webkit-transform: translateY(calc(100% - 64px));
+    transform: translateY(calc(100% - 66px));
+    -webkit-transform: translateY(calc(100% - 66px));
+  }
+  .card-wrapper .item-desc h3::after {
+    width: 6px;
+    height: 6px;
+    margin-top: 4px;
   }
   .card-wrapper .owl-stage {
     padding-left: 20px;

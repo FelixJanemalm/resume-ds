@@ -12,7 +12,7 @@ html:not(:focus-within) {
   font-weight: 600;
 }
 
-.content, .content2 {
+.content {
   position: sticky;
   top: 0;
   min-height: 100vh;
@@ -25,12 +25,12 @@ html:not(:focus-within) {
   line-height: 1;
 }
 
-.content span, .content2 span {
+.content span {
   opacity: calc(var(--opacity) + (var(--active)));
   transition: opacity 0.5s;
 }
 
-.reader, .reader2 {
+.reader {
   background-color: var(--bg);
   --thick: 0px;
   outline: var(--thick) dashed var(--primaryText);
@@ -54,21 +54,10 @@ h2 span {
   .reader {
     view-timeline: --reader block;
   }
-  
-  .reader2 {
-    view-timeline: --reader2 block;
-  }
 
   .content span {
     animation: activate both steps(1);
     animation-timeline: --reader;
-    animation-range: contain calc(((var(--start, 0) * var(--ppc)) * 1px))
-      contain calc(((var(--end, 0) * var(--ppc)) * 1px));
-  }
-  
-  .content2 span {
-    animation: activate both steps(1);
-    animation-timeline: --reader2;
     animation-range: contain calc(((var(--start, 0) * var(--ppc)) * 1px))
       contain calc(((var(--end, 0) * var(--ppc)) * 1px));
   }
@@ -79,72 +68,4 @@ h2 span {
     }
   }
 
-  .after-reader {
-      animation: scale-up both ease-in;
-      animation-timeline: view(66vh 90vh);
-      /*animation-timeline: view(200vh -180vh); */
-      animation-range: enter;
-      view-timeline: --after-reader block;
-  }
-  
-  @keyframes scale-up {
-      from {
-        transform: scale(0.1); /* Start from a smaller scale */
-      }
-      to {
-        transform: scale(.66); /* End at a larger scale */
-      }
-  }
-}
-
-.after-reader {
-  transform-origin: top;
-  margin-left: auto;
-  margin-right: auto;
-  width: 100%;
-  translate: 0 calc(((var(--ppc) * var(--content-length) + (var(--pad) * var(--buffer))) * 1px) - (330px - (var(--text-container-height)/2)));
-  /* translate: 0 -61vh; 
-  margin-bottom: -80vh; */
-}
-
-.after-reader video {
-  width: 100%;
-  border-radius: 20px;
-}
-
-.spacer {
-  height: calc(32.5vw * 1.4);
-  background-color: var(--bg);
-}
-
-@media (min-width: 1830px) {
-  .after-reader {
-      max-width: 80vw;
-      translate: 0 calc(((var(--ppc) * var(--content-length) + (var(--pad) * var(--buffer))) * 1px) - (560px - (var(--text-container-height)/2)));
-      animation-timeline: view(60vh -80vh);
-  }
-  
-  .spacer {
-      height: 32.5vw;
-  }
-}
-
-@media (max-width: 700px) {
-  .after-reader {
-      width: calc(100vw - 40px);
-      translate: 0 calc(((var(--ppc) * var(--content-length) + (var(--pad) * var(--buffer))) * 1px) - (260px - (var(--text-container-height)/2)));
-  }
-  
-  .spacer {
-      height: calc(32.5vw * 2);
-  }
-
-  @keyframes scale-up {
-      from {
-          transform: scale(0.1); /* Start from a smaller scale */
-      }
-      to {
-          transform: scale(1); /* End at a larger scale */
-      }
-  }
 }

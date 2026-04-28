@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Case study: How Felix Janemalm built one design system for five products across three engineering teams — while a company rebrand was underway.">
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+    <title>One Design System for Five Products – Felix Janemalm</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;1,8..60,400&display=swap" rel="stylesheet">
+    <link rel="preload" href="../fonts/woff2/RNSPhysis-Medium.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="../fonts/woff2/RNSPhysis-Light.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="../css/tokens/Ref/yds.css">
+    <link rel="stylesheet" href="../css/tokens/Ref/mui.css">
+    <link rel="stylesheet" href="../css/tokens/theme.css">
+    <link rel="stylesheet" href="../css/master.css">
+    <link rel="stylesheet" href="../css/typography.css">
+    <link rel="stylesheet" href="../css/materials.css">
+    <link rel="stylesheet" href="../css/header.css">
+    <link rel="stylesheet" href="../css/drawer.css">
+    <link rel="stylesheet" href="../css/case-study-page.css">
+    <link rel="stylesheet" href="../css/footer.css">
+</head>
+<body>
+
+    <header>
+        <nav>
+            <div class="logo">
+                <a href="../index.html#home">
+                    <span class="short-logo">
+                        <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <g filter="url(#filter0_dd_357_229)">
+                            <path d="M107.098 139.927H161.976C161.976 117.976 175.878 99.6829 202.22 99.6829C227.982 99.6829 271 99.9268 289.293 99.6829V50.6585H194.902C146.61 50.6585 107.098 86.5122 107.098 139.927Z" fill="currentColor"/>
+                            <path d="M91 175.049H243.195C243.195 200.659 233.683 228.463 186.854 228.463C156.994 228.463 118.317 228.707 91 228.463V175.049Z" fill="currentColor"/>
+                            <path d="M409.292 175.049V338.951C409.292 409.195 347.829 464.805 261.488 464.805C167.829 464.805 107.829 401.143 107.829 341.878V261.393H161.243V326.512C161.243 382.854 211 411.39 261.488 411.39C311.976 411.39 356.61 382.854 356.61 326.512C356.61 266.22 356.61 263.832 356.61 265.052V175.78L409.292 175.049Z" fill="currentColor"/>
+                            <path d="M421 85.0488C421 106.063 403.965 123.098 382.951 123.098C361.937 123.098 344.902 106.063 344.902 85.0488C344.902 64.035 361.937 47 382.951 47C403.965 47 421 64.035 421 85.0488Z" fill="currentColor"/>
+                            </g>
+                            <defs>
+                            <filter id="filter0_dd_357_229" x="83.6829" y="42.6098" width="347.561" height="435.366" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+                            <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+                            <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+                            <feOffset dx="1.46341" dy="4.39024"/>
+                            <feGaussianBlur stdDeviation="4.39024"/>
+                            <feComposite in2="hardAlpha" operator="out"/>
+                            <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/>
+                            <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_357_229"/>
+                            <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+                            <feOffset dy="5.85366"/>
+                            <feGaussianBlur stdDeviation="2.92683"/>
+                            <feComposite in2="hardAlpha" operator="out"/>
+                            <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/>
+                            <feBlend mode="normal" in2="effect1_dropShadow_357_229" result="effect2_dropShadow_357_229"/>
+                            <feBlend mode="normal" in="SourceGraphic" in2="effect2_dropShadow_357_229" result="shape"/>
+                            </filter>
+                            </defs>
+                        </svg>
+                    </span>
+                    <span class="full-logo">
+                        Felix Janemalm
+                    </span>
+                </a>
+            </div>
+            <ul class="nav-links">
+                <li><a href="../index.html#work">Work</a></li>
+                <li><a href="../Resume.pdf" target="_blank">Resume.pdf</a></li>
+                <li><a href="#contact" id="contactBtn">Contact</a></li>
+            </ul>
+        </nav>
+        <div id="progress-bar"></div>
+    </header>
+    <div id="overlay" class="overlay"></div>
+
+    <div id="drawer" class="drawer">
+        <div class="drawer-content">
+          <nav class="nav-links">
+            <span>
+                <a href="mailto:hello@felixjanemalm.com">
+                    <svg width="16" height="16" viewBox="0 0 140 112" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;">
+                            <path d="M118.666 0H20.9411C15.3872 0 10.0607 2.20629 6.1335 6.1335C2.20629 10.0607 0 15.3872 0 20.9411V90.7446C0 96.2986 2.20629 101.625 6.1335 105.552C10.0607 109.479 15.3872 111.686 20.9411 111.686H118.666C124.22 111.686 129.546 109.479 133.474 105.552C137.401 101.625 139.607 96.2986 139.607 90.7446V20.9411C139.607 15.3872 137.401 10.0607 133.474 6.1335C129.546 2.20629 124.22 0 118.666 0ZM118.666 13.9607L73.2938 45.1629C72.2326 45.7756 71.0289 46.0981 69.8036 46.0981C68.5783 46.0981 67.3745 45.7756 66.3134 45.1629L20.9411 13.9607H118.666Z" fill="currentColor"/>
+                        </svg>
+                    hello@felixjanemalm.com</a>
+             </span>
+            <a href="https://www.linkedin.com/in/felixjanemalm/" target="_blank">
+                <svg width="16" height="16" viewBox="0 0 20 21" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;">
+                <path d="M0 6.53138H4.42553V20.9687H0V6.53138ZM16.9787 7.4231C17.8582 7.90435 18.5816 8.63329 19.1489 9.60994C19.7163 10.5866 20 11.5845 20 12.6036V20.9687H15.5319V12.6036C15.5319 12.3771 15.4468 12.1223 15.2766 11.8392C15.1064 11.5562 14.9504 11.3721 14.8085 11.2872C14.5816 11.1457 14.2695 11.0749 13.8723 11.0749C13.4752 11.0749 13.1631 11.1315 12.9362 11.2448L11.1064 12.1365V20.9687H6.6383V6.53138H11.1064V7.21079C11.9858 6.81447 12.9787 6.63046 14.0851 6.65877C15.1915 6.68708 16.156 6.94186 16.9787 7.4231ZM2.21277 0.96875C2.83688 0.96875 3.3617 1.18106 3.78723 1.60569C4.21277 2.03032 4.42553 2.55403 4.42553 3.17682C4.42553 3.79961 4.21277 4.33039 3.78723 4.76917C3.3617 5.20796 2.83688 5.42735 2.21277 5.42735C1.58865 5.42735 1.06383 5.20796 0.638298 4.76917C0.212766 4.33039 0 3.79961 0 3.17682C0 2.55403 0.212766 2.03032 0.638298 1.60569C1.06383 1.18106 1.58865 0.96875 2.21277 0.96875Z" fill="currentColor"/>
+                </svg>
+                /felixjanemalm</a>
+          </nav>
+        </div>
+    </div>
+
+    <div class="cs-page">
+
+        <a href="../index.html#work" class="cs-back">&larr; All Work</a>
+
+        <div class="cs-hero">
+            <div class="cs-hero__surface">
+                <video class="hue-shift" autoplay muted loop playsinline>
+                    <source src="../images/v7-demo.mp4" type="video/mp4">
+                </video>
+            </div>
+        </div>
+
+        <div class="cs-intro">
+            <div class="cs-meta">
+                <span>Yubico</span>
+                <span class="cs-meta-sep">/</span>
+                <span>Principal Product Designer</span>
+                <span class="cs-meta-sep">/</span>
+                <span>~9 months</span>
+            </div>
+            <h1 class="cs-title">Reclaimed $3M+ annually by unifying 5 products under one design system</h1>
+            <p class="cs-description">Yubico had five products built by three separate engineering teams — each with their own UI, their own code conventions, and no shared components. A rebrand was coming, and without a common foundation every team would have to implement it independently. I led the effort to build one system they could all share.</p>
+        </div>
+
+        <div class="cs-metrics-strip">
+        <div class="cs-metrics">
+            <div class="cs-metric">
+                <div class="cs-metric-value">80%</div>
+                <div class="cs-metric-label"> less UI rework across 3 engineering teams</div>
+            </div>
+            <div class="cs-metric">
+                <div class="cs-metric-value">30–45%</div>
+                <div class="cs-metric-label">faster design-to-engineering handoff</div>
+            </div>
+            <div class="cs-metric">
+                <div class="cs-metric-value">~70%</div>
+                <div class="cs-metric-label">fewer visual inconsistencies across products</div>
+            </div>
+            <div class="cs-metric">
+                <div class="cs-metric-value">100%</div>
+                <div class="cs-metric-label">of components meet WCAG 2.2 AA contrast</div>
+            </div>
+        </div>
+        </div>
+
+        <div class="cs-content">
+
+            <div class="cs-section cs-section--wide cs-section--summary-brief">
+                <div class="cs-summary-brief__layout">
+                    <div class="cs-summary-brief__intro">
+                        <div class="cs-summary-brief__intro-main">
+                            <div class="cs-section-label">Summary</div>
+                            <h2 class="cs-section-title">What I did</h2>
+                            <p class="cs-section-text">I ran the full arc: auditing existing UIs across stacks, negotiating a shared naming convention with every team, designing the component library and token structure in Figma, establishing the governance model, and building a migration playbook so legacy products could adopt without a rewrite. I also designed the Figma-to-code pipeline that would later become <a href="design-tokens.html">its own case study</a>.</p>
+                        </div>
+                        <aside class="cs-summary-brief__context" aria-label="Project context">
+                            <div class="cs-context-card" role="group" aria-labelledby="team-card-kicker team-card-title">
+                                <div class="cs-context-card__header" id="team-card-title">Team</div>
+                                <div class="cs-context-card__body">
+                                    <p>DS lead • Me&nbsp;🧑‍💼</p>
+                                    <p>Designers • (x3)</p>
+                                    <p>Engineers • (x5)</p>
+                                    <p>QA &amp; accessibility • Shared</p>
+                                    <p>PMs · Tech docs · 3 eng teams</p>
+                                </div>
+                            </div>
+                        </aside>
+                    </div>
+                    <div class="cs-summary-brief__did">
+                        <div class="cs-summary-brief__steps" aria-label="Process at a glance">
+                            <div class="cs-summary-brief__step">
+                                <span class="cs-summary-brief__step-icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg></span>
+                                <span class="cs-summary-brief__step-label">Audit</span>
+                            </div>
+                            <div class="cs-summary-brief__step">
+                                <span class="cs-summary-brief__step-icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span>
+                                <span class="cs-summary-brief__step-label">Negotiate</span>
+                            </div>
+                            <div class="cs-summary-brief__step">
+                                <span class="cs-summary-brief__step-icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></span>
+                                <span class="cs-summary-brief__step-label">Design</span>
+                            </div>
+                            <div class="cs-summary-brief__step">
+                                <span class="cs-summary-brief__step-icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+                                <span class="cs-summary-brief__step-label">Govern</span>
+                            </div>
+                            <div class="cs-summary-brief__step">
+                                <span class="cs-summary-brief__step-icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg></span>
+                                <span class="cs-summary-brief__step-label">Pipeline</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="cs-summary-brief__quote-break">
+                        <div class="cs-summary-brief__quote-break-rule" aria-hidden="true"></div>
+                        <p class="cs-summary-brief__quote-break-eyebrow">From a collaborator</p>
+                        <blockquote class="cs-summary-brief__testimonial cs-summary-brief__testimonial--break" cite="https://www.linkedin.com/in/felixjanemalm/">
+                            <p class="cs-summary-brief__testimonial-quote">“I had the unique opportunity to collaborate with Felix on a comprehensive design system project, where his role as the UX lead was nothing short of exemplary. His approach to integrating and guiding teams across different departments was marked by empathy and a deep understanding of collaborative dynamics… His adaptability, respect for diverse viewpoints, and innovative problem-solving approach were consistently on display…”</p>
+                            <cite class="cs-summary-brief__testimonial-cite">Eden, Senior Software Engineer — <a href="https://www.linkedin.com/in/felixjanemalm/#recommendations" target="_blank" rel="noopener noreferrer">Read on LinkedIn</a></cite>
+                        </blockquote>
+                    </div>
+                </div>
+            </div>
+
+            <div class="cs-section cs-section--split cs-section--challenge" data-split-media-sync>
+                <figure class="cs-media cs-media--challenge">
+                    <img src="../images/case-studies/ds-ui-button-chaos.png" width="482" height="480" loading="lazy" alt="Collage of many inconsistent green button styles—mixed type, radii, and shades—used across separate products.">
+                </figure>
+                <div class="cs-section--challenge__copy cs-split-copy">
+                    <div class="cs-section-label">Challenge</div>
+                    <h2 class="cs-section-title">Six codebases, no shared system</h2>
+                    <p class="cs-section-text">The marketing site ran on WordPress + React. The console app used Svelte + Tailwind. The admin tools were built on MUI. Add docs, email templates, and mobile apps, and you had six surfaces with no shared design language. Buttons looked different across products. The brand's primary color existed in four variations — the result of Pantone-to-hex conversion differences, founder preferences, and individual attempts at fixing contrast.</p>
+                    <p class="cs-section-text">A company rebrand was about to make it worse: without a shared system, every team would interpret the new brand independently, multiplying the inconsistencies.</p>
+                </div>
+            </div>
+
+            <div class="cs-section cs-section--split cs-section--goals" data-split-media-sync>
+                <figure class="cs-media cs-media--goals">
+                    <img src="../images/case-studies/ds-success-criteria.png" width="1024" height="738" loading="lazy" alt="Contained button matrix: seven intents from Primary through Inherit Text; Enabled, Hovered, and Focused states with Large, Medium, and Small sizes.">
+                </figure>
+                <div class="cs-section--goals__copy cs-split-copy">
+                    <div class="cs-section-label">Goals</div>
+                    <h2 class="cs-section-title">Success meant adoption, speed, and consistency</h2>
+                    <p class="cs-section-text">We set four targets before starting any design work:</p>
+                    <ul class="cs-goals-list" role="list">
+                        <li>Get at least 3 products on the system within 2 quarters</li>
+                        <li>Cut design-to-engineering handoff time by at least 25%</li>
+                        <li>Reduce visual inconsistencies across products by at least 50%</li>
+                        <li>Reach WCAG 2.2 AA across all shipped components</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="cs-section cs-section--split cs-section--approach" data-split-media-sync>
+                <figure class="cs-media cs-media--approach cs-media--approach--anchor-right">
+                    <img src="../images/case-studies/ds-approach-audit-inventory.png" width="996" height="996" loading="lazy" alt="Design system inventory table: Particles and Atoms with category rows, items, and Block column tags (btn-primary, nav-pagination, de-select, etc.).">
+                </figure>
+                <div class="cs-section--approach__copy cs-split-copy">
+                    <div class="cs-section-label">Approach</div>
+                    <h2 class="cs-section-title">Find what exists, agree on what it’s called, then build</h2>
+                    <p class="cs-section-text">Before building anything, I audited every product for duplicate patterns, inconsistent naming, and accessibility gaps. We mapped the findings into a single document: what exists, what it's called, and where it lives. This gave every stakeholder — designers, engineers, PMs — the same set of facts to discuss.</p>
+                    <p class="cs-section-text">We didn't debate which shade of blue was "correct." We agreed on what each color was <em>for</em>, and deferred the cosmetic choices to the rebrand. The goal was to make saying yes easy. As the facilitator bridging teams on different islands, I either drove decisions based on first principles or sold the system with a value-agnostic approach — showing teams what they'd gain without requiring them to change how they already worked.</p>
+                </div>
+            </div>
+
+            <div class="cs-section cs-section--wide cs-section--delivery-bridge">
+                <div class="cs-section-label">Introducing the system</div>
+                <h2 class="cs-section-title">How teams would trust the system in practice</h2>
+                <p class="cs-section-text cs-section--delivery-bridge__lead">I hosted internal brown bag sessions for designers and engineers: shared libraries, how each product maps in, contribution paths, and how to adopt it without slowing teams down.</p>
+                <div class="cs-media cs-media--brown-bag-video">
+                    <video
+                        width="1258"
+                        height="534"
+                        autoplay
+                        muted
+                        loop
+                        playsinline
+                        preload="metadata"
+                        loading="lazy"
+                        disablepictureinpicture
+                        aria-label="Recording: internal brown bag on the Yubico design system"
+                    >
+                        <source src="../images/case-studies/ds-brown-bag-yubico.mp4" type="video/mp4">
+                    </video>
+                </div>
+                <p class="cs-caption">Video of a brown bag session</p>
+            </div>
+
+            <div class="cs-section cs-section--split" data-split-media-sync>
+                <div class="cs-media cs-media--code-snippet">
+                    <img src="../images/slides/ds-02-api-snippet.png" width="1024" height="350" loading="lazy" alt="Code example: Button with intent, label, and onClick — comment notes a11y defaults and design tokens applied automatically.">
+                </div>
+                <div class="cs-split-copy">
+                    <div class="cs-section-label">Components</div>
+                    <h2 class="cs-section-title">Simple APIs, accessibility built in</h2>
+                    <p class="cs-section-text">Each component — Button, Dialog, Menu, Table — has a small API that focuses on what it does, not how it looks. Colors, spacing, and states come from the design tokens automatically. Focus rings, contrast ratios, and motion preferences are all built into the defaults. Every component ships with clear guidelines, do's and don'ts, and code examples so teams can self-serve without asking the systems team.</p>
+                </div>
+            </div>
+
+            <div class="cs-section cs-section--split cs-section--reverse">
+                <div class="cs-media cs-media--adoption-visual">
+                    <div class="cs-media--adoption-stack">
+                        <img class="cs-media--adoption-base" src="../images/slides/ds-04-adoption-base.png" width="1024" height="1024" loading="lazy" alt="Date range picker UI: dark theme, August range selected.">
+                        <div class="cs-adoption-overlay" aria-hidden="true">
+                            <svg class="cs-adoption-overlay-svg" width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M332.113 870.876C300.006 761.956 314.128 527.734 457.807 364.071" fill="none" stroke="currentColor" stroke-width="9.85333"/>
+                                <path d="M560 924.318C621.327 914.933 722.366 881.814 795.56 817.721" fill="none" stroke="currentColor" stroke-width="10.178"/>
+                                <path d="M823.62 792.965L808.462 840.473L774.898 803.592L823.62 792.965Z" fill="currentColor"/>
+                                <path d="M484.413 330.471L480.031 379.937L439.383 351.409L484.413 330.471Z" fill="currentColor"/>
+                            </svg>
+                            <p class="cs-adoption-overlay-copy">🤖 Visual changes identified</p>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <div class="cs-section-label">Adoption</div>
+                    <h2 class="cs-section-title">Automated regression tests</h2>
+                    <p class="cs-section-text">New components go through a lightweight proposal process. Updates ship as versioned packages with deprecation warnings, so nothing breaks overnight. Automated tests catch visual regressions and accessibility failures before code merges. I focused on making the system easy for designers first — once they were on board, engineers followed naturally because the handoff became simpler.</p>
+                </div>
+            </div>
+
+            <div class="cs-section cs-section--impact">
+                <div class="cs-section-label">Impact</div>
+                <h2 class="cs-section-title">Every target exceeded</h2>
+                <ul class="cs-impact-grid" role="list">
+                    <li class="cs-impact-card">
+                        <div class="cs-impact-card__glow" aria-hidden="true"></div>
+                        <p class="cs-impact-card__stat"><span class="cs-impact-card__figure">5</span> products</p>
+                        <p class="cs-impact-card__vs"><span class="cs-impact-card__target">Target 3</span><span class="cs-impact-card__dash">→</span><span class="cs-impact-card__win">5 shipped</span></p>
+                        <p class="cs-impact-card__detail">Three engineering teams on the system in two quarters.</p>
+                    </li>
+                    <li class="cs-impact-card">
+                        <div class="cs-impact-card__glow" aria-hidden="true"></div>
+                        <p class="cs-impact-card__stat"><span class="cs-impact-card__figure">30–45%</span> faster handoff</p>
+                        <p class="cs-impact-card__vs"><span class="cs-impact-card__target">Target 25%</span><span class="cs-impact-card__dash">→</span><span class="cs-impact-card__win">30–45%</span></p>
+                        <p class="cs-impact-card__detail">Time-to-merge for UI changes dropped 20–35%.</p>
+                    </li>
+                    <li class="cs-impact-card">
+                        <div class="cs-impact-card__glow" aria-hidden="true"></div>
+                        <p class="cs-impact-card__stat"><span class="cs-impact-card__figure">~70%</span> fewer inconsistencies</p>
+                        <p class="cs-impact-card__vs"><span class="cs-impact-card__target">Target 50%</span><span class="cs-impact-card__dash">→</span><span class="cs-impact-card__win">~70%</span></p>
+                        <p class="cs-impact-card__detail">Visual regressions caught before merge, not after shipping.</p>
+                    </li>
+                    <li class="cs-impact-card">
+                        <div class="cs-impact-card__glow" aria-hidden="true"></div>
+                        <p class="cs-impact-card__stat"><span class="cs-impact-card__figure">100%</span> WCAG 2.2 AA</p>
+                        <p class="cs-impact-card__vs"><span class="cs-impact-card__target">Required</span><span class="cs-impact-card__dash">→</span><span class="cs-impact-card__win">All components</span></p>
+                        <p class="cs-impact-card__detail">Contrast checked automatically on every change.</p>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="cs-section cs-section--no-chapter-tint">
+                <div class="cs-section-label">What I'd do differently</div>
+                <h2 class="cs-section-title">Adoption was uneven at first</h2>
+                <p class="cs-section-text">The first two teams adopted quickly because I'd involved them from the audit stage. The third team — who joined mid-rollout — had a slower start because they hadn't been part of the naming negotiations and the system felt imposed rather than collaborative. If I did it again, I'd run a condensed onboarding workshop for any team joining after the initial build, so they'd feel ownership over the decisions rather than inheriting them.</p>
+            </div>
+
+        </div>
+
+        <div class="cs-next">
+            <div class="cs-next-label">Next Project</div>
+            <a href="design-tokens.html" class="cs-next-link">
+                One Color Change, Six Platforms Updated <span class="cs-next-arrow">&rarr;</span>
+            </a>
+        </div>
+
+    </div>
+
+    <footer>
+            <span>
+                <a href="mailto:hello@felixjanemalm.com">hello@felixjanemalm.com</a>
+            </span>
+            <span>
+                <a href="../Resume.pdf" target="_blank" download>
+                    Resume.pdf
+                    <svg width="18" height="22" viewBox="0 0 18 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9.85 2C9.85 1.53056 9.46944 1.15 9 1.15C8.53056 1.15 8.15 1.53056 8.15 2L9.85 2ZM8.39896 17.601C8.73091 17.933 9.2691 17.933 9.60104 17.601L15.0104 12.1917C15.3424 11.8597 15.3424 11.3215 15.0104 10.9896C14.6785 10.6576 14.1403 10.6576 13.8083 10.9896L9 15.7979L4.19167 10.9896C3.85973 10.6576 3.32154 10.6576 2.98959 10.9896C2.65765 11.3215 2.65765 11.8597 2.98959 12.1917L8.39896 17.601ZM8.15 2L8.15 17L9.85 17L9.85 2L8.15 2Z" fill="currentColor"/>
+                        <path d="M1.21094 20.9688H17.0004" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                    </svg>
+                </a>
+            </span>
+            <span>
+                <a href="https://www.linkedin.com/in/felixjanemalm/" target="_blank">
+                    <svg width="20" height="21" viewBox="0 0 20 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M0 6.53138H4.42553V20.9687H0V6.53138ZM16.9787 7.4231C17.8582 7.90435 18.5816 8.63329 19.1489 9.60994C19.7163 10.5866 20 11.5845 20 12.6036V20.9687H15.5319V12.6036C15.5319 12.3771 15.4468 12.1223 15.2766 11.8392C15.1064 11.5562 14.9504 11.3721 14.8085 11.2872C14.5816 11.1457 14.2695 11.0749 13.8723 11.0749C13.4752 11.0749 13.1631 11.1315 12.9362 11.2448L11.1064 12.1365V20.9687H6.6383V6.53138H11.1064V7.21079C11.9858 6.81447 12.9787 6.63046 14.0851 6.65877C15.1915 6.68708 16.156 6.94186 16.9787 7.4231ZM2.21277 0.96875C2.83688 0.96875 3.3617 1.18106 3.78723 1.60569C4.21277 2.03032 4.42553 2.55403 4.42553 3.17682C4.42553 3.79961 4.21277 4.33039 3.78723 4.76917C3.3617 5.20796 2.83688 5.42735 2.21277 5.42735C1.58865 5.42735 1.06383 5.20796 0.638298 4.76917C0.212766 4.33039 0 3.79961 0 3.17682C0 2.55403 0.212766 2.03032 0.638298 1.60569C1.06383 1.18106 1.58865 0.96875 2.21277 0.96875Z" fill="currentColor"/>
+                    </svg>
+                </a>
+            </span>
+            <span>
+                <a href="https://maps.app.goo.gl/ar51QZTdsHNgS3Ej8" target="_blank">
+                    <svg width="16" height="20" viewBox="0 0 16 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7.77618 20C6.37306 18.8032 5.0725 17.4911 3.88809 16.0775C2.11068 13.9546 9.81645e-07 10.793 9.81645e-07 7.7803C-0.00157443 4.63378 1.89322 1.79641 4.8002 0.592222C7.70718 -0.611966 11.0534 0.0543808 13.2773 2.28032C14.7397 3.73625 15.5589 5.71671 15.5524 7.7803C15.5524 10.793 13.4417 13.9546 11.6643 16.0775C10.4799 17.4911 9.1793 18.8032 7.77618 20ZM7.77618 4.44765C6.58554 4.44765 5.48534 5.08285 4.89002 6.11398C4.2947 7.1451 4.2947 8.4155 4.89002 9.44662C5.48534 10.4777 6.58554 11.1129 7.77618 11.1129C9.61675 11.1129 11.1088 9.62087 11.1088 7.7803C11.1088 5.93973 9.61675 4.44765 7.77618 4.44765Z" fill="currentColor"/>
+                    </svg>
+                    Los Angeles
+                </a>
+            </span>
+    </footer>
+
+    <script>
+    (function () {
+        var mq = window.matchMedia("(min-width: 769px)");
+        var sections = document.querySelectorAll("[data-split-media-sync]");
+
+        function syncAll() {
+            sections.forEach(function (section) {
+                var copy = section.querySelector(".cs-split-copy");
+                var media = section.querySelector(".cs-media");
+                if (!copy || !media) return;
+                if (!mq.matches) {
+                    media.style.height = "";
+                    return;
+                }
+                media.style.height = copy.offsetHeight + "px";
+            });
+        }
+
+        sections.forEach(function (section) {
+            var copy = section.querySelector(".cs-split-copy");
+            if (copy && window.ResizeObserver) {
+                new ResizeObserver(syncAll).observe(copy);
+            }
+        });
+        window.addEventListener("resize", syncAll);
+        window.addEventListener("load", syncAll);
+        mq.addEventListener("change", syncAll);
+        syncAll();
+    })();
+    </script>
+    <script>
+    (function () {
+        var grid = document.querySelector(".cs-impact-grid");
+        if (!grid) return;
+        var cards = [].slice.call(grid.querySelectorAll(".cs-impact-card"));
+        if (!cards.length) return;
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+        var activeIndex = 0;
+        var timer = null;
+        var cycleMs = 4800;
+
+        function setActive(i) {
+            activeIndex = ((i % cards.length) + cards.length) % cards.length;
+            cards.forEach(function (card, j) {
+                card.classList.toggle("cs-impact-card--active", j === activeIndex);
+            });
+        }
+
+        function next() {
+            setActive(activeIndex + 1);
+        }
+
+        function startCycle() {
+            clearInterval(timer);
+            timer = setInterval(next, cycleMs);
+        }
+
+        function pauseCycle() {
+            clearInterval(timer);
+            timer = null;
+        }
+
+        cards.forEach(function (card, i) {
+            card.addEventListener("mouseenter", function () {
+                pauseCycle();
+                setActive(i);
+            });
+            card.addEventListener("mouseleave", function () {
+                startCycle();
+            });
+        });
+
+        setActive(0);
+        startCycle();
+    })();
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tinycolor/1.4.2/tinycolor.min.js"></script>
+    <script src="../js/color-shade-calculator.js"></script>
+    <script src="../js/header.js"></script>
+    <script src="../js/drawer.js"></script>
+
+</body>
+</html>

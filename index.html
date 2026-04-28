@@ -3,8 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Felix Janemalm — Product Designer specializing in design systems, design tokens, and AI-assisted workflows. Based in Los Angeles.">
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <title>Felix Janemalm – Product Designer</title>
+    <link rel="preload" href="fonts/woff2/RNSPhysis-Medium.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="fonts/woff2/RNSPhysis-Light.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="css/tokens/Ref/yds.css">
     <link rel="stylesheet" href="css/tokens/Ref/mui.css">
     <link rel="stylesheet" href="css/tokens/theme.css">
@@ -21,7 +24,6 @@
     <link rel="stylesheet" href="css/cards.css">
     <link rel="stylesheet" href="css/reader.css">
     <link rel="stylesheet" href="css/image-text.css">
-    <link rel="stylesheet" href="css/slideshow.css">
     <link rel="stylesheet" href="css/footer.css">
     <link rel="stylesheet" href="css/figma-iframe.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap">
@@ -103,7 +105,7 @@
             <div class="hero-left">
                 <h1>A systems-based approach to <span class="hue-rotate">product design</span></h1>
                 <div class="glass box" id="color-picker-container">
-                    <p>Pick any color</p>
+                    <p>Pick your color</p>
                     <div id="hue-canvas-container">
                         <canvas id="hue-canvas" width="215" height="12"></canvas>
                         <div id="hue-cursor" class="cursor"></div>
@@ -114,44 +116,99 @@
                         <div id="spectrum-cursor" class="cursor"></div>
                         <div id="spectrum-hitbox" class="hitbox"></div>
                     </div>
-                    <!--
-                    <div id="color-picker-arrow">
-                        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M12 4V20M12 20L6 14M12 20L18 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                    </div>
-                    -->
                 </div>
                 <div class="hero-content">
-                    <p class="hero-subhead">Hi, I'm Felix 👋, I build design systems and AI-assisted workflows that make the right thing easy.</p>
+                    <p class="hero-subhead">Hi! I'm Felix 👋 I build design systems and AI-assisted workflows that remove friction between design and code.</p>
                     <a href="#work" class="primary-btn">View Work</a>
-                    <!--
-                    <a href="#" id="contactBtn" class="secondary-btn" style="margin-left: 20px;">
-                    Contact Me
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-arrow-right" viewBox="0 0 16 16">
-                        <path fill-rule="evenodd" d="M10.354 3.646a.5.5 0 0 0-.708.708L12.293 7H1.5a.5.5 0 0 0 0 1h10.793l-2.647 2.646a.5.5 0 0 0 .708.708l3.5-3.5a.5.5 0 0 0 0-.708l-3.5-3.5z"/>
-                    </svg>
-                    </a>
-                    -->
                 </div>
             </div>
             <div class="hero-right">
-            </div><!--
-            <div id="c" class="container">
-                <div id="s" class="stage"></div>	
-            </div>                     -->
+            </div>
         </div>
         <div class="hero-bg"></div>
-        <a href="#scalability" id="scroll-down-arrow">
+        <a href="#work" id="scroll-down-arrow">
             <svg width="30" height="30" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M12 4V20M12 20L6 14M12 20L18 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
         </a>            
     </div>
 
+    <h2 class="h2-gradient work-heading" id="work">Work</h2>
+
+    <div class="case-study-teasers">
+
+        <a href="work/design-system.html" class="case-study-teaser">
+            <div class="teaser-visual">
+                <video class="hue-shift" autoplay muted loop playsinline>
+                    <source src="images/v7-demo.mp4" type="video/mp4">
+                </video>
+            </div>
+            <div class="teaser-body">
+                <span class="teaser-label">Yubico / Principal Product Designer</span>
+                <h3 class="teaser-title">Reclaimed $3M+ annually by unifying 5 products under one design system</h3>
+                <p class="teaser-summary">Built a shared component library and design language across 5 products — while a company rebrand was underway.</p>
+                <div class="teaser-metrics">
+                    <div class="metric"><strong>80%</strong> less UI rework across 3 engineering teams</div>
+                    <div class="metric"><strong>30–45%</strong> faster design-to-engineering handoff</div>
+                    <div class="metric"><strong>~70%</strong> fewer visual inconsistencies across products</div>
+                </div>
+                <span class="teaser-cta">View case study &rarr;</span>
+            </div>
+        </a>
+
+        <a href="work/design-tokens.html" class="case-study-teaser">
+            <div class="teaser-visual">
+                <video autoplay muted loop playsinline>
+                    <source src="images/tokens-v3-export.mp4" type="video/mp4">
+                </video>
+            </div>
+            <div class="teaser-body">
+                <span class="teaser-label">Yubico / Design Systems</span>
+                <h3 class="teaser-title">One change updates 6 platforms — adding $6M to YoY pipeline</h3>
+                <p class="teaser-summary">Created a design token system that automatically keeps colors, spacing, and typography in sync across web, iOS, Android, and Figma.</p>
+                <div class="teaser-metrics">
+                    <div class="metric"><strong>6</strong> platforms updated from a single source</div>
+                    <div class="metric"><strong>0</strong> manual steps between design and code</div>
+                    <div class="metric"><strong>4</strong> theme dimensions: brand, light/dark, density, screen size</div>
+                </div>
+                <span class="teaser-cta">View case study &rarr;</span>
+            </div>
+        </a>
+
+        <a href="work/ai-sourcing.html" class="case-study-teaser case-study-teaser--locked">
+            <div class="teaser-visual">
+                <video autoplay muted loop playsinline>
+                    <source src="images/case-studies/sourcing-platform-overview.mp4" type="video/mp4">
+                </video>
+            </div>
+            <div class="teaser-body">
+                <span class="teaser-label">Startup / Solo build</span>
+                <h3 class="teaser-title">AI-powered supply chain traceability</h3>
+                <p class="teaser-summary">Designed and built a sourcing platform for a fashion startup — automating vendor communication intake, tracking materials through production, and generating QR codes that trace every garment back to its source.</p>
+                <div class="teaser-metrics">
+                    <div class="metric"><strong>20+</strong> specialist AI agents replace manual sourcing ops</div>
+                    <div class="metric"><strong>100%</strong> of sustainability claims tied to verifiable records</div>
+                    <div class="metric"><strong>2027</strong> EU Digital Product Passport — shipped 3 years early</div>
+                </div>
+                <span class="teaser-cta teaser-cta--locked">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    Contact me to view
+                </span>
+            </div>
+        </a>
+
+    </div>
+
+    <section class="reader" id="read">
+        <div class="content">
+          <div data-split aria-hidden="true">
+            I make efficient systems a catalyst for creativity, enabling teams to scale by design, not by chance.
+          </div>
+        </div>
+    </section>
+
     <section class="card-wrapper" id="scalability">
-        <!--<div class="hue-filter" style="z-index: 0; margin-top: -50px;"></div>-->
-        <h2 class="h2-gradient">I create your scalable architecture</h2>
+        <h2 class="h2-gradient">Principles that scale</h2>
         <div class="owl-carousel custom-carousel owl-theme">
           <div class="item">
             <video autoplay muted loop playsinline class="background-video">
@@ -159,16 +216,15 @@
                 Your browser does not support the video tag.
               </video>
             <div class="item-desc">
-              <h3>Value</h3>
-              <p>Clarifying the 'why' through strong problem statements builds the foundation for great products</p>
+              <h3>Start with why</h3>
+              <p>Every great product starts with a well-framed problem. I ground design decisions in business context and user evidence before reaching for pixels.</p>
             </div>
           </div>
           <div class="item">
-
             <dotlottie-player class="hue-shift" src="https://lottie.host/23500ac5-13f4-4f84-95d7-579c3f134a6b/jSd8kwdgJI.lottie" background="black" speed="1" style="width: 100%; height: 100%; position: absolute;" loop pause></dotlottie-player>
             <div class="item-desc">
-              <h3>Team</h3>
-              <p>Creating psychological safety and balancing autonomy with alignment empowers teams to do their best work</p>
+              <h3>People first</h3>
+              <p>Design systems are adopted by people, not mandated by tools. I build psychological safety so teams contribute honestly and own the system together.</p>
             </div>
           </div>
           <div class="item">
@@ -177,8 +233,8 @@
                 Your browser does not support the video tag.
               </video>
             <div class="item-desc">
-              <h3>Componentization</h3>
-              <p>Designing components that serve users, designers, and developers fuels effortless delivery</p>
+              <h3>Component thinking</h3>
+              <p>I design components that serve users, designers, and developers alike — from Figma variants to production-ready code with built-in accessibility.</p>
             </div>
           </div>
           <div class="item">
@@ -187,345 +243,20 @@
                 Your browser does not support the video tag.
               </video>
             <div class="item-desc">
-              <h3>Tokenization</h3>
-              <p>Multi-level design tokens weaves brand consistency through every touchpoint, reducing time to market.</p>
+              <h3>Token architecture</h3>
+              <p>Multi-level design tokens connect brand decisions to every touchpoint — enabling theming, light/dark modes, and faster cross-platform delivery.</p>
             </div>
           </div>
           <div class="item">
             <dotlottie-player class="hue-shift" src="https://lottie.host/aa824455-454d-4dd2-95b5-4efa197d9e76/KWgSTJ1fiU.lottie" background="black" speed=".5" style="height: 100%; position: absolute; transform: scale(1.525); top: -19px;" loop pause></dotlottie-player>
             <div class="item-desc">
-              <h3>Essentialism</h3>
-              <p>By tackling only the top 10% of what truly matters, we still face more meaningful work than a lifetime can accomplish.</p>
+              <h3>Ruthless focus</h3>
+              <p>The top 10% of priorities already contain more meaningful work than a team can deliver. I help identify what truly moves the needle and protect against scope creep.</p>
             </div>
           </div>
         </div>
-        </div>
     </section>
 
-    <section class="reader" id="read">
-        <div class="content">
-          <div data-split aria-hidden="true">
-            I make efficient systems a catalyst for creativity, enabling teams to scale by design, not by chance.
-          </div>
-        </div>
-        <div class="after-reader">
-            <video autoplay muted loop playsinline controls class="shadow hue-shift">
-              <source src="images/v7-demo.mp4" type="video/mp4">
-              Your browser does not support the video tag.
-            </video>
-          </div>
-    </section>
-
-    <div class="spacer"></div>
-
-    <section class="reader2" id="read2" style="margin-top: calc(-8vh + -5vw);">
-        <div class="content2">
-          <div data-split aria-hidden="true">
-            Designers should consider every design their own, and it should still be consistent.
-          </div>
-        </div>
-    </section>
-    
-
-    <h2 class="h2-gradient" id="work" style="margin: 10px; margin-top: calc(-8vh + -5vw);">Work</h2>
-
-
-    <!--
-    <section class="image-text">
-        <div class="image">
-            <div class="figma-frame-wrapper">
-                <iframe
-                  class="figma-frame"
-                  src="https://embed.figma.com/deck/4FojaIUyd5mnNANQX2HSzn/A-design-system-is-born?node-id=1-57&viewport=-4221%2C-64%2C0.63&scaling=min-zoom&content-scaling=fixed&page-id=0%3A1&embed-host=share"
-                  allowfullscreen
-                  loading="lazy"
-                ></iframe>
-            </div>
-        </div>
-        <div class="text">
-            <h2 class="tiny-header">🚀 Impact</h2>
-            <ul class="feature-list">
-                <li>Reduced average lead time for new web pages from 2 weeks to 2 days (an 80% speed-up).</li>
-            </ul>
-        </div>
-    </section>
-
-    <section class="image-text">
-        <div class="image">
-            <div class="figma-frame-wrapper">
-                <iframe
-                  class="figma-frame"
-                  src="https://embed.figma.com/deck/8S3lGNxOqd5ODFs6zCZLNR/Design-Tokens-as-a-Shared-Language?node-id=1-66&viewport=-136%2C-1126%2C0.63&scaling=min-zoom&content-scaling=fixed&page-id=0%3A1&embed-host=share"
-                  allowfullscreen
-                  loading="lazy"
-                ></iframe>
-            </div>
-        </div>
-        <div class="text">
-            <h2>Reflection</h2>
-            <p>
-                It wasn't just about tokens—it was about trust. Design systems succeed when they're easy to use, hard to break, and built with empathy.
-            </p>
-        </div>
-    </section> 
-
-    -->
-
-
-   <!-- #### New stuffe #### -->
-
-
-<!-- Design System -->
-<section class="image-text">
-    <div class="image">
-        <div class="slider-container slider-design-system">
-            <!-- Fullscreen controls -->
-            <button class="slider-fullscreen-btn" aria-label="Enter fullscreen">
-                <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
-                    <path fill="currentColor" fill-rule="evenodd" d="m17 7.707-3.146 3.147a.5.5 0 0 1-.708-.708L16.293 7H13.5a.5.5 0 0 1 0-1h4a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-1 0zm-6.854 5.44a.5.5 0 0 1 .708.707L7.707 17H10.5a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5v-4a.5.5 0 0 1 1 0v2.793z" clip-rule="evenodd"></path>
-                </svg>
-            </button>
-            
-            <button class="slider-exit-fullscreen-btn" aria-label="Exit fullscreen">
-                <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
-                    <path fill="currentColor" fill-rule="evenodd" d="M17.146 6.146a.5.5 0 0 1 .708.708L14.707 10H17.5a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5v-4a.5.5 0 0 1 1 0v2.793zM6.854 17.854a.5.5 0 0 1-.708-.708L9.293 14H6.5a.5.5 0 0 1 0-1h4a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-1 0v-2.793z" clip-rule="evenodd"></path>
-                </svg>
-            </button>
-            
-            <!-- Slides -->
-            <div class="slider-slides">
-                <!-- New Case Study Slide 1 -->
-                <div class="slider-slide slider-mint active" data-index="0">
-                    <div class="slider-content">
-                        <h2 class="slider-title" style="color: black!important;">A DESIGN SYSTEM IS BORN</h2>
-                        <h2 class="slider-subtitle">UNIFYING THE COMPANY</h2>
-                    </div>
-                </div>
-
-                <!-- New Case Study Slide 2 -->
-                <div class="slider-slide" data-index="1">
-                    <div class="figma-frame-wrapper">
-                        <img style="object-fit: cover; object-position: left center;" src="images/slides/ds-01.png" alt="Dashboard">
-                    </div>
-                </div>
-
-                <!-- New Case Study Slide 3 -->
-                <div class="slider-slide" data-index="2">
-                    <div class="figma-frame-wrapper">
-                        <img style="object-fit: cover; object-position: left center;" src="images/slides/ds-02.png" alt="Dashboard">
-                    </div>
-                </div>
-
-                <!-- New Case Study Slide 4 -->
-                <div class="slider-slide" data-index="3">
-                    <div class="figma-frame-wrapper">
-                        <video autoplay muted loop playsinline style="width: 100%; height: auto; object-fit: cover; object-position: left center;">
-                            <source src="images/slides/ds-04.mp4" type="video/mp4">
-                            Your browser does not support the video tag.
-                          </video>                          
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Navigation controls -->
-            <div class="slider-controls-wrapper">
-                <div class="slider-controls">
-                    <button class="slider-btn slider-prev-btn" disabled aria-label="Previous slide">
-                        <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
-                            <path fill="currentColor" fill-rule="evenodd" d="M13.854 7.146a.5.5 0 0 1 0 .708L9.707 12l4.147 4.146a.5.5 0 0 1-.708.708l-4.5-4.5a.5.5 0 0 1 0-.708l4.5-4.5a.5.5 0 0 1 .708 0" clip-rule="evenodd"></path>
-                        </svg>
-                    </button>
-                    
-                    <div class="slider-counter">1 / 4</div>
-                    
-                    <button class="slider-btn slider-next-btn" aria-label="Next slide">
-                        <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
-                            <path fill="currentColor" fill-rule="evenodd" d="M10.146 16.854a.5.5 0 0 1 0-.708L14.293 12l-4.147-4.146a.5.5 0 0 1 .708-.708l4.5 4.5a.5.5 0 0 1 0 .708l-4.5 4.5a.5.5 0 0 1-.708 0" clip-rule="evenodd"></path>
-                        </svg>
-                    </button>
-                    
-                    <div class="slider-separator"></div>
-                    
-                    <button class="slider-btn slider-reset-btn" aria-label="Reset to first slide">
-                        <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
-                            <path fill="currentColor" fill-rule="evenodd" d="M8.854 5.854a.5.5 0 1 0-.708-.708l-3 3a.5.5 0 0 0 0 .708l3 3a.5.5 0 0 0 .708-.708L6.707 9H14a4 4 0 1 1-3.748 5.4.56.56 0 0 0-.516-.377c-.326 0-.57.3-.464.608A5.002 5.002 0 0 0 19 13a5 5 0 0 0-4.998-5H6.707z" clip-rule="evenodd"></path>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="text">
-        <h2 class="tiny-header">Impact</h2>
-        <p>
-            Reduced average lead time for new web pages from 2 weeks to 2 days (an 80% speed-up).
-        </p>
-    </div>
-</section>
-
-
-<!-- Design Tokens -->
-<section class="image-text">
-    <div class="image">
-        <div class="slider-container slider-tokens">
-            <!-- Fullscreen controls -->
-            <button class="slider-fullscreen-btn" aria-label="Enter fullscreen">
-                <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
-                    <path fill="currentColor" fill-rule="evenodd" d="m17 7.707-3.146 3.147a.5.5 0 0 1-.708-.708L16.293 7H13.5a.5.5 0 0 1 0-1h4a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-1 0zm-6.854 5.44a.5.5 0 0 1 .708.707L7.707 17H10.5a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5v-4a.5.5 0 0 1 1 0v2.793z" clip-rule="evenodd"></path>
-                </svg>
-            </button>
-            
-            <button class="slider-exit-fullscreen-btn" aria-label="Exit fullscreen">
-                <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
-                    <path fill="currentColor" fill-rule="evenodd" d="M17.146 6.146a.5.5 0 0 1 .708.708L14.707 10H17.5a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5v-4a.5.5 0 0 1 1 0v2.793zM6.854 17.854a.5.5 0 0 1-.708-.708L9.293 14H6.5a.5.5 0 0 1 0-1h4a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-1 0v-2.793z" clip-rule="evenodd"></path>
-                </svg>
-            </button>
-            
-            <!-- Slides -->
-            <div class="slider-slides">
-                <!-- Slide 1 -->
-                <div class="slider-slide active" data-index="0">
-                    <div class="slider-content">
-                        <h1 class="slider-title gradient-inverse">Design Tokens as a Shared Language</h1>
-                        <h2 class="slider-subtitle" style="color: white;">Alignment across stacks,<br>teams, and timezones</h2>
-                    </div>
-                </div>
-                
-                <!-- Slide 2 -->
-                <div class="slider-slide" data-index="1">
-                    <div class="figma-frame-wrapper">
-                        <img style="object-fit: cover; object-position: left center;" src="images/slides/tokens-01.png" alt="Dashboard">
-                    </div>
-                </div>
-        
-                <!-- Slide 3 with polaroid -->
-                <div class="slider-slide" data-index="2">
-                    <div class="figma-frame-wrapper">
-                        <img style="object-fit: cover; object-position: left center;" src="images/slides/tokens-02.png" alt="Dashboard">
-                    </div>
-                </div>
-
-                <!-- Slide 4 -->
-                <div class="slider-slide" data-index="2">
-                    <div class="figma-frame-wrapper">
-                        <img style="object-fit: cover; object-position: left center;" src="images/slides/tokens-03.png" alt="Dashboard">
-                    </div>
-                </div>
-
-                <!-- Slide 4 -->
-                <div class="slider-slide" data-index="2">
-                    <div class="figma-frame-wrapper">
-                        <video autoplay muted loop playsinline style="width: 100%; height: auto; object-fit: cover; object-position: left center;">
-                            <source src="images/slides/tokens-04-web.mp4" type="video/mp4">
-                            Your browser does not support the video tag.
-                        </video> 
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Navigation controls -->
-            <div class="slider-controls-wrapper">
-                <div class="slider-controls">
-                    <button class="slider-btn slider-prev-btn" disabled aria-label="Previous slide">
-                        <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
-                            <path fill="currentColor" fill-rule="evenodd" d="M13.854 7.146a.5.5 0 0 1 0 .708L9.707 12l4.147 4.146a.5.5 0 0 1-.708.708l-4.5-4.5a.5.5 0 0 1 0-.708l4.5-4.5a.5.5 0 0 1 .708 0" clip-rule="evenodd"></path>
-                        </svg>
-                    </button>
-                    
-                    <div class="slider-counter">1 / 3</div>
-                    
-                    <button class="slider-btn slider-next-btn" aria-label="Next slide">
-                        <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
-                            <path fill="currentColor" fill-rule="evenodd" d="M10.146 16.854a.5.5 0 0 1 0-.708L14.293 12l-4.147-4.146a.5.5 0 0 1 .708-.708l4.5 4.5a.5.5 0 0 1 0 .708l-4.5 4.5a.5.5 0 0 1-.708 0" clip-rule="evenodd"></path>
-                        </svg>
-                    </button>
-                    
-                    <div class="slider-separator"></div>
-                    
-                    <button class="slider-btn slider-reset-btn" aria-label="Reset to first slide">
-                        <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
-                            <path fill="currentColor" fill-rule="evenodd" d="M8.854 5.854a.5.5 0 1 0-.708-.708l-3 3a.5.5 0 0 0 0 .708l3 3a.5.5 0 0 0 .708-.708L6.707 9H14a4 4 0 1 1-3.748 5.4.56.56 0 0 0-.516-.377c-.326 0-.57.3-.464.608A5.002 5.002 0 0 0 19 13a5 5 0 0 0-4.998-5H6.707z" clip-rule="evenodd"></path>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="text">
-        <h2 class="tiny-header">Reflection</h2>
-        <p>
-            It wasn't just about tokens—it was about trust. Design systems succeed when they're easy to use, hard to break, and built with empathy.
-        </p>
-    </div>
-</section>
-
-<section class="image-text">
-    <div class="image">
-        <div class="figma-frame-wrapper">
-            <img style="object-fit: cover; object-position: left center;" src="images/case-study-coming-soon.png" alt="Dashboard">
-        </div>
-    </div>
-    <div class="text">
-        <h2 class="tiny-header">AI is what design systems have been waiting for</h2>
-        <p>
-            Many companies struggle to redeem the full value of their design systems. AI lowers the entry barrier, making these systems accessible to all. With AI as both a consumer and co-creator, designers are empowered to elevate their role and guide technology toward humane and inspiring outcomes.</p>
-    </div>
-</section>
-
-
-
-
-    <!-- Old image text section starts here
-
-    <section class="image-text">
-        <div class="image">
-            <img src="images/dashboard.png" alt="Dashboard">
-        </div>
-        <div class="text">
-            <h2>Data visualization</h2>
-            <p>Capturing complex business logic on a dashboard and leveraging usability studies to improve the designs</p>
-            <a href="https://www.figma.com/deck/DOFb5Kj55S66Nr5ZEHgAQi/Untitled?node-id=1-17&viewport=-5599%2C-64%2C0.63&t=BrR4bgixoiK5ml9D-1&scaling=min-zoom&content-scaling=fixed&page-id=0%3A1" target="_blank" class="secondary-btn" style="padding-left: 0; margin: 0;">
-                View in Figma
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-arrow-right" viewBox="0 0 16 16">
-                    <path fill-rule="evenodd" d="M10.354 3.646a.5.5 0 0 0-.708.708L12.293 7H1.5a.5.5 0 0 0 0 1h10.793l-2.647 2.646a.5.5 0 0 0 .708.708l3.5-3.5a.5.5 0 0 0 0-.708l-3.5-3.5z"/>
-                </svg>
-            </a>
-        </div>
-    </section>
-
-    <section class="image-text">
-        <div class="image">
-            <img src="images/prototype-ia.png" alt="Figma prototye and IA map">
-        </div>
-        <div class="text">
-            <h2>Creating a SaaS product</h2>
-            <p>Building a multi million dollar SaaS product on a hardware subscription model</p>
-            <a href="https://www.figma.com/proto/ACKDbDQFc7OZRjWiFKgnJS/UX---Case-Studies?page-id=0%3A1&node-id=41-4505&p=f&viewport=595%2C527%2C0.03&t=Hj61QEFk0UoDdIPI-1&scaling=min-zoom&content-scaling=fixed&starting-point-node-id=41%3A4505&show-proto-sidebar=1" target="_blank" class="secondary-btn" style="padding-left: 0; margin: 0;">
-                View in Figma
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-arrow-right" viewBox="0 0 16 16">
-                    <path fill-rule="evenodd" d="M10.354 3.646a.5.5 0 0 0-.708.708L12.293 7H1.5a.5.5 0 0 0 0 1h10.793l-2.647 2.646a.5.5 0 0 0 .708.708l3.5-3.5a.5.5 0 0 0 0-.708l-3.5-3.5z"/>
-                </svg>
-            </a>
-        </div>
-    </section>
-
-    <section class="image-text">
-        <div class="image">
-            <img src="images/flowcharts.png" alt="Process artefacts and flowcharts">
-        </div>
-        <div class="text">
-            <h2>Cross functional product workflow</h2>
-            <p>Over the years working with XF teams we developed a robust hand-off and QA process which enables simple and effective collaboration</p>
-            <a href="https://www.figma.com/proto/ACKDbDQFc7OZRjWiFKgnJS/UX---Case-Studies?page-id=0%3A1&node-id=41-4505&p=f&viewport=595%2C527%2C0.03&t=Hj61QEFk0UoDdIPI-1&scaling=min-zoom&content-scaling=fixed&starting-point-node-id=41%3A4505&show-proto-sidebar=1" target="_blank" class="secondary-btn" style="padding-left: 0; margin: 0;">
-                View in Figma
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-arrow-right" viewBox="0 0 16 16">
-                    <path fill-rule="evenodd" d="M10.354 3.646a.5.5 0 0 0-.708.708L12.293 7H1.5a.5.5 0 0 0 0 1h10.793l-2.647 2.646a.5.5 0 0 0 .708.708l3.5-3.5a.5.5 0 0 0 0-.708l-3.5-3.5z"/>
-                </svg>
-            </a>
-        </div>
-    </section>
-
-    -->
 
     <div class="testimonials-wrapper">
         <div data-carousel>
@@ -533,7 +264,7 @@
             <ul class="slide__list Wallop-list">
                 <li class="slide__item Wallop-item Wallop-item--current">
                     <blockquote>
-                        <p class="slide__quote">“I had the unique opportunity to collaborate with Felix on a comprehensive design system project, where his role as the UX lead was nothing short of exemplary. His approach to integrating and guiding teams across different departments was marked by empathy and a deep understanding of collaborative dynamics...His adaptability, respect for diverse viewpoints, and innovative problem-solving approach were consistently on display...”</p>
+                        <p class="slide__quote">"I had the unique opportunity to collaborate with Felix on a comprehensive design system project, where his role as the UX lead was nothing short of exemplary. His approach to integrating and guiding teams across different departments was marked by empathy and a deep understanding of collaborative dynamics...His adaptability, respect for diverse viewpoints, and innovative problem-solving approach were consistently on display..."</p>
                         <cite class="slide__cite">Eden, Senior Software Engineer - <a href="https://www.linkedin.com/in/felixjanemalm/#recommendations" target="_blank">Read on LinkedIn</a></cite>
                     </blockquote>
                  </li>   
@@ -547,7 +278,7 @@
                     <blockquote>
                         <p class="slide__quote">"Felix addresses every situation with such grace and consideration, even in the face of pigheadedness.
                             I was absolutely gobsmacked by the holism of the design he developed for the visual aspect of the corporate image - not to mention its elegance.
-                            I can’t recommend him enough, and I’m so sorry not to be continuing to work with him."</p>
+                            I can't recommend him enough, and I'm so sorry not to be continuing to work with him."</p>
                         <cite class="slide__cite">Fiona, Technical Publications Manager - <a href="https://www.linkedin.com/in/felixjanemalm/#recommendations" target="_blank">Read on LinkedIn</a> </cite>
                     </blockquote>
                 </li>
@@ -565,7 +296,7 @@
                  </li>
                  <li class="slide__item Wallop-item">
                     <blockquote>
-                        <p class="slide__quote">“Felix has great work ethics and passion towards his work. He has very good collaboration skills, takes feedback and incorporates it into his design...conducted usability studies with stakeholders and strives towards the constant improvement...drove meetings with different UI teams across Yubico to bring design consistency. He has enthusiasm to learn new frameworks. He has great knowledge of Figma, plugins and is always ready to share his knowledge.”</p>
+                        <p class="slide__quote">"Felix has great work ethics and passion towards his work. He has very good collaboration skills, takes feedback and incorporates it into his design...conducted usability studies with stakeholders and strives towards the constant improvement...drove meetings with different UI teams across Yubico to bring design consistency. He has enthusiasm to learn new frameworks. He has great knowledge of Figma, plugins and is always ready to share his knowledge."</p>
                         <cite class="slide__cite">Sree, Senior Software Engineer - <a href="https://www.linkedin.com/in/felixjanemalm/#recommendations" target="_blank">Read on LinkedIn</a></cite>
                     </blockquote>
                  </li>   
@@ -580,6 +311,7 @@
     </div>
 
     <div class="tools">
+        <h3 class="tools-heading">Tools I work with</h3>
         <div class="mover-1"></div>
     </div>
 
@@ -616,61 +348,15 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tinycolor/1.4.2/tinycolor.min.js"></script>
     <script src="js/color-shade-calculator.js"></script>
     <script src="js/heroanimation.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/wallop/2.4.1/js/Wallop.min.js"></script>
-    <script src="js/testimonials.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/OwlCarousel2/2.3.4/owl.carousel.min.js"></script>
-    <script src="js/cards.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/wallop/2.4.1/js/Wallop.min.js" defer></script>
+    <script src="js/testimonials.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/OwlCarousel2/2.3.4/owl.carousel.min.js" defer></script>
+    <script src="js/cards.js" defer></script>
     <script src="js/header.js"></script>
     <script src="js/drawer.js"></script>
     <script src="js/reader.js"></script>
     <script src="js/grid.js"></script>
-    <script src="https://cdn.skypack.dev/gsap@3.12.0"></script>
-    <script src="https://cdn.skypack.dev/gsap@3.12.0/ScrollTrigger"></script>
-    <script src="js/slideshow.js"></script>
-
-
-    <div class="debug">
-        <label for="colorblindSwitch">Colorblind Mode:</label>
-        <input type="checkbox" id="colorblindSwitch">
-    </div>
-
-    <div class="color-display debug">
-        <div class="color-box" id="strongBox">Strong</div>
-        <div class="color-box" id="defaultBox">Default</div>
-        <div class="color-box" id="subtleBox">Subtle</div>
-        <div class="color-box" id="tintBox">Tint</div>
-    </div>
-
-    <div class="color-display debug">
-        <div class="color-box" style="color: var(--sysNeutral7)">Neutral 7</div>
-        <div class="color-box" style="color: var(--sysNeutral6)">Neutral 6</div>
-        <div class="color-box" style="color: var(--sysNeutral5)">Neutral 5</div>
-        <div class="color-box" style="color: var(--sysNeutral4)">Neutral 4</div>
-        <div class="color-box" style="color: var(--sysNeutral3)">Neutral 3</div>
-        <div class="color-box" style="color: var(--sysNeutral2)">Neutral 2</div>
-        <div class="color-box" style="color: var(--sysNeutral1)">Neutral 1</div>
-        <div class="color-box" style="color: var(--sysNeutral0)">Neutral 0</div>
-    </div>
-    <div class="color-display debug">
-        <div class="color-box" style="color: var(--sysWarningDefault)">Warning Default</div>
-        <div class="color-box" style="color: var(--sysWarningSubtle)">Warning Subtle</div>
-        <div class="color-box" style="color: var(--sysDangerDefault)">Danger Default</div>
-        <div class="color-box" style="color: var(--sysDangerSubtle)">Danger Subtle</div>
-        <div class="color-box" style="color: var(--sysInfoDefault)">Info Default</div>
-        <div class="color-box" style="color: var(--sysInfoSubtle)">Info Subtle</div>
-        <div class="color-box" style="color: var(--sysSuccessDefault)">Success Default</div>
-        <div class="color-box" style="color: var(--sysSuccessSubtle)">Success Subtle</div>
-    </div>
-
-    <div class="color-display debug">
-        <div class="color-box" style="color: var(--textInverse)">text inverse</div>
-        <div class="color-box" style="color: var(--text)">text</div>
-        <div class="color-box" style="color: var(--OnprimaryText)">OnprimaryText</div>
-        <div class="color-box" style="color: var(--OnsecondaryText)">OnsecondaryText</div>
-    </div>
 
 </body>
 </html>
-
-

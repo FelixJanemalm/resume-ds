@@ -1,0 +1,19 @@
+# macOS metadata
+.DS_Store
+**/.DS_Store
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs / OS
+*.log
+Thumbs.db
+
+# Local backups (work-in-progress drafts kept locally only)
+work/backups/
+
+# Note: the parent-level `local-ai-packaged 2/` folder is outside this repo and
+# cannot be committed from here. Listed for documentation only.

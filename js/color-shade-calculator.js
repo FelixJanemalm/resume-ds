@@ -1,4 +1,14 @@
-let currentColor = '#FFFFFF'; // Initial color
+const THEME_STORAGE_KEY = 'portfolio-theme-primary';
+const FALLBACK_THEME_COLOR = '#4faad1';
+
+let currentColor = null;
+
+try {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    if (stored && /^#[0-9A-Fa-f]{6}$/i.test(stored)) {
+        currentColor = stored;
+    }
+} catch (e) { /* private mode / quota */ }
 
 Object.defineProperty(window, 'currentColor', {
     get: function() {
@@ -12,6 +22,13 @@ Object.defineProperty(window, 'currentColor', {
 
 document.addEventListener('DOMContentLoaded', function() {
     const spectrumCanvas = document.getElementById('spectrum-canvas');
+    if (!spectrumCanvas) {
+        const hex = currentColor || FALLBACK_THEME_COLOR;
+        currentColor = hex;
+        updateColors(hex, { skipBodyTheme: true });
+        return;
+    }
+
     const spectrumCtx = spectrumCanvas.getContext('2d');
     const spectrumCursor = document.getElementById('spectrum-cursor');
     const spectrumHitbox = document.getElementById('spectrum-hitbox');
@@ -30,8 +47,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function ColorPicker() {
         createHueSpectrum();
-        createShadeSpectrum(colorToHue(`hsl(${hue}, 100%, 50%)`));
-        const initialColor = tinycolor(`hsl(${hue}, ${saturation * 80}%, ${lightness * 90}%)`);
+        const initialColor = currentColor
+            ? tinycolor(currentColor)
+            : tinycolor(`hsl(${hue}, ${saturation * 80}%, ${lightness * 90}%)`);
+        createShadeSpectrum(colorToHue(initialColor.toHexString()));
         colorToPos(initialColor);
         setCurrentColor(initialColor);
     }
@@ -318,7 +337,8 @@ function hexToRgba(hex, opacity) {
 
 function applyThemeBasedOnBrightnessAndMode(hexColor) {
     let [h, s, l] = hexToHsl(hexColor);
-    const colorblindMode = document.getElementById('colorblindSwitch').checked;
+    const colorblindEl = document.getElementById('colorblindSwitch');
+    const colorblindMode = colorblindEl ? colorblindEl.checked : false;
 
     document.body.classList.remove('default-dark-colorblind', 'default-light-colorblind', 'default-dark', 'default-light');
 
@@ -372,7 +392,8 @@ function hexToRGB(hex) {
     return [(c >> 16) & 255, (c >> 8) & 255, c & 255].join(',');
 }
 
-function updateColors(color) {
+function updateColors(color, options) {
+    options = options || {};
     const selectedColor = limitBrightness(color);
     const shades = calculateShades(selectedColor);
     const buttonColors = calculateButtonColors(selectedColor);
@@ -399,15 +420,14 @@ function updateColors(color) {
     document.documentElement.style.setProperty('--bgMedium-opacity', bgMediumOpacity);
     document.documentElement.style.setProperty('--gridOverlay', gridOverlay);
 
-    document.getElementById('strongBox').style.backgroundColor = shades.strong;
-    document.getElementById('defaultBox').style.backgroundColor = shades.default;
-    document.getElementById('subtleBox').style.backgroundColor = shades.subtle;
-    document.getElementById('tintBox').style.backgroundColor = shades.tint;
-
-    document.getElementById('strongBox').textContent = shades.strong;
-    document.getElementById('defaultBox').textContent = shades.default;
-    document.getElementById('subtleBox').textContent = shades.subtle;
-    document.getElementById('tintBox').textContent = shades.tint;
+    const strongBox = document.getElementById('strongBox');
+    const defaultBox = document.getElementById('defaultBox');
+    const subtleBox = document.getElementById('subtleBox');
+    const tintBox = document.getElementById('tintBox');
+    if (strongBox) { strongBox.style.backgroundColor = shades.strong; strongBox.textContent = shades.strong; }
+    if (defaultBox) { defaultBox.style.backgroundColor = shades.default; defaultBox.textContent = shades.default; }
+    if (subtleBox) { subtleBox.style.backgroundColor = shades.subtle; subtleBox.textContent = shades.subtle; }
+    if (tintBox) { tintBox.style.backgroundColor = shades.tint; tintBox.textContent = shades.tint; }
 
     // Get computed primary color before passing it
     const computedPrimaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim();
@@ -418,10 +438,20 @@ function updateColors(color) {
             el.style.filter = `hue-rotate(${hueShift}deg) saturate(${saturationScale}) brightness(${brightnessChange})`;
         }
     });
-    
-    
 
-    applyThemeBasedOnBrightnessAndMode(selectedColor);
+    try {
+        localStorage.setItem(THEME_STORAGE_KEY, selectedColor);
+    } catch (e) { /* ignore */ }
+
+    try {
+        document.dispatchEvent(
+            new CustomEvent("portfolioThemePrimaryChanged", { detail: { color: selectedColor } })
+        );
+    } catch (e) { /* ignore */ }
+
+    if (!options.skipBodyTheme) {
+        applyThemeBasedOnBrightnessAndMode(selectedColor);
+    }
 }
 
 // Function to calculate hue shift
@@ -466,9 +496,10 @@ function getHueSaturationBrightnessShift(originalHex, targetHex) {
 
 document.addEventListener('DOMContentLoaded', () => {
     const colorblindSwitch = document.getElementById('colorblindSwitch');
-
-    colorblindSwitch.addEventListener('change', () => updateColors(currentColor));
-
-    // Initial call to set colors based on default current color and switch state
-    updateColors(currentColor);
+    if (colorblindSwitch) {
+        colorblindSwitch.addEventListener('change', () => updateColors(currentColor));
+    }
+    if (document.getElementById('spectrum-canvas') && currentColor) {
+        updateColors(currentColor);
+    }
 });

@@ -314,7 +314,7 @@ footer {
 }
 
 .tiny-header {
-    font-size: var(--body-font-size)*.75;
+    font-size: calc(var(--body-font-size) * 0.75);
     font-weight: 600;
     letter-spacing: 1px;
     text-transform: uppercase;

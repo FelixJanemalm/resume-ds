@@ -35,18 +35,16 @@ document.addEventListener("DOMContentLoaded", function () {
 
 document.addEventListener("DOMContentLoaded", function () {
     const scrollArrow = document.getElementById("scroll-down-arrow");
+    if (!scrollArrow) return;
 
-    // Initially hide the arrow
     scrollArrow.style.opacity = "0";
     scrollArrow.style.pointerEvents = "none";
 
-    // Delay the appearance of the arrow
     setTimeout(() => {
         scrollArrow.style.opacity = "0.8";
         scrollArrow.style.pointerEvents = "auto";
-    }, 3500); // Delay of 2 seconds (adjust as needed)
+    }, 3500);
 
-    // Hide the arrow on scroll
     function hideArrowOnScroll() {
         if (window.scrollY > 0) {
             scrollArrow.style.opacity = "0";

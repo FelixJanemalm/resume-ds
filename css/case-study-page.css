@@ -1,0 +1,2415 @@
+
+/* ─── Case Study Page Theme ─── */
+/* Accents derive from theme.css :root tokens (--primary-color, --sysPrimary*) so the page stays cohesive with the main site palette. */
+
+body:has(.cs-page) {
+    --bg: #101012;
+    --text: #ededef;
+    --textSubtle: #9a9a9f;
+    --textInverse: #101012;
+    --borderSubtle: rgba(255, 255, 255, 0.08);
+    --bgStrong: #1a1a1e;
+    --bgMedium: #141416;
+
+    /* Accent = design-system primary (same family as index color picker default) */
+    --cs-accent: var(--primary-color);
+    --cs-accent-solid: var(--sysPrimaryDefault);
+    --cs-accent-glow: color-mix(in srgb, var(--primary-color) 28%, transparent);
+    --cs-accent-border: color-mix(in srgb, var(--sysPrimaryDefault) 32%, transparent);
+    --cs-accent-surface: color-mix(in srgb, var(--sysPrimaryTint) 45%, var(--bg));
+
+    --button-color: var(--sysPrimaryDefault);
+    --button-hover-color: color-mix(in srgb, var(--sysPrimaryDefault) 78%, #ffffff);
+    --button-pressed-color: color-mix(in srgb, var(--sysPrimaryDefault) 75%, #000000);
+    --OnprimaryText: #fff;
+    /* --link-color inherits from :root (theme.css); same hue family as --sysPrimaryDefault */
+    --nav-a-hover: var(--sysPrimaryDefault);
+
+    --header: rgba(255, 255, 255, 0.8);
+    --header-scrolled: rgba(255, 255, 255, 0.08);
+    --header-hover: rgba(255, 255, 255, 1);
+
+    --primaryBgTint: var(--cs-accent-surface);
+    --primaryOnContrastText: var(--sysPrimaryStrong);
+    --primaryBg: color-mix(in srgb, var(--sysPrimaryDefault) 35%, var(--bg));
+
+    --glass: color-mix(in srgb, var(--sysPrimaryStrong) 12%, rgba(255, 255, 255, 0.04));
+    --text-glass: #ededef;
+    --bgMedium-opacity: rgba(255, 255, 255, 0.03);
+
+    /*
+     * Gradient headings: raw --primary-color / --sysPrimary* can get very dark when the picker
+     * is in “dark” territory — blended with text + a light anchor so clips never read as black-on-black.
+     */
+    --cs-text-grad-a: var(--text);
+    --cs-text-grad-b: color-mix(in srgb, var(--sysPrimaryDefault) 52%, var(--text));
+    --cs-text-grad-c: color-mix(in srgb, var(--sysPrimaryDefault) 34%, #f0f3f8);
+
+    /* Metric numerals: keep hue but floor lightness (same dark-primary issue as heading gradients) */
+    --cs-metric-value-fg: color-mix(in srgb, var(--sysPrimaryDefault) 48%, #e8eef6);
+    --cs-metric-value-glow: color-mix(in srgb, var(--sysPrimaryDefault) 22%, rgba(255, 255, 255, 0.14));
+
+    /*
+     * Vertical rhythm (8px grid). Used from .cs-content downward so sections align;
+     * .cs-hero / .cs-intro / .cs-metrics-strip keep their existing clamps.
+     */
+    --cs-rhythm-xs: 0.25rem; /* 4px */
+    --cs-rhythm-sm: 0.5rem; /* 8px */
+    --cs-rhythm-smd: 0.75rem; /* 12px */
+    --cs-rhythm-md: 1rem; /* 16px */
+    --cs-rhythm-lg: 1.5rem; /* 24px */
+    --cs-rhythm-xl: 2rem; /* 32px */
+    --cs-rhythm-2xl: 3rem; /* 48px */
+    --cs-rhythm-3xl: 4rem; /* 64px */
+    --cs-rhythm-4xl: 5rem; /* 80px */
+    --cs-rhythm-5xl: 5.5rem; /* 88px */
+    /* Unified with .cs-hero video / image */
+    --cs-radius-surface: 16px;
+    /* Sticky copy beside tall media (header: top 12px + height 46px + gap) */
+    --cs-sticky-header-offset: calc(12px + 46px + 1rem);
+
+    background-color: #101012 !important;
+    color: #ededef;
+}
+
+/* ─── Case Study Page Layout ─── */
+
+.cs-page {
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+@supports (overflow: clip) {
+    .cs-page {
+        /* clip avoids scrollport that breaks position:sticky; hidden+visible forces other axis to scroll container */
+        overflow-x: clip;
+    }
+}
+
+/* Hero */
+.cs-hero {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: clamp(100px, 12vw, 140px) var(--marginSides) 0;
+}
+
+/* Ring + glow on wrapper so .hue-shift filter on <video> doesn’t recolor the border */
+.cs-hero__surface {
+    border-radius: var(--cs-radius-surface);
+    overflow: hidden;
+    box-shadow:
+        0 0 0 1px var(--cs-accent-border),
+        0 24px 48px -16px var(--cs-accent-glow);
+}
+
+.cs-hero video,
+.cs-hero img {
+    width: 100%;
+    border-radius: var(--cs-radius-surface);
+    display: block;
+    box-shadow:
+        0 0 0 1px var(--cs-accent-border),
+        0 24px 48px -16px var(--cs-accent-glow);
+}
+
+.cs-hero__surface video,
+.cs-hero__surface img {
+    border-radius: 0;
+    box-shadow: none;
+    vertical-align: middle;
+}
+
+.cs-hero--text {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(40px, 6vw, 80px);
+    text-align: center;
+    background:
+        radial-gradient(120% 80% at 50% 0%, var(--cs-accent-surface) 0%, var(--bgStrong, #111) 55%);
+    border-radius: var(--cs-radius-surface);
+    border: 1px solid var(--cs-accent-border);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--sysPrimaryStrong) 22%, transparent);
+    aspect-ratio: 16 / 7;
+}
+
+.cs-hero--text .cs-hero-heading {
+    font-size: clamp(1.6rem, 4vw, 3.2rem);
+    font-weight: 700;
+    background: linear-gradient(
+        125deg,
+        var(--cs-text-grad-a) 0%,
+        var(--cs-text-grad-b) 48%,
+        var(--cs-text-grad-c) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    max-width: 700px;
+    line-height: 1.2;
+}
+
+/* Intro */
+.cs-intro {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: clamp(32px, 5vw, 64px) var(--marginSides) clamp(40px, 6vw, 88px);
+    text-align: left;
+}
+
+.cs-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: color-mix(in srgb, var(--sysPrimaryDefault) 40%, var(--textSubtle));
+    margin-bottom: 16px;
+}
+
+.cs-meta-sep {
+    opacity: 0.4;
+}
+
+.cs-title {
+    font-size: clamp(2rem, 4vw, 3.5rem);
+    font-weight: 800;
+    line-height: 1.15;
+    margin: 0 0 16px;
+    background: linear-gradient(
+        118deg,
+        var(--cs-text-grad-a) 0%,
+        var(--cs-text-grad-a) 22%,
+        var(--cs-text-grad-b) 58%,
+        var(--cs-text-grad-c) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.cs-description {
+    font-size: clamp(1rem, 1.5vw, 1.2rem);
+    line-height: 1.7;
+    color: var(--textSubtle, rgba(255,255,255,0.7));
+    max-width: 720px;
+    margin: 0;
+}
+
+/* Metrics — full-width band + constrained inner row */
+.cs-metrics-strip {
+    width: 100%;
+    border-top: 1px solid color-mix(in srgb, var(--cs-metric-value-fg) 22%, transparent);
+    border-bottom: 1px solid var(--borderSubtle, rgba(255, 255, 255, 0.08));
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--cs-metric-value-fg) 10%, transparent) 0%,
+        transparent 78%
+    );
+    box-sizing: border-box;
+}
+
+.cs-metrics {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: clamp(32px, 4vw, 56px) var(--marginSides);
+    display: flex;
+    gap: clamp(24px, 4vw, 48px);
+    flex-wrap: wrap;
+}
+
+.cs-metric {
+    flex: 1;
+    min-width: 120px;
+    text-align: left;
+}
+
+.cs-metric-value {
+    font-size: clamp(1.8rem, 3vw, 2.8rem);
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: 4px;
+    color: var(--cs-metric-value-fg);
+    text-shadow: 0 0 28px var(--cs-metric-value-glow);
+}
+
+.cs-metric-label {
+    font-size: 0.85em;
+    color: var(--textSubtle, rgba(255,255,255,0.7));
+    line-height: 1.4;
+}
+
+/* Content Sections */
+/*
+ * Narrative blocks use a reading column (~40rem); split rows use the full 1200px track for image + copy.
+ * Keeping both aligned to the same max-width shell avoids “floating” full-bleed media vs. narrow text.
+ */
+.cs-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 var(--marginSides);
+}
+
+.cs-section {
+    padding: clamp(var(--cs-rhythm-xl), 5vw, var(--cs-rhythm-3xl)) 0;
+}
+
+.cs-section + .cs-section {
+    border-top: 1px solid var(--borderSubtle, rgba(255,255,255,0.08));
+}
+
+/* Subtle “chapter” tint on narrative-only even sections (reading column only; skips split / full-bleed / wide / impact) */
+.cs-content > .cs-section:nth-child(even):not(.cs-section--split):not(.cs-section--full):not(.cs-section--full-bleed-video):not(.cs-section--wide):not(.cs-section--summary-brief):not(.cs-section--impact):not(.cs-section--challenge-goals):not(.cs-section--no-chapter-tint) {
+    box-sizing: border-box;
+    background: color-mix(in srgb, var(--text) 2.5%, transparent);
+    border-radius: var(--cs-radius-surface);
+    padding-inline: var(--cs-rhythm-md);
+}
+
+.cs-section-label {
+    font-size: 0.75em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: color-mix(in srgb, var(--sysPrimaryDefault) 58%, var(--textSubtle));
+    margin-bottom: var(--cs-rhythm-md);
+}
+
+.cs-section-title {
+    font-size: clamp(1.4rem, 2.5vw, 2rem);
+    font-weight: 700;
+    line-height: 1.25;
+    margin: 0 0 var(--cs-rhythm-md);
+    padding-left: 14px;
+    border-left: 3px solid color-mix(in srgb, var(--sysPrimaryDefault) 55%, transparent);
+}
+
+/* Second heading in the same section (e.g. Summary) */
+.cs-section .cs-section-title ~ .cs-section-title {
+    margin-top: clamp(1.5rem, 3vw, 2.25rem);
+}
+
+.cs-section-text {
+    font-size: clamp(0.95rem, 1.2vw, 1.1rem);
+    line-height: 1.8;
+    color: var(--textSubtle, rgba(255,255,255,0.8));
+    max-width: none;
+    margin: 0;
+}
+
+.cs-section-text + .cs-section-text {
+    margin-top: 1.15em;
+}
+
+/* Goals / outcome lists (replace br-separated faux bullets in markup) */
+.cs-goals-list {
+    list-style: none;
+    margin: var(--cs-rhythm-md) 0 0;
+    padding: 0;
+    font-size: clamp(0.95rem, 1.2vw, 1.1rem);
+    line-height: 1.75;
+    color: var(--textSubtle, rgba(255, 255, 255, 0.8));
+    max-width: none;
+}
+
+.cs-goals-list li {
+    position: relative;
+    margin: 0 0 0.65em;
+    padding-left: 1.2em;
+}
+
+.cs-goals-list li:last-child {
+    margin-bottom: 0;
+}
+
+.cs-goals-list li::before {
+    content: "\2731";
+    position: absolute;
+    left: 0;
+    top: 0.05em;
+    font-size: 0.85em;
+    color: color-mix(in srgb, var(--sysPrimaryDefault) 55%, var(--textSubtle));
+}
+
+.cs-goals-list strong {
+    font-weight: 700;
+    color: color-mix(in srgb, var(--text) 88%, var(--textSubtle));
+}
+
+.cs-section-text + .cs-goals-list {
+    margin-top: var(--cs-rhythm-smd);
+}
+
+/*
+ * Default narrative sections: centered reading column (avoids “orphan” text hugging the left
+ * of a 1200px container). Split / full-width sections opt out.
+ */
+.cs-section:not(.cs-section--split):not(.cs-section--full):not(.cs-section--wide):not(.cs-section--summary-brief):not(.cs-section--impact):not(.cs-section--challenge-goals) {
+    max-width: min(40rem, 100%);
+    margin-inline: auto;
+    width: 100%;
+}
+
+/* Tokens (and similar): Challenge + Goals side by side */
+.cs-section--challenge-goals {
+    max-width: min(72rem, 100%);
+    margin-inline: auto;
+    width: 100%;
+}
+
+.cs-section--challenge-goals__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: clamp(1.5rem, 4vw, 2.75rem);
+    align-items: start;
+}
+
+.cs-section--challenge-goals__challenge,
+.cs-section--challenge-goals__goals {
+    min-width: 0;
+}
+
+.cs-section--challenge-goals__challenge .cs-section-title,
+.cs-section--challenge-goals__goals .cs-section-title {
+    margin-top: 0;
+}
+
+@media (min-width: 769px) {
+    .cs-section--challenge-goals__challenge {
+        padding-right: clamp(1rem, 2.5vw, 2rem);
+        border-right: 1px solid var(--borderSubtle, rgba(255, 255, 255, 0.08));
+    }
+}
+
+.cs-section--challenge-goals__goals {
+    padding: clamp(1rem, 2.2vw, 1.5rem);
+    border-radius: var(--cs-radius-surface);
+    border: 1px solid color-mix(in srgb, var(--sysPrimaryDefault) 22%, var(--borderSubtle));
+    background:
+        linear-gradient(
+            160deg,
+            color-mix(in srgb, var(--sysPrimaryDefault) 10%, var(--bg)) 0%,
+            color-mix(in srgb, var(--text) 4%, var(--bg)) 100%
+        );
+    box-shadow:
+        inset 0 1px 0 color-mix(in srgb, var(--text) 8%, transparent),
+        0 12px 40px color-mix(in srgb, var(--sysPrimaryDefault) 8%, transparent);
+}
+
+/* Goals as numbered cards (tokens case study) */
+.cs-goals-list--cards {
+    counter-reset: goals-card;
+    margin-top: var(--cs-rhythm-md);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.cs-goals-list--cards li {
+    counter-increment: goals-card;
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin: 0;
+    padding: 12px 14px 12px 12px;
+    border-radius: 12px;
+    border: 1px solid color-mix(in srgb, var(--text) 10%, var(--borderSubtle));
+    background: color-mix(in srgb, var(--text) 5%, var(--bg));
+    box-shadow: 0 1px 0 color-mix(in srgb, var(--text) 6%, transparent);
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease,
+        transform 0.2s ease;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .cs-goals-list--cards li:hover {
+        transform: translateY(-1px);
+        border-color: color-mix(in srgb, var(--sysPrimaryDefault) 35%, var(--borderSubtle));
+        box-shadow:
+            0 8px 24px color-mix(in srgb, var(--sysPrimaryDefault) 12%, transparent),
+            0 1px 0 color-mix(in srgb, var(--text) 6%, transparent);
+    }
+}
+
+.cs-goals-list--cards li::before {
+    content: counter(goals-card, decimal-leading-zero);
+    position: static;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2rem;
+    height: 2rem;
+    margin-top: 0.1em;
+    padding: 0 0.35em;
+    font-size: 0.68rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
+    line-height: 1;
+    border-radius: 8px;
+    color: color-mix(in srgb, var(--sysPrimaryDefault) 88%, var(--text));
+    background: linear-gradient(
+        165deg,
+        color-mix(in srgb, var(--sysPrimaryDefault) 22%, var(--bg)),
+        color-mix(in srgb, var(--sysPrimaryDefault) 10%, var(--bg))
+    );
+    border: 1px solid color-mix(in srgb, var(--sysPrimaryDefault) 38%, var(--borderSubtle));
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--sysPrimaryDefault) 25%, transparent);
+}
+
+.cs-goals-list--cards li:last-child {
+    margin-bottom: 0;
+}
+
+@media (max-width: 768px) {
+    .cs-section--challenge-goals__grid {
+        grid-template-columns: 1fr;
+        gap: clamp(1.75rem, 5vw, 2.5rem);
+    }
+
+    .cs-section--challenge-goals__challenge {
+        padding-right: 0;
+        border-right: none;
+        padding-bottom: clamp(1.25rem, 3vw, 1.75rem);
+        border-bottom: 1px solid var(--borderSubtle, rgba(255, 255, 255, 0.08));
+    }
+}
+
+/* Impact: “every target exceeded” — full-width stat grid (no section box; padding from .cs-section) */
+.cs-section--impact {
+    max-width: min(72rem, 100%);
+    margin-inline: auto;
+    width: 100%;
+    border: none;
+    background: none;
+    box-shadow: none;
+    border-radius: 0;
+}
+
+.cs-section--impact .cs-section-title {
+    margin-bottom: clamp(var(--cs-rhythm-lg), 3vw, var(--cs-rhythm-xl));
+}
+
+.cs-impact-grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(22px, 3vw, 32px);
+}
+
+@media (max-width: 640px) {
+    .cs-impact-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Animated ring: no transform on the card — highlight moves by animating conic “from” angle (@property) */
+@property --cs-impact-angle {
+    syntax: "<angle>";
+    inherits: false;
+    initial-value: 0deg;
+}
+
+@keyframes cs-impact-border-orbit {
+    to {
+        --cs-impact-angle: 360deg;
+    }
+}
+
+.cs-impact-card {
+    --cs-impact-orbit-duration: 22s;
+    position: relative;
+    margin: 0;
+    padding: clamp(22px, 3.5vw, 32px);
+    border-radius: var(--cs-radius-surface);
+    overflow: visible;
+    border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
+    background: transparent;
+    text-align: center;
+    transition:
+        border-color 0.35s ease,
+        box-shadow 0.4s ease;
+}
+
+.cs-impact-card--active {
+    border-color: transparent;
+}
+
+.cs-impact-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    z-index: 0;
+    padding: 1px;
+    box-sizing: border-box;
+    pointer-events: none;
+    opacity: 0;
+    --cs-impact-angle: 0deg;
+    background: conic-gradient(
+        from var(--cs-impact-angle),
+        transparent 0deg,
+        transparent 218deg,
+        color-mix(in srgb, var(--sysPrimaryDefault) 16%, transparent) 236deg,
+        color-mix(in srgb, var(--sysPrimaryDefault) 38%, transparent) 254deg,
+        color-mix(in srgb, var(--sysPrimaryDefault) 62%, transparent) 274deg,
+        color-mix(in srgb, var(--sysPrimaryDefault) 90%, #f0f4fc) 292deg,
+        color-mix(in srgb, var(--sysPrimaryDefault) 62%, transparent) 306deg,
+        color-mix(in srgb, var(--sysPrimaryDefault) 38%, transparent) 320deg,
+        color-mix(in srgb, var(--sysPrimaryDefault) 16%, transparent) 336deg,
+        transparent 352deg,
+        transparent 360deg
+    );
+    animation: none;
+    transition: opacity 0.55s ease;
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+}
+
+.cs-impact-card--active::before {
+    opacity: 1;
+    animation: cs-impact-border-orbit var(--cs-impact-orbit-duration) linear infinite;
+}
+
+.cs-impact-card--active:hover {
+    --cs-impact-orbit-duration: 5.5s;
+}
+
+.cs-impact-card:hover {
+    box-shadow: 0 14px 36px -16px color-mix(in srgb, var(--sysPrimaryDefault) 35%, transparent);
+}
+
+.cs-impact-card__glow {
+    display: none;
+}
+
+.cs-impact-card__stat,
+.cs-impact-card__vs,
+.cs-impact-card__detail {
+    position: relative;
+    z-index: 2;
+}
+
+.cs-impact-card__stat {
+    margin: 0 0 var(--cs-rhythm-smd);
+    font-size: clamp(0.95rem, 1.15vw, 1.05rem);
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--text);
+}
+
+.cs-impact-card__figure {
+    display: inline-block;
+    font-size: clamp(1.65rem, 2.8vw, 2.35rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: var(--cs-metric-value-fg);
+    text-shadow: 0 0 24px var(--cs-metric-value-glow);
+    margin-right: 0.1em;
+}
+
+.cs-impact-card__vs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35em 0.5em;
+    margin: 0 0 var(--cs-rhythm-md);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.cs-impact-card__target {
+    padding: 0.28em 0.65em;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+    color: color-mix(in srgb, var(--textSubtle) 92%, var(--text));
+}
+
+.cs-impact-card__dash {
+    color: color-mix(in srgb, var(--sysPrimaryDefault) 70%, var(--textSubtle));
+    font-weight: 700;
+}
+
+.cs-impact-card__win {
+    padding: 0.28em 0.65em;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--sysPrimaryDefault) 22%, transparent);
+    color: var(--cs-metric-value-fg);
+    box-shadow: 0 0 20px color-mix(in srgb, var(--sysPrimaryDefault) 20%, transparent);
+}
+
+.cs-impact-card__detail {
+    margin: 0;
+    font-size: clamp(0.88rem, 1.05vw, 0.98rem);
+    line-height: 1.55;
+    color: var(--textSubtle);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cs-impact-card {
+        transition: none;
+        border: 1px solid color-mix(in srgb, var(--sysPrimaryDefault) 28%, var(--borderSubtle));
+    }
+
+    .cs-impact-card::before {
+        display: none;
+    }
+
+    .cs-impact-card--active {
+        border-color: color-mix(in srgb, var(--sysPrimaryDefault) 38%, var(--borderSubtle));
+    }
+
+    .cs-impact-card:hover {
+        transform: none;
+    }
+}
+
+.cs-section--wide {
+    max-width: none;
+    margin-inline: 0;
+}
+
+/* ─── Design system: Summary (situation + team row → full-width what I did → quote break) ─── */
+
+.cs-section--summary-brief {
+    max-width: min(72rem, 100%);
+    margin-inline: auto;
+}
+
+.cs-summary-brief__layout {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.cs-summary-brief__intro {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+    gap: clamp(var(--cs-rhythm-lg), 4vw, var(--cs-rhythm-xl));
+    align-items: start;
+}
+
+.cs-summary-brief__context {
+    position: relative;
+    padding: 0 10px 14px 0;
+}
+
+.cs-summary-brief__context .cs-summary-brief__card-eyebrow {
+    margin: 0 0 12px;
+    text-align: center;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--sysPrimaryDefault) 45%, #a89a9a);
+}
+
+/* Flat neo-brutalist Team card: solid fills + one hard offset slab (no gradients) */
+.cs-summary-brief__context .cs-context-card {
+    position: relative;
+    margin: 0 0 var(--cs-rhythm-smd);
+    border-radius: var(--cs-radius-surface);
+    overflow: hidden;
+    background: #232328;
+    border: 2px solid #0e0e10;
+    box-shadow: 7px 7px 0 #34343a;
+}
+
+.cs-summary-brief__context .cs-context-card__header {
+    margin: 0;
+    padding: 10px 14px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    text-align: center;
+    color: #fafafa;
+    /* Flat maroon from user accent — single solid */
+    background: color-mix(in srgb, var(--sysPrimaryDefault) 52%, #3a1820);
+    border-bottom: 2px solid #0e0e10;
+}
+
+.cs-summary-brief__context .cs-context-card__body {
+    padding: 14px 14px 16px;
+    text-align: center;
+    font-size: 0.8rem;
+    font-weight: 500;
+    line-height: 1.55;
+    color: #e8e8ec;
+    background: #232328;
+}
+
+.cs-summary-brief__context .cs-context-card__body p {
+    margin: 0 0 0.45em;
+}
+
+.cs-summary-brief__context .cs-context-card__body p:last-child {
+    margin-bottom: 0;
+}
+
+.cs-summary-brief__intro-main .cs-section-label {
+    margin-bottom: var(--cs-rhythm-md);
+}
+
+.cs-summary-brief__intro-main > .cs-section-title:first-of-type {
+    margin-top: 0;
+}
+
+.cs-summary-brief__did {
+    width: 100%;
+    margin-top: clamp(var(--cs-rhythm-xl), 4vw, var(--cs-rhythm-2xl));
+    padding-top: clamp(1.75rem, 3.5vw, 2.75rem);
+    border-top: 1px solid var(--borderSubtle);
+}
+
+.cs-summary-brief__intro-main .cs-section-text a {
+    color: var(--link-color, var(--sysPrimaryDefault));
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.cs-summary-brief__intro-main .cs-section-text a:hover {
+    color: var(--sysPrimaryStrong);
+}
+
+.cs-summary-brief__steps {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: var(--cs-rhythm-smd);
+    margin-top: clamp(1.25rem, 2.5vw, 1.75rem);
+}
+
+@media (min-width: 769px) and (max-width: 1100px) {
+    .cs-summary-brief__steps {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+.cs-summary-brief__did .cs-summary-brief__steps {
+    margin-top: 0;
+}
+
+.cs-summary-brief__step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 100%;
+    padding-block: 12px;
+    padding-inline: 10px;
+    box-sizing: border-box;
+    text-align: center;
+    border-radius: var(--cs-radius-surface);
+    border: 1px solid var(--borderSubtle);
+    background: color-mix(in srgb, var(--text) 4%, var(--bg));
+}
+
+.cs-summary-brief__step-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: color-mix(in srgb, var(--button-color, var(--primary-color)) 85%, var(--textSubtle));
+}
+
+.cs-summary-brief__step-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--textSubtle);
+}
+
+/* Tokens case study: pipeline + six outputs (replaces generic step grid) */
+.cs-token-atlas {
+    --token-atlas-accent: var(--sysPrimaryDefault);
+    --token-atlas-slab: color-mix(in srgb, var(--text) 22%, var(--bgStrong, var(--bg)));
+    margin-top: clamp(0.5rem, 1.5vw, 0.85rem);
+}
+
+.cs-token-atlas__kicker {
+    margin: 0 0 clamp(0.85rem, 2vw, 1.15rem);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--token-atlas-accent) 58%, var(--textSubtle));
+}
+
+.cs-token-atlas__flow {
+    position: relative;
+    display: grid;
+    grid-template-columns:
+        minmax(0, 1.05fr)
+        minmax(28px, auto)
+        minmax(0, 0.75fr)
+        minmax(28px, auto)
+        minmax(0, 1.2fr);
+    align-items: stretch;
+    gap: clamp(6px, 1.2vw, 12px);
+    padding: clamp(18px, 2.5vw, 26px) clamp(16px, 2.5vw, 28px);
+    border-radius: calc(var(--cs-radius-surface) + 2px);
+    border: 2px solid color-mix(in srgb, var(--text) 14%, var(--borderSubtle));
+    background-color: color-mix(in srgb, var(--text) 4%, var(--bg));
+    background-image:
+        linear-gradient(
+            165deg,
+            color-mix(in srgb, var(--token-atlas-accent) 14%, transparent) 0%,
+            transparent 42%
+        ),
+        repeating-linear-gradient(
+            -12deg,
+            transparent,
+            transparent 24px,
+            color-mix(in srgb, var(--text) 4%, transparent) 24px,
+            color-mix(in srgb, var(--text) 4%, transparent) 25px
+        ),
+        radial-gradient(ellipse 90% 70% at 12% 0%, color-mix(in srgb, var(--token-atlas-accent) 12%, transparent), transparent 55%),
+        radial-gradient(ellipse 70% 50% at 100% 100%, color-mix(in srgb, var(--text) 8%, transparent), transparent 50%);
+    box-shadow:
+        8px 8px 0 var(--token-atlas-slab),
+        inset 0 1px 0 color-mix(in srgb, var(--text) 10%, transparent);
+    overflow: hidden;
+}
+
+.cs-token-atlas__flow::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 3px;
+    background: linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--token-atlas-accent) 8%, transparent),
+        color-mix(in srgb, var(--token-atlas-accent) 72%, var(--text)) 24%,
+        color-mix(in srgb, var(--token-atlas-accent) 42%, transparent) 76%,
+        color-mix(in srgb, var(--token-atlas-accent) 10%, transparent)
+    );
+    opacity: 0.95;
+}
+
+.cs-token-atlas__lane {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid color-mix(in srgb, var(--text) 10%, var(--borderSubtle));
+    background: color-mix(in srgb, var(--text) 5%, var(--bg));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 5%, transparent);
+    text-align: center;
+}
+
+.cs-token-atlas__lane--source {
+    background:
+        linear-gradient(145deg, color-mix(in srgb, var(--token-atlas-accent) 11%, var(--bg)) 0%, color-mix(in srgb, var(--text) 5%, var(--bg)) 100%);
+    border-color: color-mix(in srgb, var(--token-atlas-accent) 28%, var(--borderSubtle));
+}
+
+.cs-token-atlas__lane--gate {
+    background: color-mix(in srgb, var(--text) 9%, var(--bg));
+    border-color: color-mix(in srgb, var(--text) 14%, var(--borderSubtle));
+}
+
+.cs-token-atlas__lane--out {
+    padding-bottom: 14px;
+    background: color-mix(in srgb, var(--token-atlas-accent) 7%, var(--bg));
+    border-color: color-mix(in srgb, var(--token-atlas-accent) 22%, var(--borderSubtle));
+}
+
+.cs-token-atlas__lane-kicker {
+    width: 100%;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--token-atlas-accent) 45%, var(--textSubtle));
+}
+
+.cs-token-atlas__lane--gate .cs-token-atlas__lane-kicker {
+    color: color-mix(in srgb, var(--textSubtle) 92%, var(--text));
+}
+
+.cs-token-atlas__sources {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+}
+
+.cs-token-atlas__join {
+    font-size: 0.8rem;
+    font-weight: 800;
+    color: color-mix(in srgb, var(--textSubtle) 75%, var(--token-atlas-accent));
+    text-shadow: 0 0 12px color-mix(in srgb, var(--token-atlas-accent) 25%, transparent);
+}
+
+.cs-token-atlas__node {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.4em 0.7em;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border-radius: 8px;
+    border: 1px solid var(--borderSubtle);
+    background: color-mix(in srgb, var(--text) 7%, var(--bg));
+    color: var(--text);
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease,
+        border-color 0.2s ease;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .cs-token-atlas__node:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px color-mix(in srgb, var(--token-atlas-accent) 12%, transparent);
+    }
+}
+
+.cs-token-atlas__node--figma {
+    border-color: color-mix(in srgb, var(--token-atlas-accent) 42%, var(--borderSubtle));
+    background: color-mix(in srgb, var(--token-atlas-accent) 16%, var(--bg));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--token-atlas-accent) 20%, transparent);
+}
+
+.cs-token-atlas__node--tool {
+    border-color: color-mix(in srgb, var(--token-atlas-accent) 28%, var(--borderSubtle));
+    background: color-mix(in srgb, var(--token-atlas-accent) 8%, var(--bg));
+}
+
+.cs-token-atlas__pipeline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.cs-token-atlas__pipeline li {
+    margin: 0;
+    padding: 0.3em 0.55em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    line-height: 1.3;
+    text-align: center;
+    border-radius: 5px;
+    border: 1px dashed color-mix(in srgb, var(--text) 22%, var(--borderSubtle));
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--text) 10%, var(--bg)),
+        color-mix(in srgb, var(--text) 5%, var(--bg))
+    );
+    color: color-mix(in srgb, var(--textSubtle) 88%, var(--text));
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 8%, transparent);
+    transition:
+        transform 0.2s ease,
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .cs-token-atlas__pipeline li:hover {
+        transform: translateY(-1px);
+        border-color: color-mix(in srgb, var(--token-atlas-accent) 40%, var(--borderSubtle));
+        border-style: solid;
+        box-shadow: 0 3px 12px color-mix(in srgb, var(--token-atlas-accent) 12%, transparent);
+    }
+}
+
+.cs-token-atlas__arrow {
+    display: flex;
+    align-items: center;
+    align-self: center;
+    min-width: 0;
+    color: color-mix(in srgb, var(--token-atlas-accent) 72%, var(--textSubtle));
+    filter: drop-shadow(0 0 10px color-mix(in srgb, var(--token-atlas-accent) 22%, transparent));
+}
+
+.cs-token-atlas__arrow-line {
+    flex: 1 1 14px;
+    min-width: 10px;
+    height: 2px;
+    border-radius: 2px;
+    background: linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--token-atlas-accent) 35%, transparent),
+        color-mix(in srgb, var(--token-atlas-accent) 75%, var(--textSubtle)),
+        color-mix(in srgb, var(--token-atlas-accent) 45%, transparent)
+    );
+    opacity: 0.9;
+}
+
+.cs-token-atlas__arrow-head {
+    flex-shrink: 0;
+    margin-left: -1px;
+}
+
+.cs-token-atlas__targets {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.cs-token-atlas__targets li {
+    margin: 0;
+    padding: 0.32em 0.62em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    border-radius: 6px;
+    border: 1px solid color-mix(in srgb, var(--token-atlas-accent) 32%, var(--borderSubtle));
+    background: linear-gradient(
+        165deg,
+        color-mix(in srgb, var(--token-atlas-accent) 16%, var(--bg)),
+        color-mix(in srgb, var(--token-atlas-accent) 7%, var(--bg))
+    );
+    color: color-mix(in srgb, var(--text) 92%, var(--token-atlas-accent));
+    box-shadow:
+        0 1px 0 color-mix(in srgb, var(--text) 12%, transparent),
+        inset 0 1px 0 color-mix(in srgb, var(--token-atlas-accent) 15%, transparent);
+    transition:
+        transform 0.2s ease,
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .cs-token-atlas__targets li:hover {
+        transform: translateY(-2px);
+        border-color: color-mix(in srgb, var(--token-atlas-accent) 55%, var(--borderSubtle));
+        box-shadow:
+            0 4px 14px color-mix(in srgb, var(--token-atlas-accent) 18%, transparent),
+            0 1px 0 color-mix(in srgb, var(--text) 10%, transparent);
+    }
+}
+
+.cs-token-atlas__footnote {
+    margin: clamp(1.1rem, 2.4vw, 1.5rem) auto 0;
+    padding: clamp(0.85rem, 1.8vw, 1.1rem) clamp(0.75rem, 2vw, 1.25rem) 0;
+    max-width: 52rem;
+    font-size: clamp(0.84rem, 1.05vw, 0.92rem);
+    line-height: 1.58;
+    text-align: center;
+    color: var(--textSubtle);
+    border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+.cs-token-atlas__footnote strong {
+    color: color-mix(in srgb, var(--text) 82%, var(--textSubtle));
+    font-weight: 600;
+}
+
+@media (max-width: 900px) {
+    .cs-token-atlas__flow {
+        grid-template-columns: 1fr;
+        gap: 0;
+        padding: clamp(16px, 3vw, 22px);
+    }
+
+    .cs-token-atlas__lane {
+        padding: 14px 16px;
+    }
+
+    .cs-token-atlas__arrow {
+        flex-direction: column;
+        justify-content: center;
+        width: 100%;
+        min-height: 28px;
+        padding: 4px 0;
+    }
+
+    .cs-token-atlas__arrow-line {
+        flex: 0 0 18px;
+        width: 2px;
+        min-width: 2px;
+        height: 18px;
+        margin: 0 auto;
+        background: linear-gradient(
+            180deg,
+            color-mix(in srgb, var(--token-atlas-accent) 35%, transparent),
+            color-mix(in srgb, var(--token-atlas-accent) 75%, var(--textSubtle)),
+            color-mix(in srgb, var(--token-atlas-accent) 45%, transparent)
+        );
+    }
+
+    .cs-token-atlas__arrow-head {
+        margin-left: 0;
+        margin-top: -4px;
+        transform: rotate(90deg);
+    }
+
+    .cs-token-atlas__targets {
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .cs-token-atlas__flow {
+        border-radius: 14px;
+        box-shadow:
+            5px 5px 0 var(--token-atlas-slab),
+            inset 0 1px 0 color-mix(in srgb, var(--text) 10%, transparent);
+    }
+}
+
+/* Full-width page break + pull quote below “What I did” */
+.cs-summary-brief__quote-break {
+    margin-top: clamp(2.5rem, 5vw, 4rem);
+    padding: clamp(2rem, 4vw, 3.25rem) clamp(0.5rem, 2vw, 1rem) 0;
+    border-top: 1px solid var(--borderSubtle);
+    text-align: center;
+    background:
+        radial-gradient(ellipse 90% 120% at 50% 0%, color-mix(in srgb, var(--button-color, var(--primary-color)) 10%, transparent) 0%, transparent 55%);
+}
+
+.cs-summary-brief__quote-break-rule {
+    width: min(5rem, 35%);
+    height: 3px;
+    margin: 0 auto clamp(1.35rem, 2.8vw, 1.85rem);
+    border: none;
+    border-radius: 2px;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        color-mix(in srgb, var(--button-color, var(--primary-color)) 75%, var(--textSubtle)),
+        transparent
+    );
+}
+
+.cs-summary-brief__quote-break-eyebrow {
+    margin: 0 0 clamp(1rem, 2vw, 1.35rem);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--sysPrimaryDefault) 72%, var(--textSubtle));
+}
+
+.cs-summary-brief__testimonial--break {
+    margin: 0 auto;
+    max-width: min(56ch, 100%);
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    text-align: left;
+}
+
+/* Pull quote: Source Serif 4 (pairs with Source Sans class of neo-grotesques; Physis is in that vein) */
+.cs-summary-brief__testimonial--break .cs-summary-brief__testimonial-quote {
+    margin: 0 0 clamp(1.15rem, 2.5vw, 1.5rem);
+    padding: 0;
+    font-family: "Source Serif 4", "Source Serif", Georgia, "Times New Roman", serif;
+    font-size: clamp(1.12rem, 1.48vw, 1.34rem);
+    font-weight: 400;
+    font-style: normal;
+    font-synthesis: none;
+    font-optical-sizing: auto;
+    line-height: 1.72;
+    letter-spacing: -0.006em;
+    color: color-mix(in srgb, var(--text) 93%, var(--textSubtle));
+    text-wrap: pretty;
+    hanging-punctuation: first last;
+}
+
+.cs-summary-brief__testimonial--break .cs-summary-brief__testimonial-cite {
+    display: block;
+    margin: 0;
+    padding-top: clamp(0.95rem, 2vw, 1.2rem);
+    border-top: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+    font-family: "RNSPhysis", Helvetica, Arial, sans-serif;
+    font-size: clamp(0.88rem, 1.05vw, 0.98rem);
+    font-style: normal;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    line-height: 1.55;
+    text-align: left;
+    color: color-mix(in srgb, var(--text) 62%, var(--textSubtle));
+}
+
+.cs-summary-brief__testimonial--break .cs-summary-brief__testimonial-cite a {
+    color: var(--link-color, var(--sysPrimaryDefault));
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.cs-summary-brief__testimonial--break .cs-summary-brief__testimonial-cite a:hover {
+    color: var(--sysPrimaryStrong);
+}
+
+/* Revenue impact chart (design-tokens): Chart.js cumulative pipeline */
+.cs-revenue-chart {
+    min-width: 0;
+    width: 100%;
+}
+
+.cs-revenue-chart__legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem 1.25rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.8125rem;
+    color: var(--textSubtle);
+}
+
+.cs-revenue-chart__legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.cs-revenue-chart__swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.cs-revenue-chart__swatch--original {
+    background: #1d9e75;
+}
+
+.cs-revenue-chart__swatch--accelerated {
+    background: #97c459;
+}
+
+.cs-revenue-chart__canvas-wrap {
+    position: relative;
+    width: 100%;
+    height: min(380px, 38vw);
+    min-height: 260px;
+}
+
+/* Split layout: image + text side by side */
+.cs-section--split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(var(--cs-rhythm-lg), 4vw, var(--cs-rhythm-2xl));
+    align-items: center;
+    max-width: none;
+    width: 100%;
+    margin-inline: 0;
+}
+
+.cs-section--split .cs-section-text {
+    max-width: none;
+}
+
+.cs-section--split.cs-section--reverse {
+    direction: rtl;
+}
+
+.cs-section--split.cs-section--reverse > * {
+    direction: ltr;
+}
+
+.cs-section--split.cs-section--revenue-impact {
+    align-items: start;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    gap: clamp(var(--cs-rhythm-lg), 4vw, var(--cs-rhythm-2xl));
+}
+
+/* Approach: audit / inventory screenshot beside narrative */
+.cs-section--approach {
+    align-items: start;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
+    gap: clamp(var(--cs-rhythm-lg), 5vw, 3.25rem);
+}
+
+.cs-section--approach__copy .cs-section-title {
+    margin-top: 0;
+}
+
+.cs-media--approach {
+    /* Focal crop: zoom + anchor (percent of image). Tune for audit table: Atoms + Block tags, less empty Particles rows. */
+    --cs-media-crop-zoom: 1.11;
+    --cs-media-crop-x: 74%;
+    --cs-media-crop-y: 56%;
+    margin: 0;
+    border-radius: var(--cs-radius-surface);
+    overflow: hidden;
+    background: var(--bg);
+    box-shadow:
+        0 1px 0 color-mix(in srgb, var(--text) 8%, transparent),
+        0 24px 48px color-mix(in srgb, var(--text) 18%, transparent);
+}
+
+.cs-media--approach img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: var(--cs-radius-surface);
+    vertical-align: middle;
+    background-color: var(--bg);
+}
+
+/* Challenge: UI fragmentation visual + narrative */
+.cs-section--challenge {
+    align-items: start;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
+    gap: clamp(var(--cs-rhythm-lg), 5vw, 3.25rem);
+}
+
+.cs-section--challenge__copy .cs-section-title {
+    margin-top: 0;
+}
+
+.cs-media--challenge {
+    margin: 0;
+    border-radius: var(--cs-radius-surface);
+    overflow: hidden;
+    background: var(--bg);
+    box-shadow:
+        0 1px 0 color-mix(in srgb, var(--text) 8%, transparent),
+        0 24px 48px color-mix(in srgb, var(--text) 18%, transparent);
+}
+
+.cs-media--challenge img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: var(--cs-radius-surface);
+    vertical-align: middle;
+    background-color: var(--bg);
+}
+
+@media (min-width: 769px) {
+    .cs-section--challenge .cs-media--challenge,
+    .cs-section--goals .cs-media--goals,
+    .cs-section--approach .cs-media--approach {
+        align-self: start;
+    }
+
+    .cs-section--challenge .cs-media--challenge img {
+        height: 100%;
+        object-fit: cover;
+        object-position: 50% 12%;
+    }
+
+    /* Goals + Approach: cover + focal zoom (vars on .cs-media--goals / .cs-media--approach) */
+    .cs-section--goals .cs-media--goals img,
+    .cs-section--approach .cs-media--approach img {
+        height: 100%;
+        object-fit: cover;
+        object-position: var(--cs-media-crop-x) var(--cs-media-crop-y);
+        transform: scale(var(--cs-media-crop-zoom));
+        transform-origin: var(--cs-media-crop-x) var(--cs-media-crop-y);
+    }
+}
+
+/* Goals: success criteria visual + narrative */
+.cs-section--goals {
+    align-items: start;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
+    gap: clamp(var(--cs-rhythm-lg), 5vw, 3.25rem);
+}
+
+.cs-section--goals__copy .cs-section-title {
+    margin-top: 0;
+}
+
+.cs-media--goals {
+    /* Focal crop: Primary / intent column + state rows — fewer tiny cells on screen at once. */
+    --cs-media-crop-zoom: 1.16;
+    --cs-media-crop-x: 17%;
+    --cs-media-crop-y: 38%;
+    margin: 0;
+    border-radius: var(--cs-radius-surface);
+    overflow: hidden;
+    background: var(--bg);
+    box-shadow:
+        0 1px 0 color-mix(in srgb, var(--text) 8%, transparent),
+        0 24px 48px color-mix(in srgb, var(--text) 18%, transparent);
+}
+
+.cs-media--goals img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: var(--cs-radius-surface);
+    vertical-align: middle;
+    background-color: var(--bg);
+}
+
+/* Decorative placeholder when final art isn’t ready yet */
+.cs-media--placeholder {
+    aspect-ratio: 4 / 3;
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: clamp(16px, 3vw, 28px);
+    box-sizing: border-box;
+    background:
+        radial-gradient(80% 60% at 50% 0%, color-mix(in srgb, var(--cs-metric-value-fg) 12%, transparent) 0%, transparent 55%),
+        linear-gradient(155deg, var(--bgStrong) 0%, var(--bg) 100%);
+    border: 1px dashed color-mix(in srgb, var(--cs-metric-value-fg) 35%, transparent);
+    border-radius: var(--cs-radius-surface);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--sysPrimaryStrong) 15%, transparent);
+}
+
+.cs-media-placeholder-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-width: 12rem;
+}
+
+.cs-media-placeholder-kicker {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--sysPrimaryDefault) 45%, var(--textSubtle));
+}
+
+.cs-media-placeholder-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--textSubtle);
+}
+
+/* Full-width media */
+.cs-section--full {
+    padding: clamp(var(--cs-rhythm-xl), 5vw, var(--cs-rhythm-3xl)) 0;
+}
+
+/* Design tokens: “What I learned” + long outro video: 50/50; copy stays in view while tall video scrolls */
+.cs-section--split.cs-section--learn-outro {
+    align-items: start;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: clamp(var(--cs-rhythm-lg), 4vw, var(--cs-rhythm-2xl));
+    overflow: visible;
+}
+
+.cs-learn-outro__col--copy {
+    min-width: 0;
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+}
+
+.cs-learn-outro__copy {
+    position: sticky;
+    top: calc(var(--cs-sticky-header-offset) + 1rem);
+    min-width: 0;
+    flex: 0 0 auto;
+    /* clip prevents scroll-container capture without hiding overflow */
+    max-height: calc(100vh - var(--cs-sticky-header-offset) - 2.5rem);
+    overflow-y: clip;
+}
+
+.cs-media--learn-outro {
+    margin: 0;
+    width: 100%;
+    max-width: none;
+    margin-inline: 0;
+    border-radius: var(--cs-radius-surface);
+    overflow: hidden;
+    box-shadow:
+        0 0 0 1px var(--cs-accent-border),
+        0 24px 48px -16px var(--cs-accent-glow);
+    background: var(--bgStrong, #1a1a1e);
+}
+
+.cs-media--learn-outro video {
+    width: 100%;
+    height: auto;
+    display: block;
+    vertical-align: middle;
+}
+
+/* Architecture: interactive diagram + narrative (design-tokens) */
+.cs-section--architecture.cs-section--split {
+    align-items: start;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
+    gap: clamp(var(--cs-rhythm-xl), 5vw, var(--cs-rhythm-3xl));
+    max-width: min(72rem, 100%);
+    margin-inline: auto;
+}
+
+.cs-section--architecture .cs-token-diagram-wrap {
+    margin-top: 0;
+    max-width: none;
+    width: 100%;
+    min-width: 0;
+}
+
+.cs-architecture__copy {
+    min-width: 0;
+}
+
+.cs-architecture__copy .cs-section-title {
+    margin-top: 0;
+}
+
+/* Stack diagram above copy below ~laptop width (beats higher-specificity 2-col rule at 768px) */
+@media (max-width: 1280px) {
+    .cs-section--architecture.cs-section--split {
+        grid-template-columns: 1fr;
+        gap: clamp(var(--cs-rhythm-lg), 4vw, var(--cs-rhythm-2xl));
+        align-items: stretch;
+    }
+
+    .cs-section--architecture .cs-token-diagram-wrap {
+        margin-top: 0;
+    }
+}
+
+/* ─── Browser-rendered token hierarchy (SVG overlay: straight + cubic branches) ─── */
+.cs-token-diagram-wrap {
+    max-width: min(72rem, 100%);
+    margin-inline: auto;
+    margin-top: clamp(var(--cs-rhythm-lg), 3vw, var(--cs-rhythm-xl));
+}
+
+.cs-token-hierarchy {
+    container-type: inline-size;
+    container-name: th-root;
+}
+
+.cs-token-hierarchy * {
+    box-sizing: border-box;
+}
+
+.cs-token-hierarchy__toggle-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.cs-token-hierarchy__toggle-label {
+    border: none;
+    background: none;
+    padding: 0.25rem 0.35rem;
+    cursor: pointer;
+    font: inherit;
+    color: var(--textSubtle);
+    font-weight: 400;
+    transition: color 0.3s;
+}
+
+.cs-token-hierarchy__toggle-label.is-active {
+    color: var(--text);
+    font-weight: 600;
+}
+
+.cs-token-hierarchy__toggle-label:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--sysPrimaryDefault) 70%, transparent);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.cs-token-hierarchy__switch {
+    position: relative;
+    width: 48px;
+    height: 26px;
+    padding: 0;
+    border: none;
+    border-radius: 13px;
+    cursor: pointer;
+    background: color-mix(in srgb, var(--text) 18%, var(--bg));
+    transition: background 0.3s;
+    flex-shrink: 0;
+}
+
+.cs-token-hierarchy__switch.is-on {
+    background: color-mix(in srgb, var(--sysPrimaryDefault) 55%, #6eb8ff);
+}
+
+.cs-token-hierarchy__switch:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--sysPrimaryDefault) 70%, transparent);
+    outline-offset: 3px;
+}
+
+.cs-token-hierarchy__switch-thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.3s;
+    pointer-events: none;
+    display: block;
+}
+
+.cs-token-hierarchy__switch.is-on .cs-token-hierarchy__switch-thumb {
+    transform: translateX(22px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cs-token-hierarchy__switch-thumb,
+    .cs-token-hierarchy__switch {
+        transition: none;
+    }
+}
+
+.cs-token-hierarchy__hint {
+    margin: 0 0 clamp(0.75rem, 1.2vw + 0.45rem, 1.1rem);
+    text-align: center;
+    font-size: 0.82rem;
+    line-height: 1.45;
+    color: var(--textSubtle);
+}
+
+.cs-token-hierarchy__scene {
+    position: relative;
+    /* Font/spacing scale with the diagram column width (architecture split), not only the viewport */
+    container-type: inline-size;
+    container-name: th-scene;
+    border-radius: var(--cs-radius-surface);
+    overflow: hidden;
+    /* Tighter vertical padding; a bit less on the left to give chips more room */
+    padding:
+        calc(clamp(1rem, 2vw + 0.65rem, 2rem) + 10px)
+        clamp(0.45rem, 1.5vw + 0.3rem, 1.35rem)
+        calc(clamp(1rem, 2vw + 0.65rem, 2rem) + 2px)
+        calc(clamp(0.2rem, 0.9vw + 0.1rem, 0.65rem) - 4px);
+    transition: background 0.4s, color 0.4s;
+    border: 1px solid color-mix(in srgb, var(--text) 12%, var(--borderSubtle));
+    box-shadow:
+        0 1px 0 color-mix(in srgb, var(--text) 6%, transparent),
+        0 18px 44px color-mix(in srgb, var(--text) 10%, transparent);
+}
+
+.cs-token-hierarchy__scene.light {
+    background: var(--th-bg-light, #f8f8f6);
+}
+
+.cs-token-hierarchy__scene.dark {
+    background: var(--th-bg-dark, #1a1a1a);
+}
+
+.cs-token-hierarchy__tier {
+    display: flex;
+    align-items: center;
+    gap: clamp(8px, 1.2vw + 4px, 16px);
+    min-width: 0;
+}
+
+.cs-token-hierarchy__tier-label {
+    flex: 0 0 clamp(3.5rem, 11vw + 1rem, 5.625rem);
+    max-width: 34%;
+    font-size: clamp(0.72rem, 0.55rem + 0.85vw, 0.875rem);
+    font-weight: 500;
+    text-align: right;
+    transition: color 0.4s;
+}
+
+.cs-token-hierarchy__scene.light .cs-token-hierarchy__tier-label {
+    color: var(--th-label-light, #639922);
+}
+
+.cs-token-hierarchy__scene.dark .cs-token-hierarchy__tier-label {
+    color: var(--th-label-dark, #97c459);
+}
+
+.cs-token-hierarchy__tier-content {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: clamp(0.5rem, 1.2vw + 0.25rem, 2rem);
+    flex-wrap: nowrap;
+    min-width: 0;
+}
+
+/* Two usage chips: always one row; shrink type/padding before wrapping */
+.cs-token-hierarchy__tier-content--pair {
+    flex-wrap: nowrap;
+    justify-content: center;
+    gap: clamp(0.25rem, 0.85vw + 0.15rem, 1.25rem);
+}
+
+/* Content-sized widths: shorter token stays tight, longer one gets room before ellipsis */
+.cs-token-hierarchy__tier-content--pair .cs-token-hierarchy__chip {
+    flex: 0 1 auto;
+    min-width: 0;
+    justify-content: center;
+    max-width: none;
+}
+
+.cs-token-hierarchy__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: clamp(4px, 0.65vw + 2px, 8px);
+    padding: clamp(5px, 0.85vw + 3px, 8px) clamp(6px, 1.6vw + 4px, 18px);
+    border-radius: 8px;
+    font-size: clamp(0.62rem, 0.48rem + 1.15vw, 0.9rem);
+    font-weight: 500;
+    position: relative;
+    z-index: 2;
+    transition: background 0.4s, color 0.4s;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.cs-token-hierarchy__divider {
+    border: none;
+    border-top: 1px dashed;
+    margin: calc(clamp(0.55rem, 1.4vw + 0.3rem, 1.15rem) + 8px) 0;
+    transition: border-color 0.4s;
+}
+
+.cs-token-hierarchy__divider--before-intent {
+    margin: calc(clamp(1.2rem, 3.2vw + 0.65rem, 3rem) + 2px) 0;
+}
+
+@supports (container-type: inline-size) {
+    .cs-token-hierarchy__scene {
+        padding:
+            calc(clamp(1rem, 3.2cqw + 0.65rem, 2rem) + 10px)
+            clamp(0.45rem, 2.2cqw + 0.3rem, 1.35rem)
+            calc(clamp(1rem, 3.2cqw + 0.65rem, 2rem) + 2px)
+            calc(clamp(0.2rem, 1.1cqw + 0.1rem, 0.65rem) - 4px);
+    }
+
+    .cs-token-hierarchy__hint {
+        margin-bottom: clamp(0.75rem, 2.2cqw + 0.35rem, 1.1rem);
+    }
+
+    .cs-token-hierarchy__tier {
+        gap: clamp(8px, 2cqw + 4px, 16px);
+    }
+
+    .cs-token-hierarchy__tier-label {
+        flex: 0 0 clamp(3.5rem, 22cqw + 1.5rem, 5.625rem);
+        font-size: clamp(0.72rem, 0.55rem + 1.1cqw, 0.875rem);
+    }
+
+    .cs-token-hierarchy__tier-content {
+        gap: clamp(0.5rem, 2cqw + 0.25rem, 2rem);
+    }
+
+    .cs-token-hierarchy__tier-content--pair {
+        gap: clamp(0.25rem, 1.2cqw + 0.15rem, 1.25rem);
+    }
+
+    .cs-token-hierarchy__scene .cs-token-hierarchy__chip {
+        gap: clamp(4px, 1cqw + 2px, 8px);
+        padding: clamp(5px, 1.2cqw + 3px, 8px) clamp(6px, 2.2cqw + 4px, 18px);
+        font-size: clamp(0.55rem, 0.38rem + 2.1cqw, 0.9rem);
+    }
+
+    .cs-token-hierarchy__dot {
+        width: clamp(12px, 3.5cqw + 5px, 16px);
+        height: clamp(12px, 3.5cqw + 5px, 16px);
+    }
+
+    .cs-token-hierarchy__divider:not(.cs-token-hierarchy__divider--before-intent) {
+        margin: calc(clamp(0.55rem, 1.8cqw + 0.3rem, 1.15rem) + 8px) 0;
+    }
+
+    .cs-token-hierarchy__divider--before-intent {
+        margin: calc(clamp(1.2rem, 4cqw + 0.65rem, 3rem) + 2px) 0;
+    }
+}
+
+.cs-token-hierarchy__chip > span:last-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cs-token-hierarchy__scene.light .cs-token-hierarchy__chip {
+    background: var(--th-chip-bg-light, #eceae4);
+    color: var(--th-chip-fg-light, #2c2c2a);
+}
+
+.cs-token-hierarchy__scene.dark .cs-token-hierarchy__chip {
+    background: var(--th-chip-bg-dark, #3a3a38);
+    color: var(--th-chip-fg-dark, #e0ddd4);
+}
+
+.cs-token-hierarchy__dot {
+    width: clamp(12px, 2.5vw + 8px, 16px);
+    height: clamp(12px, 2.5vw + 8px, 16px);
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.cs-token-hierarchy__scene.light .cs-token-hierarchy__divider {
+    border-color: var(--th-divider-light, #d3d1c7);
+}
+
+.cs-token-hierarchy__scene.dark .cs-token-hierarchy__divider {
+    border-color: var(--th-divider-dark, #555);
+}
+
+.cs-token-hierarchy__overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 3;
+    overflow: visible;
+}
+
+@media (max-width: 520px) {
+    .cs-token-hierarchy__tier {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+    }
+
+    .cs-token-hierarchy__tier-label {
+        flex-basis: auto;
+        max-width: none;
+        text-align: left;
+    }
+
+    .cs-token-hierarchy__tier-content {
+        justify-content: center;
+    }
+
+    /* Intent row: keep both chips on one horizontal line */
+    .cs-token-hierarchy__tier-content--pair {
+        flex-direction: row;
+        flex-wrap: nowrap;
+    }
+
+}
+
+/* Full-viewport band: matches page --bg; video blacks blend up via lighten (see inner) */
+.cs-section--full-bleed-video {
+    width: 100vw;
+    max-width: 100vw;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+    padding: clamp(var(--cs-rhythm-lg), 5vw, var(--cs-rhythm-3xl)) 0;
+    box-sizing: border-box;
+    background: var(--bg);
+}
+
+.cs-section + .cs-section.cs-section--full-bleed-video {
+    border-top: none;
+}
+
+.cs-full-bleed-video__inner {
+    width: 100%;
+    margin: 0;
+    padding: clamp(0px, 2vw, 20px) 0;
+    box-sizing: border-box;
+    background: var(--bg);
+    isolation: isolate;
+}
+
+.cs-full-bleed-video__inner video {
+    display: block;
+    width: 100%;
+    height: auto;
+    vertical-align: middle;
+    mix-blend-mode: lighten;
+}
+
+.cs-caption--full-bleed-video {
+    margin-top: clamp(var(--cs-rhythm-md), 3vw, var(--cs-rhythm-xl));
+    margin-bottom: 0;
+    padding-inline: var(--marginSides);
+    max-width: min(40rem, 100%);
+    margin-inline: auto;
+}
+
+.cs-media {
+    width: 100%;
+    border-radius: var(--cs-radius-surface);
+    overflow: hidden;
+}
+
+.cs-media img,
+.cs-media video {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: var(--cs-radius-surface);
+}
+
+/* Pipeline (design-tokens): three-tool constellation; scale with column, no outer “card” */
+.cs-media--pipeline-logos {
+    container-type: inline-size;
+    container-name: pipeline-media;
+    width: 100%;
+    padding: 0;
+    background: none;
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    overflow: visible;
+    /* Max logo sizes: bump on desktop only */
+    --pipeline-ts-max: 5.25rem;
+    --pipeline-sm-max: 4.75rem;
+}
+
+@media (min-width: 1024px) {
+    .cs-media--pipeline-logos {
+        --pipeline-ts-max: 6rem;
+        --pipeline-sm-max: 5.5rem;
+    }
+}
+
+.cs-pipeline-logos__logo {
+    display: block;
+    object-fit: contain;
+}
+
+/* Triangle constellation: Tokens Studio up, Style Dictionary + Git below */
+.cs-pipeline-logos--constellation {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+    row-gap: clamp(0.5rem, 2.5cqi, 0.9rem);
+    column-gap: clamp(0.8rem, 5.5cqi, 1.75rem);
+    justify-items: center;
+    align-items: center;
+    width: 100%;
+    max-width: 100%;
+    margin-inline: auto;
+}
+
+.cs-pipeline-logos--constellation .cs-pipeline-logos__logo--ts {
+    grid-column: 1 / -1;
+}
+
+.cs-pipeline-logos--constellation .cs-pipeline-logos__logo--sd {
+    justify-self: end;
+    margin-right: clamp(0, 1cqi, 0.35rem);
+    transform: rotate(-4deg);
+}
+
+.cs-pipeline-logos--constellation .cs-pipeline-logos__logo--git {
+    justify-self: start;
+    margin-left: clamp(0, 1cqi, 0.35rem);
+    transform: rotate(4deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cs-pipeline-logos--constellation .cs-pipeline-logos__logo--sd,
+    .cs-pipeline-logos--constellation .cs-pipeline-logos__logo--git {
+        transform: none;
+    }
+}
+
+/* Fluid size vs container width; cap so icons stay crisp (PNGs / SVG) */
+.cs-media--pipeline-logos img.cs-pipeline-logos__logo--ts {
+    width: clamp(3.15rem, 32cqi, var(--pipeline-ts-max));
+    height: clamp(3.15rem, 32cqi, var(--pipeline-ts-max));
+    max-width: min(var(--pipeline-ts-max), 100%);
+    max-height: var(--pipeline-ts-max);
+}
+
+.cs-media--pipeline-logos img.cs-pipeline-logos__logo--sd,
+.cs-media--pipeline-logos img.cs-pipeline-logos__logo--git {
+    width: clamp(2.85rem, 28cqi, var(--pipeline-sm-max));
+    height: clamp(2.85rem, 28cqi, var(--pipeline-sm-max));
+    max-width: min(var(--pipeline-sm-max), 100%);
+    max-height: var(--pipeline-sm-max);
+}
+
+/* Fallback when container queries aren’t available (entire @supports block) */
+@supports not (width: 1cqi) {
+    .cs-media--pipeline-logos img.cs-pipeline-logos__logo--ts {
+        width: clamp(3.15rem, 15vw, var(--pipeline-ts-max));
+        height: clamp(3.15rem, 15vw, var(--pipeline-ts-max));
+    }
+
+    .cs-media--pipeline-logos img.cs-pipeline-logos__logo--sd,
+    .cs-media--pipeline-logos img.cs-pipeline-logos__logo--git {
+        width: clamp(2.85rem, 13vw, var(--pipeline-sm-max));
+        height: clamp(2.85rem, 13vw, var(--pipeline-sm-max));
+    }
+
+    .cs-pipeline-logos--constellation {
+        row-gap: clamp(0.5rem, 1.75vw, 0.9rem);
+        column-gap: clamp(0.8rem, 3.25vw, 1.75rem);
+    }
+}
+
+/* Brown bag video: same shell as split-section figures (goals / approach) */
+.cs-media--brown-bag-video {
+    margin: 0;
+    border-radius: var(--cs-radius-surface);
+    overflow: hidden;
+    background: var(--bg);
+    box-shadow:
+        0 1px 0 color-mix(in srgb, var(--text) 8%, transparent),
+        0 24px 48px color-mix(in srgb, var(--text) 18%, transparent);
+}
+
+/* Reserve space to limit CLS; letterboxing matches page bg */
+.cs-media--brown-bag-video video {
+    aspect-ratio: 1258 / 534;
+    object-fit: contain;
+    vertical-align: middle;
+    background-color: var(--bg);
+}
+
+/* Override for videos with a different native ratio — no black bars */
+.cs-media--natural-ratio video {
+    aspect-ratio: auto;
+    object-fit: initial;
+    background-color: transparent;
+}
+
+/* API snippet PNG: matte usually isn’t true alpha; lighten + --bg matches page like challenge cat */
+.cs-media--code-snippet {
+    background-color: var(--bg);
+    isolation: isolate;
+}
+
+.cs-media--code-snippet img {
+    mix-blend-mode: lighten;
+}
+
+/* Delivery bridge: intro copy + brown bag video in one section (no border between) */
+.cs-section--delivery-bridge {
+    padding-block: clamp(var(--cs-rhythm-lg), 3.5vw, var(--cs-rhythm-2xl));
+}
+
+.cs-section--delivery-bridge .cs-media--brown-bag-video {
+    margin-top: clamp(var(--cs-rhythm-lg), 4vw, var(--cs-rhythm-2xl));
+}
+
+.cs-section--delivery-bridge .cs-section-title {
+    max-width: min(42rem, 100%);
+    margin-inline: auto;
+    font-size: clamp(1.25rem, 2.15vw, 1.85rem);
+}
+
+.cs-section--delivery-bridge__lead {
+    max-width: min(42rem, 100%);
+    margin-inline: auto;
+}
+
+@media (min-width: 769px) {
+    /* design-system.html: code snippet column height synced to copy via data-split-media-sync */
+    .cs-section--split .cs-media--code-snippet {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+    }
+
+    .cs-section--split .cs-media--code-snippet img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        object-position: left center;
+    }
+}
+
+/* Adoption: base PNG + SVG/HTML overlay; accent via currentColor / --sysPrimaryDefault (no hue-shift on photo) */
+.cs-media--adoption-visual {
+    background-color: var(--bg);
+    isolation: isolate;
+}
+
+.cs-media--adoption-stack {
+    position: relative;
+    display: block;
+    width: 100%;
+    line-height: 0;
+    border-radius: var(--cs-radius-surface);
+    overflow: hidden;
+}
+
+.cs-media--adoption-base {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: var(--cs-radius-surface);
+    vertical-align: middle;
+    mix-blend-mode: lighten;
+}
+
+.cs-adoption-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    color: var(--sysPrimaryDefault);
+}
+
+.cs-adoption-overlay-svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.cs-adoption-overlay-copy {
+    position: absolute;
+    left: 2%;
+    bottom: 8%;
+    margin: 0;
+    max-width: 92%;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: clamp(0.95rem, 2.4vw, 1.35rem);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    line-height: 1.25;
+    color: var(--sysPrimaryDefault);
+    text-shadow: 0 1px 2px color-mix(in srgb, var(--bg) 85%, transparent);
+}
+
+/* Caption under media */
+.cs-caption {
+    font-size: 0.8em;
+    color: color-mix(in srgb, var(--sysPrimaryDefault) 18%, var(--textSubtle));
+    margin-top: var(--cs-rhythm-md);
+    text-align: center;
+}
+
+/* Next Project Navigation */
+.cs-next {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: clamp(var(--cs-rhythm-2xl), 6vw, var(--cs-rhythm-4xl)) var(--marginSides);
+    border-top: 1px solid var(--borderSubtle, rgba(255,255,255,0.08));
+    text-align: center;
+}
+
+.cs-next-label {
+    font-size: 0.75em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: color-mix(in srgb, var(--sysPrimaryDefault) 58%, var(--textSubtle));
+    margin-bottom: 8px;
+}
+
+.cs-next-link {
+    display: inline-block;
+    font-size: clamp(1.4rem, 2.5vw, 2rem);
+    font-weight: 700;
+    color: var(--text);
+    text-decoration: none;
+    transition: color 0.2s ease, filter 0.2s ease;
+}
+
+.cs-next-link:hover {
+    color: var(--sysPrimaryStrong);
+    filter: drop-shadow(0 0 12px var(--cs-accent-glow));
+}
+
+.cs-next-arrow {
+    display: inline-block;
+    margin-left: 8px;
+    transition: transform 0.2s ease;
+}
+
+.cs-next-link:hover .cs-next-arrow {
+    transform: translateX(4px);
+}
+
+/* Back to all work link */
+.cs-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85em;
+    font-weight: 600;
+    color: var(--textSubtle);
+    text-decoration: none;
+    padding: 12px 0;
+    transition: color 0.2s ease;
+    position: absolute;
+    top: clamp(72px, 8vw, 100px);
+    left: var(--marginSides);
+}
+
+.cs-back:hover {
+    color: var(--sysPrimaryStrong);
+}
+
+/* Focus: case study chrome (keyboard) */
+.cs-back:focus-visible,
+.cs-next-link:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--sysPrimaryDefault) 85%, var(--textSubtle));
+    outline-offset: 3px;
+    border-radius: 4px;
+}
+
+.cs-page .cs-section-text a:focus-visible,
+.cs-page .cs-summary-brief__testimonial-cite a:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--sysPrimaryDefault) 85%, var(--textSubtle));
+    outline-offset: 3px;
+    border-radius: 2px;
+}
+
+/* ─── Responsive ─── */
+
+/*
+ * Split sections: base rules use .cs-section--split + modifier (2-class) — a lone .cs-section--split
+ * mobile rule loses the cascade. Use .cs-section.cs-section--split and stack from tablet width down.
+ */
+@media (max-width: 1023px) {
+    .cs-section.cs-section--split {
+        grid-template-columns: 1fr;
+        gap: var(--cs-rhythm-lg);
+    }
+
+    .cs-section--split.cs-section--reverse {
+        direction: ltr;
+    }
+}
+
+@media (max-width: 768px) {
+    /* Learn outro: DOM is copy → video so text stacks first; no sticky; cap clip height */
+    .cs-section--learn-outro .cs-learn-outro__col--copy {
+        align-self: start;
+    }
+
+    .cs-section--learn-outro .cs-learn-outro__copy {
+        position: static;
+        top: auto;
+        max-height: none;
+        overflow-y: visible;
+        overscroll-behavior: auto;
+    }
+
+    .cs-section--learn-outro .cs-media--learn-outro {
+        max-width: 100%;
+        max-height: 100vh;
+        margin-inline: auto;
+    }
+
+    .cs-section--learn-outro .cs-media--learn-outro video {
+        max-height: 100vh;
+        max-width: 100%;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+        margin-inline: auto;
+        display: block;
+    }
+
+    .cs-revenue-chart__canvas-wrap {
+        height: min(300px, 58vh);
+        min-height: 240px;
+    }
+
+    /* Approach / Goals: cap height (~half viewport) so stacked layout isn’t dominated */
+    .cs-section--approach .cs-media--approach,
+    .cs-section--goals .cs-media--goals {
+        height: min(50vh, 380px);
+        max-height: min(50vh, 380px);
+    }
+
+    .cs-section--approach .cs-media--approach img,
+    .cs-section--goals .cs-media--goals img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: var(--cs-media-crop-x) var(--cs-media-crop-y);
+        transform: scale(var(--cs-media-crop-zoom));
+        transform-origin: var(--cs-media-crop-x) var(--cs-media-crop-y);
+    }
+
+    .cs-media--placeholder {
+        min-height: 160px;
+        aspect-ratio: 16 / 9;
+    }
+
+    .cs-metrics {
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .cs-metric {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        min-width: 0;
+    }
+
+    .cs-metric-value {
+        font-size: 1.5rem;
+        white-space: nowrap;
+    }
+
+    .cs-hero--text {
+        aspect-ratio: 16 / 10;
+    }
+
+    .cs-back {
+        position: relative;
+        top: auto;
+        left: auto;
+        display: flex;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: clamp(80px, 10vw, 110px) var(--marginSides) 0;
+    }
+
+    .cs-hero {
+        padding-top: clamp(16px, 2vw, 24px);
+    }
+
+    .cs-summary-brief__intro {
+        grid-template-columns: 1fr;
+        gap: 28px;
+    }
+
+    .cs-summary-brief__steps {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: var(--cs-rhythm-smd);
+        overflow-x: auto;
+        padding-block: 6px;
+        padding-inline: max(var(--cs-rhythm-md), env(safe-area-inset-left), env(safe-area-inset-right));
+        box-sizing: border-box;
+        -webkit-overflow-scrolling: touch;
+        scroll-snap-type: x mandatory;
+    }
+
+    .cs-summary-brief__step {
+        flex: 0 0 min(31%, 112px);
+        min-width: 92px;
+        scroll-snap-align: start;
+    }
+}
