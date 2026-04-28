@@ -76,6 +76,14 @@
             border-radius: 16px;
             padding: clamp(1.25rem, 3vw, 2rem);
             margin-top: 2rem;
+            /* overflow hidden so content can extend flush to the rounded border on mobile
+               without showing square corners past the wrapper's rounding */
+            overflow: hidden;
+        }
+        @media (max-width: 768px) {
+            .cs-pipeline-graph { padding: 1rem 0; }
+            .cs-pipeline-graph__kicker,
+            .cs-pipeline-graph__footnote { padding-inline: 1rem; }
         }
         .cs-pipeline-graph__kicker {
             font-size: 0.75rem;
@@ -84,6 +92,30 @@
             text-transform: uppercase;
             color: color-mix(in srgb, var(--text) 50%, transparent);
             margin-bottom: 1.25rem;
+        }
+        /* Frame around the scroll element — used as a positioning context
+           for the mobile right-edge fade hint (so the fade is scoped to the
+           diagram and doesn't bleed onto the kicker / footnote). */
+        .cs-pipeline-graph__scroll-frame {
+            position: relative;
+        }
+
+        @media (max-width: 768px) {
+            .cs-pipeline-graph__scroll-frame::after {
+                content: '';
+                position: absolute;
+                top: 0;
+                right: 0;
+                bottom: 0;
+                width: 48px;
+                background: linear-gradient(
+                    to right,
+                    transparent,
+                    color-mix(in srgb, var(--bg) 92%, transparent)
+                );
+                pointer-events: none;
+                z-index: 2;
+            }
         }
         .cs-pipeline-graph__scroll {
             overflow-x: auto;
@@ -449,8 +481,87 @@
         .sankey-node-rect { cursor: pointer; }
         .sankey-node-rect:hover rect { filter: brightness(1.2); }
         .sankey-link { cursor: pointer; }
+        /* Swipe hint label below the Sankey on mobile.
+           Hidden by default; only shown on small screens. Fades out after first scroll. */
+        .cs-swipe-hint {
+            display: none;
+            margin: 12px 1rem 0;
+            text-align: center;
+            font-size: 0.78rem;
+            font-weight: 500;
+            letter-spacing: 0.04em;
+            color: color-mix(in srgb, var(--text) 50%, transparent);
+            transition: opacity 0.4s ease;
+        }
+        .cs-swipe-hint__icon {
+            display: inline-block;
+            margin: 0 0.4em;
+            font-size: 0.95rem;
+            opacity: 0.85;
+        }
+        .cs-swipe-hint.is-dismissed {
+            opacity: 0;
+            pointer-events: none;
+        }
         @media (max-width: 768px) {
-            .sankey-svg-container { padding: 16px 8px; }
+            .cs-swipe-hint { display: block; }
+
+            /* Sankey-context: overlay floating ON the diagram (top is set by JS to land
+               just inside the top of the Sankey canvas with a comfortable margin). Pill
+               style so it reads as a floating tooltip. Lower bg opacity so the diagram
+               peeks through, leaning on backdrop-blur for legibility. */
+            .cs-demo-body .cs-swipe-hint {
+                position: absolute;
+                top: 5rem; /* fallback; JS will overwrite once Sankey renders */
+                left: 50%;
+                transform: translateX(-50%);
+                margin: 0;
+                padding: 6px 14px;
+                white-space: nowrap;
+                border-radius: 999px;
+                background: color-mix(in srgb, var(--bg) 55%, transparent);
+                border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+                color: color-mix(in srgb, var(--text) 70%, transparent);
+                box-shadow: 0 4px 16px color-mix(in srgb, var(--text) 8%, transparent);
+                backdrop-filter: blur(6px);
+                -webkit-backdrop-filter: blur(6px);
+                z-index: 3;
+                pointer-events: none;
+            }
+        }
+
+        @media (max-width: 768px) {
+            /* Diagram extends flush to the wrapper edges; legend keeps its inset
+               via its own horizontal padding (applied below) so it doesn't hug the side.
+               No bottom padding on the body or svg-container — the diagram sits flush
+               with the bottom of the rounded demo wrapper. Legend padding is preserved. */
+            .cs-demo-body { padding: 1rem 0 0; }
+            .sankey-legend { padding: 0 1rem 20px; }
+            .sankey-svg-container {
+                padding: 16px 0 0;
+                border-radius: 0;
+            }
+
+            /* Persistent right-edge fade hint that the diagram scrolls horizontally
+               (mobile scrollbars are overlay-only and don't reliably advertise overflow) */
+            .cs-demo-body:has(.sankey-svg-container) {
+                position: relative;
+            }
+            .cs-demo-body:has(.sankey-svg-container)::after {
+                content: '';
+                position: absolute;
+                top: 0;
+                right: 0;
+                bottom: 0;
+                width: 36px;
+                background: linear-gradient(
+                    to right,
+                    transparent,
+                    color-mix(in srgb, var(--bg) 92%, transparent)
+                );
+                pointer-events: none;
+                z-index: 2;
+            }
         }
 
         /* ─── Material tree (ported from batch-story) ─── */
@@ -677,6 +788,11 @@
                         <div id="cs-sankey-diagram">
                             <div style="text-align:center;padding:40px;opacity:0.5;">Initializing supply chain flow diagram…</div>
                         </div>
+                        <div class="cs-swipe-hint" data-scroll-target=".sankey-svg-container" aria-hidden="true">
+                            <span class="cs-swipe-hint__icon" aria-hidden="true">←</span>
+                            swipe to explore
+                            <span class="cs-swipe-hint__icon" aria-hidden="true">→</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -701,6 +817,7 @@
 
                 <div class="cs-pipeline-graph" aria-label="Four-stage pipeline: inputs, AI pipeline, graph-shaped database, consumer + operational outputs">
                     <p class="cs-pipeline-graph__kicker">The pipeline at a glance</p>
+                    <div class="cs-pipeline-graph__scroll-frame">
                     <div class="cs-pipeline-graph__scroll">
                         <svg viewBox="0 0 920 382" class="cs-pipeline-graph__svg" role="img" aria-label="End-to-end pipeline diagram">
                             <!-- Stage column labels -->
@@ -871,6 +988,12 @@
                                 </g>
                             </g>
                         </svg>
+                    </div>
+                    </div>
+                    <div class="cs-swipe-hint" data-scroll-target=".cs-pipeline-graph__scroll" aria-hidden="true">
+                        <span class="cs-swipe-hint__icon" aria-hidden="true">←</span>
+                        swipe to explore
+                        <span class="cs-swipe-hint__icon" aria-hidden="true">→</span>
                     </div>
                     <p class="cs-pipeline-graph__footnote">Every write to the DB syncs an embedding automatically, so the chat, the QR page, and the ops autopilot all reason from the same single source of truth.</p>
                 </div>
@@ -1378,10 +1501,38 @@
         });
     }
 
+    // ─── Generic swipe-hint dismissal: fade out after first scroll of target ──
+    function initSwipeHints() {
+        document.querySelectorAll('.cs-swipe-hint[data-scroll-target]').forEach((hint) => {
+            const scroll = document.querySelector(hint.dataset.scrollTarget);
+            if (!scroll) return;
+            scroll.addEventListener('scroll', () => {
+                hint.classList.add('is-dismissed');
+            }, { passive: true, once: true });
+        });
+    }
+
+    // ─── Sankey-context overlay: anchor the hint pill just inside the top of the
+    // SVG canvas (legend wraps differently per width, so measuring is more reliable
+    // than a fixed CSS offset). Re-measure on resize. ────────────────────────────
+    function positionSankeySwipeHint() {
+        const hint = document.querySelector('.cs-demo-body .cs-swipe-hint');
+        const svgContainer = document.querySelector('.sankey-svg-container');
+        if (!hint || !svgContainer) return;
+        const TOP_MARGIN = 40; // px below the top of the Sankey canvas
+        const update = () => {
+            hint.style.top = (svgContainer.offsetTop + TOP_MARGIN) + 'px';
+        };
+        update();
+        window.addEventListener('resize', update);
+    }
+
     // ─── Init on load ─────────────────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', () => {
         initSankey();
         initBounceVideos();
+        initSwipeHints();
+        positionSankeySwipeHint();
         window._sankeyInitialized = true;
     });
     </script>

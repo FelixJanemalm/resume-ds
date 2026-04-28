@@ -81,32 +81,42 @@
   background-image: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 1));
   transition: box-shadow 0.3s ease;
 }
+/* Bottom-anchored description block — grows upward as content reveals so wrapped
+   titles push the title up rather than shoving the chevron below the card edge. */
 .card-wrapper .item-desc {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
   padding: 0 24px 12px;
   color: #fff;
-  position: relative;
   z-index: 1;
   overflow: hidden;
-  transform: translateY(calc(100% - 76px));
-  -webkit-transform: translateY(calc(100% - 76px));
-  transition: all 0.4s ease-in-out;
-  -webkit-transition: all 0.4s ease-in-out;
-}
-.card-wrapper .item.active .item-desc {
-  transform: none;
-  -webkit-transform: none;
 }
 
-/* Body text hidden when collapsed, revealed on active */
+/* Body text hidden when collapsed, revealed on active. max-height drives the
+   height growth; opacity + translateY adds a soft slide-in on top. */
 .card-wrapper .item-desc p {
   opacity: 0;
+  max-height: 0;
+  margin: 0;
   transform: translateY(20px);
   -webkit-transform: translateY(20px);
-  transition: all 0.4s ease-in-out 0.15s;
-  -webkit-transition: all 0.4s ease-in-out 0.15s;
+  transition:
+    opacity 0.4s ease-in-out 0.15s,
+    max-height 0.4s ease-in-out,
+    transform 0.4s ease-in-out 0.15s,
+    margin 0.4s ease-in-out;
+  -webkit-transition:
+    opacity 0.4s ease-in-out 0.15s,
+    max-height 0.4s ease-in-out,
+    transform 0.4s ease-in-out 0.15s,
+    margin 0.4s ease-in-out;
 }
 .card-wrapper .item.active .item-desc p {
   opacity: 1;
+  max-height: 280px;
+  margin-top: 6px;
   transform: translateY(0);
   -webkit-transform: translateY(0);
 }
@@ -193,10 +203,6 @@
   .card-wrapper .item.active {
     width: 400px;
   }
-  .card-wrapper .item-desc {
-    transform: translateY(calc(100% - 72px));
-    -webkit-transform: translateY(calc(100% - 72px));
-  }
 }
 
 @media (min-width: 768px) and (max-width: 991px) {
@@ -210,10 +216,6 @@
   }
   .card-wrapper .item.active {
     width: 360px;
-  }
-  .card-wrapper .item-desc {
-    transform: translateY(calc(100% - 70px));
-    -webkit-transform: translateY(calc(100% - 70px));
   }
 }
 
@@ -233,8 +235,6 @@
   }
   .card-wrapper .item-desc {
     padding: 0 14px 5px;
-    transform: translateY(calc(100% - 66px));
-    -webkit-transform: translateY(calc(100% - 66px));
   }
   .card-wrapper .item-desc h3::after {
     width: 6px;
