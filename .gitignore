@@ -8,6 +8,9 @@
 *.swp
 *.swo
 
+# Node dependencies (dev/build tooling only — not served to the static site)
+node_modules/
+
 # Logs / OS
 *.log
 Thumbs.db
