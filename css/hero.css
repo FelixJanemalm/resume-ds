@@ -182,6 +182,10 @@
 .hitbox {
     position: absolute;
     background: transparent;
+    touch-action: none; /* keep the browser from claiming the drag for scrolling */
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none; /* no iOS magnifier/callout on press-and-hold */
 }
 
 .hitbox:active {
