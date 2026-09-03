@@ -44,12 +44,17 @@
       ts: new Date().toISOString(),
       extra: extra || null
     });
+    // text/plain is a CORS-safelisted type, so no preflight is needed.
+    // sendBeacon always sends with credentials "include", and a preflighted
+    // request in that mode is rejected unless the server also answers
+    // Access-Control-Allow-Credentials: true. The worker parses the JSON body
+    // regardless of Content-Type. (Found by a real-page test, 2026-09-03.)
     try {
       if (navigator.sendBeacon) {
-        navigator.sendBeacon(endpoint, new Blob([body], { type: "application/json" }));
+        navigator.sendBeacon(endpoint, new Blob([body], { type: "text/plain" }));
       } else {
-        fetch(endpoint, { method: "POST", body: body, keepalive: true,
-                          headers: { "Content-Type": "application/json" } });
+        fetch(endpoint, { method: "POST", body: body, keepalive: true, mode: "cors",
+                          credentials: "omit", headers: { "Content-Type": "text/plain" } });
       }
     } catch (e) { /* analytics must never break the page */ }
   }
