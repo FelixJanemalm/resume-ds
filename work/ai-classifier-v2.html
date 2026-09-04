@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Case study: Felix Janemalm designed the annotation tool that grew an expert's ground truth from 5 to 79 labeled examples, then built the evaluation protocol that decides what ships. F1 against expert labels went from 0.34 to 0.85; a fine-tuning win was retracted when a paired bootstrap put p at 0.75.">
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+    <title>Teaching an AI a Psychologist's Framework, One Honest Number at a Time – Felix Janemalm</title>
+    <link rel="preload" href="../fonts/woff2/RNSPhysis-Medium.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="../fonts/woff2/RNSPhysis-Light.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="../css/tokens/Ref/yds.css">
+    <link rel="stylesheet" href="../css/tokens/Ref/mui.css">
+    <link rel="stylesheet" href="../css/tokens/theme.css">
+    <link rel="stylesheet" href="../css/master.css">
+    <link rel="stylesheet" href="../css/typography.css">
+    <link rel="stylesheet" href="../css/materials.css">
+    <link rel="stylesheet" href="../css/header.css">
+    <link rel="stylesheet" href="../css/drawer.css">
+    <link rel="stylesheet" href="../css/case-study-page.css">
+    <link rel="stylesheet" href="../css/footer.css">
+</head>
+<body>
+
+    <header>
+        <nav>
+            <div class="logo">
+                <a href="../index.html#home">
+                    <span class="short-logo">
+                        <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <g filter="url(#filter0_dd_357_229)">
+                            <path d="M107.098 139.927H161.976C161.976 117.976 175.878 99.6829 202.22 99.6829C227.982 99.6829 271 99.9268 289.293 99.6829V50.6585H194.902C146.61 50.6585 107.098 86.5122 107.098 139.927Z" fill="currentColor"/>
+                            <path d="M91 175.049H243.195C243.195 200.659 233.683 228.463 186.854 228.463C156.994 228.463 118.317 228.707 91 228.463V175.049Z" fill="currentColor"/>
+                            <path d="M409.292 175.049V338.951C409.292 409.195 347.829 464.805 261.488 464.805C167.829 464.805 107.829 401.143 107.829 341.878V261.393H161.243V326.512C161.243 382.854 211 411.39 261.488 411.39C311.976 411.39 356.61 382.854 356.61 326.512C356.61 266.22 356.61 263.832 356.61 265.052V175.78L409.292 175.049Z" fill="currentColor"/>
+                            <path d="M421 85.0488C421 106.063 403.965 123.098 382.951 123.098C361.937 123.098 344.902 106.063 344.902 85.0488C344.902 64.035 361.937 47 382.951 47C403.965 47 421 64.035 421 85.0488Z" fill="currentColor"/>
+                            </g>
+                            <defs>
+                            <filter id="filter0_dd_357_229" x="83.6829" y="42.6098" width="347.561" height="435.366" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+                            <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+                            <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+                            <feOffset dx="1.46341" dy="4.39024"/>
+                            <feGaussianBlur stdDeviation="4.39024"/>
+                            <feComposite in2="hardAlpha" operator="out"/>
+                            <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/>
+                            <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_357_229"/>
+                            <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+                            <feOffset dy="5.85366"/>
+                            <feGaussianBlur stdDeviation="2.92683"/>
+                            <feComposite in2="hardAlpha" operator="out"/>
+                            <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/>
+                            <feBlend mode="normal" in2="effect1_dropShadow_357_229" result="effect2_dropShadow_357_229"/>
+                            <feBlend mode="normal" in="SourceGraphic" in2="effect2_dropShadow_357_229" result="shape"/>
+                            </filter>
+                            </defs>
+                        </svg>
+                    </span>
+                    <span class="full-logo">
+                        Felix Janemalm
+                    </span>
+                </a>
+            </div>
+            <ul class="nav-links">
+                <li><a href="../index.html#work">Work</a></li>
+                <li><a href="../Resume.pdf" target="_blank">Resume.pdf</a></li>
+                <li><a href="#contact" id="contactBtn">Contact</a></li>
+            </ul>
+        </nav>
+        <div id="progress-bar"></div>
+    </header>
+    <div id="overlay" class="overlay"></div>
+
+    <div id="drawer" class="drawer">
+        <div class="drawer-content">
+          <nav class="nav-links">
+            <span>
+                <a href="mailto:hello@felixjanemalm.com">
+                    <svg width="16" height="16" viewBox="0 0 140 112" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;">
+                            <path d="M118.666 0H20.9411C15.3872 0 10.0607 2.20629 6.1335 6.1335C2.20629 10.0607 0 15.3872 0 20.9411V90.7446C0 96.2986 2.20629 101.625 6.1335 105.552C10.0607 109.479 15.3872 111.686 20.9411 111.686H118.666C124.22 111.686 129.546 109.479 133.474 105.552C137.401 101.625 139.607 96.2986 139.607 90.7446V20.9411C139.607 15.3872 137.401 10.0607 133.474 6.1335C129.546 2.20629 124.22 0 118.666 0ZM118.666 13.9607L73.2938 45.1629C72.2326 45.7756 71.0289 46.0981 69.8036 46.0981C68.5783 46.0981 67.3745 45.7756 66.3134 45.1629L20.9411 13.9607H118.666Z" fill="currentColor"/>
+                        </svg>
+                    hello@felixjanemalm.com</a>
+             </span>
+            <a href="https://www.linkedin.com/in/felixjanemalm/" target="_blank">
+                <svg width="16" height="16" viewBox="0 0 20 21" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;">
+                <path d="M0 6.53138H4.42553V20.9687H0V6.53138ZM16.9787 7.4231C17.8582 7.90435 18.5816 8.63329 19.1489 9.60994C19.7163 10.5866 20 11.5845 20 12.6036V20.9687H15.5319V12.6036C15.5319 12.3771 15.4468 12.1223 15.2766 11.8392C15.1064 11.5562 14.9504 11.3721 14.8085 11.2872C14.5816 11.1457 14.2695 11.0749 13.8723 11.0749C13.4752 11.0749 13.1631 11.1315 12.9362 11.2448L11.1064 12.1365V20.9687H6.6383V6.53138H11.1064V7.21079C11.9858 6.81447 12.9787 6.63046 14.0851 6.65877C15.1915 6.68708 16.156 6.94186 16.9787 7.4231ZM2.21277 0.96875C2.83688 0.96875 3.3617 1.18106 3.78723 1.60569C4.21277 2.03032 4.42553 2.55403 4.42553 3.17682C4.42553 3.79961 4.21277 4.33039 3.78723 4.76917C3.3617 5.20796 2.83688 5.42735 2.21277 5.42735C1.58865 5.42735 1.06383 5.20796 0.638298 4.76917C0.212766 4.33039 0 3.79961 0 3.17682C0 2.55403 0.212766 2.03032 0.638298 1.60569C1.06383 1.18106 1.58865 0.96875 2.21277 0.96875Z" fill="currentColor"/>
+                </svg>
+                /felixjanemalm</a>
+          </nav>
+        </div>
+    </div>
+
+    <div class="cs-page">
+
+        <a href="../index.html#work" class="cs-back">&larr; All Work</a>
+
+        <div class="cs-hero">
+            <div class="cs-hero__surface">
+                <svg viewBox="0 0 1200 520" role="img" aria-label="Line chart of F1 score against the expert's labels from July to August 2026: 0.34 with the first prompt on July 2, 0.51 after rebuilding the prompt, 0.71 on July 10 with a frontier model and eight retrieved examples, 0.78 when the champion was promoted on August 11 at P equals 0.96, and 0.85 on 107 real-world statements on August 21. A hollow struck-through point on July 3 marks a fine-tuned model at 0.22 whose win over prompting was retracted with p equals 0.75." style="display:block;width:100%;height:auto;font-family:inherit;">
+                    <defs>
+                        <linearGradient id="csf-bg" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0" stop-color="#121821"/>
+                            <stop offset="1" stop-color="#0a0d12"/>
+                        </linearGradient>
+                        <linearGradient id="csf-area" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0" stop-color="var(--sysPrimaryDefault, #7dd3fc)" stop-opacity="0.28"/>
+                            <stop offset="1" stop-color="var(--sysPrimaryDefault, #7dd3fc)" stop-opacity="0"/>
+                        </linearGradient>
+                    </defs>
+                    <rect width="1200" height="520" fill="url(#csf-bg)"/>
+
+                    <text x="60" y="62" fill="#e8eef6" fill-opacity="0.5" font-size="12" letter-spacing="2.4">F1 AGAINST THE EXPERT'S LABELS · JULY TO AUGUST 2026</text>
+                    <text x="60" y="108" fill="#e8eef6" font-size="30" font-weight="600">From 0.34 to 0.85 in seven weeks, with one retraction on the way</text>
+                    <text x="60" y="136" fill="#e8eef6" fill-opacity="0.6" font-size="16">F1 combines precision and recall into one score. 1.0 is perfect.</text>
+
+                    <!-- grid: y = 430 - 270 * score -->
+                    <g stroke="#e8eef6" stroke-opacity="0.1">
+                        <line x1="120" y1="160" x2="1130" y2="160"/>
+                        <line x1="120" y1="214" x2="1130" y2="214"/>
+                        <line x1="120" y1="268" x2="1130" y2="268"/>
+                        <line x1="120" y1="322" x2="1130" y2="322"/>
+                        <line x1="120" y1="376" x2="1130" y2="376"/>
+                    </g>
+                    <g fill="#e8eef6" fill-opacity="0.4" font-size="12" text-anchor="end">
+                        <text x="104" y="164">1.0</text>
+                        <text x="104" y="218">0.8</text>
+                        <text x="104" y="272">0.6</text>
+                        <text x="104" y="326">0.4</text>
+                        <text x="104" y="380">0.2</text>
+                    </g>
+                    <line x1="120" y1="430" x2="1130" y2="430" stroke="#e8eef6" stroke-opacity="0.25"/>
+
+                    <!-- area + line -->
+                    <polygon points="170,338.2 530,292.3 710,238.3 890,219.4 1070,200.5 1070,430 170,430" fill="url(#csf-area)"/>
+                    <polyline points="170,338.2 530,292.3 710,238.3 890,219.4 1070,200.5" fill="none" stroke="var(--sysPrimaryDefault, #7dd3fc)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+
+                    <!-- points -->
+                    <g fill="var(--sysPrimaryDefault, #7dd3fc)" stroke="#0a0d12" stroke-width="3">
+                        <circle cx="170" cy="338.2" r="8"/>
+                        <circle cx="530" cy="292.3" r="8"/>
+                        <circle cx="710" cy="238.3" r="8"/>
+                        <circle cx="890" cy="219.4" r="8"/>
+                        <circle cx="1070" cy="200.5" r="9"/>
+                    </g>
+                    <g fill="#e8eef6" font-size="20" font-weight="600" text-anchor="middle">
+                        <text x="170" y="316">0.34</text>
+                        <text x="530" y="270">0.51</text>
+                        <text x="710" y="216">0.71</text>
+                        <text x="890" y="197">0.78</text>
+                        <text x="1070" y="178">0.85</text>
+                    </g>
+
+                    <!-- retracted fine-tune result -->
+                    <circle cx="350" cy="370.6" r="8" fill="none" stroke="#e8eef6" stroke-opacity="0.7" stroke-width="2"/>
+                    <line x1="341" y1="379.6" x2="359" y2="361.6" stroke="#e8eef6" stroke-opacity="0.7" stroke-width="2"/>
+                    <text x="350" y="350" text-anchor="middle" fill="#e8eef6" fill-opacity="0.75" font-size="15">0.22</text>
+                    <text x="350" y="400" text-anchor="middle" fill="#e8eef6" fill-opacity="0.55" font-size="12" font-style="italic">retracted (p = .75)</text>
+
+                    <!-- promotion gate tag -->
+                    <rect x="822" y="240" width="136" height="24" rx="12" fill="var(--sysPrimaryDefault, #7dd3fc)" fill-opacity="0.16"/>
+                    <text x="890" y="256.5" text-anchor="middle" fill="var(--sysPrimaryDefault, #7dd3fc)" font-size="12" font-weight="600">promoted · P = 0.96</text>
+
+                    <!-- x labels -->
+                    <g fill="#e8eef6" fill-opacity="0.85" font-size="14" text-anchor="middle">
+                        <text x="170" y="458">Jul 2</text>
+                        <text x="350" y="458">Jul 3</text>
+                        <text x="530" y="458">Jul</text>
+                        <text x="710" y="458">Jul 10</text>
+                        <text x="890" y="458">Aug 11</text>
+                        <text x="1070" y="458">Aug 21</text>
+                    </g>
+                    <g fill="#e8eef6" fill-opacity="0.5" font-size="12" text-anchor="middle">
+                        <text x="170" y="478">first prompt, local model</text>
+                        <text x="350" y="478">fine-tuned vs prompted: tie</text>
+                        <text x="530" y="478">rebuilt prompt, local</text>
+                        <text x="710" y="478">frontier + 8 retrieved examples</text>
+                        <text x="890" y="478">champion cleared the gate</text>
+                        <text x="1070" y="478">107 real-world statements</text>
+                    </g>
+                    <text x="1130" y="508" text-anchor="end" fill="#e8eef6" fill-opacity="0.4" font-size="12">Promotion rule: a change replaces the champion only when P(better) ≥ 0.95 on a paired bootstrap</text>
+                </svg>
+            </div>
+        </div>
+
+        <div class="cs-intro">
+            <div class="cs-meta">
+                <span>AI Product Design · Applied AI</span>
+                <span class="cs-meta-sep">/</span>
+                <span>Solo build</span>
+                <span class="cs-meta-sep">/</span>
+                <span>Jan 2026 · ongoing</span>
+            </div>
+            <h1 class="cs-title">Teaching an AI a psychologist's framework, one honest number at a time</h1>
+            <p class="cs-description">The expert, a psychologist, spent years mapping 12 coping styles in a 107,000-word manuscript. I'm building the system that reads what a person wrote and says which styles are at work, with her own labels as the yardstick. I designed the tool that produced those labels, then the scoring rules that decide what ships. The score went from 0.34 to 0.85 along the way, and one of my favorite results got retracted.</p>
+        </div>
+
+        <div class="cs-metrics-strip">
+        <div class="cs-metrics">
+            <div class="cs-metric">
+                <div class="cs-metric-value">5 → 79</div>
+                <div class="cs-metric-label">expert-labeled examples, made with an annotation tool I designed for her</div>
+            </div>
+            <div class="cs-metric">
+                <div class="cs-metric-value">0.34 → 0.85</div>
+                <div class="cs-metric-label">F1 against expert labels, first prompt to current model. 1.0 is perfect</div>
+            </div>
+            <div class="cs-metric">
+                <div class="cs-metric-value">17 of 79</div>
+                <div class="cs-metric-label">expert labels revised after she reviewed where the model disagreed</div>
+            </div>
+            <div class="cs-metric">
+                <div class="cs-metric-value">P ≥ 0.95</div>
+                <div class="cs-metric-label">confidence a change needs before it replaces the champion</div>
+            </div>
+        </div>
+        </div>
+
+        <div class="cs-content">
+
+            <div class="cs-section cs-section--wide cs-section--summary-brief">
+                <div class="cs-summary-brief__layout">
+                    <div class="cs-summary-brief__intro">
+                        <div class="cs-summary-brief__intro-main">
+                            <div class="cs-section-label">Ground truth</div>
+                            <h2 class="cs-section-title">There was no dataset, so I built the tool that makes one</h2>
+                            <p class="cs-section-text">When I started in January 2026 there were five diagnosed cases. Six local models, from 8 to 120 billion parameters, all scored within half a point of each other on them. Five examples cannot teach anyone a 12-way distinction, model or human.</p>
+                            <p class="cs-section-text">So I built the expert an annotation tool. It's a single HTML file. She imports statements, sees key phrases highlighted from the framework's own diagrams, adds style nodes, drags connections between them (core, wrapped, defense, and so on), and writes out her reasoning in her own words. A progress counter and a "next incomplete" button carry her through the set. There is no model prefill anywhere; the labels had to be hers. Forty-two versions later, the export held 79 labeled examples with one to five styles each.</p>
+                        </div>
+                        <aside class="cs-summary-brief__context" aria-label="Team">
+                            <div class="cs-context-card" role="group" aria-labelledby="classifier-team-title">
+                                <div class="cs-context-card__header" id="classifier-team-title">Team</div>
+                                <div class="cs-context-card__body">
+                                    <p>Design, engineering, evaluation · Me 🧑‍💻</p>
+                                    <p>Framework and every label · The expert</p>
+                                    <p>Jan 2026 → ongoing · pre-launch</p>
+                                </div>
+                            </div>
+                        </aside>
+                    </div>
+                    <div class="cs-summary-brief__did">
+                        <div class="cs-media cs-media--placeholder" style="max-width: 480px; margin: 0 auto;" role="img" aria-label="Placeholder for the annotation tool walkthrough">
+                            <div class="cs-media-placeholder-inner">
+                                <span class="cs-media-placeholder-kicker">Annotation tool</span>
+                                <span class="cs-media-placeholder-title">Walkthrough coming soon</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="cs-section cs-section--wide">
+                <div class="cs-section-label">Measurement</div>
+                <h2 class="cs-section-title">Every change earns a score before anyone gets an opinion</h2>
+                <p class="cs-section-text">With 79 examples I could finally measure. Each candidate, whether a new prompt, a new model, or a new retrieval setting, diagnoses every statement, and its ranked styles are scored against the expert's. The score is F1: precision and recall combined into one number, where 1.0 is perfect. Then a written protocol decides what happens next.</p>
+                <ul class="cs-goals-list cs-goals-list--cards" role="list">
+                    <li><span><strong>Paired bootstrap on the same statements.</strong>&nbsp;A candidate replaces the champion only when P(better) ≥ 0.95.</span></li>
+                    <li><span><strong>Parse-OK ≥ 0.9.</strong>&nbsp;A model that answers well in the wrong format doesn't get scored on its good days.</span></li>
+                    <li><span><strong>Winners get re-run.</strong>&nbsp;A lucky result loses its shine the second time.</span></li>
+                    <li><span><strong>A 94-record regression suite, and every run committed to the repo.</strong>&nbsp;A conclusion has to cite its runs.</span></li>
+                </ul>
+            </div>
+
+            <div class="cs-section cs-section--wide cs-section--no-chapter-tint">
+                <div class="cs-section-label">Retraction</div>
+                <h2 class="cs-section-title">Fine-tuning won. Then the math said it didn't, so I retracted it</h2>
+                <p class="cs-section-text">In late June I got LoRA fine-tuning running on Apple Silicon and trained a small model on the 79 examples. It scored 0.222. The same model, merely prompted, scored 0.202. I wrote it up as a win.</p>
+                <p class="cs-section-text">Then I ran the paired bootstrap. p = 0.75. The same audit turned up a parser bug that had been inflating early scores. I retracted the claim in the log and marked the run. What fine-tuning on 79 examples actually bought was reliability: nearly every answer parsed, and it ran about three times faster. Accuracy didn't move.</p>
+                <p class="cs-section-text">The protocol went on to kill other favorites. Retrieval over the whole manuscript lost to a short prompt, 0.37 to 0.42. Generating more synthetic examples didn't help either.</p>
+            </div>
+
+            <div class="cs-section cs-section--wide">
+                <div class="cs-section-label">What worked</div>
+                <h2 class="cs-section-title">What actually moved the number: better examples, retrieved per case</h2>
+                <p class="cs-section-text">Rebuilding the prompt around the expert's examples took the best local model from 0.34 to 0.51. The next jump came from retrieval. For each new statement, the system pulls the eight most similar expert-labeled examples, reasoning attached, and puts them in front of the model. With a frontier model doing the reading, that reached 0.71.</p>
+                <p class="cs-section-text">On August 11 the current champion cleared the gate at P = 0.96, scoring 0.78 against the gold set. Ten days later I mined 107 real statements from a public corpus of a million posts and ran them cold. The candidate scored 0.85 on text nobody had tuned for.</p>
+                <div class="cs-token-atlas" aria-label="Pipeline: the expert and the annotation tool produce labeled examples; for each statement the system retrieves similar examples and a model returns ranked styles with cited reasoning; a scorer and gate promote or park the change" style="margin-top: 32px;">
+                    <p class="cs-token-atlas__kicker">One statement, end to end</p>
+                    <div class="cs-token-atlas__flow">
+                        <div class="cs-token-atlas__lane cs-token-atlas__lane--source">
+                            <span class="cs-token-atlas__lane-kicker">Ground truth</span>
+                            <div class="cs-token-atlas__sources">
+                                <span class="cs-token-atlas__node cs-token-atlas__node--figma">Expert</span>
+                                <span class="cs-token-atlas__join" aria-hidden="true">+</span>
+                                <span class="cs-token-atlas__node cs-token-atlas__node--tool">Annotation tool</span>
+                            </div>
+                        </div>
+                        <div class="cs-token-atlas__arrow" aria-hidden="true">
+                            <span class="cs-token-atlas__arrow-line"></span>
+                            <svg class="cs-token-atlas__arrow-head" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                        </div>
+                        <div class="cs-token-atlas__lane cs-token-atlas__lane--gate">
+                            <span class="cs-token-atlas__lane-kicker">Per statement</span>
+                            <ul class="cs-token-atlas__pipeline" role="list" aria-label="Retrieve eight similar labeled examples, model reads them, returns ranked styles with cited reasoning">
+                                <li>Retrieve 8 similar examples</li>
+                                <li>Model reads, ranks styles</li>
+                                <li>Cites its reasoning</li>
+                            </ul>
+                        </div>
+                        <div class="cs-token-atlas__arrow" aria-hidden="true">
+                            <span class="cs-token-atlas__arrow-line"></span>
+                            <svg class="cs-token-atlas__arrow-head" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                        </div>
+                        <div class="cs-token-atlas__lane cs-token-atlas__lane--out">
+                            <span class="cs-token-atlas__lane-kicker">Scorer + gate</span>
+                            <ul class="cs-token-atlas__targets" role="list">
+                                <li>F1 vs expert</li>
+                                <li>Paired bootstrap</li>
+                                <li>P ≥ 0.95 → promote</li>
+                                <li>Otherwise → park</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <p class="cs-token-atlas__footnote">Stack: single-file HTML annotation tool · local models on Apple Silicon, LoRA via MLX · Claude through a provider-agnostic API · Python eval harness with paired bootstrap · every run's artifacts committed to the repo.</p>
+                </div>
+            </div>
+
+            <div class="cs-section cs-section--wide cs-section--no-chapter-tint">
+                <div class="cs-section-label">Feedback loop</div>
+                <h2 class="cs-section-title">The model started correcting its teacher</h2>
+                <p class="cs-section-text">On July 29 the expert sat down with every statement where the champion disagreed with her. She revised 17 of her 79 labels. Some disagreements were the model's mistakes. Others were hers, on statements labeled months earlier. The gold set got better because the model argued with it.</p>
+                <p class="cs-section-text">One caveat stays on the page. The gold set has a single annotator, so nobody knows how often two experts would agree. The measurable ceiling isn't 1.0, and I don't report it as if it were.</p>
+            </div>
+
+            <div class="cs-section cs-section--split cs-section--reverse">
+                <div class="cs-media">
+                    <svg viewBox="0 0 600 340" role="img" aria-label="Bar chart of F1 on the same examples in August 2026: Claude, the frontier model, 0.78; gemma4 31B, local, 0.68; qwen3.8 27B, local, 0.66. The two local models tie, about a tenth of a point behind the frontier model." style="display:block;width:100%;height:auto;font-family:inherit;">
+                        <defs>
+                            <linearGradient id="csl-bg" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stop-color="#121821"/>
+                                <stop offset="1" stop-color="#0a0d12"/>
+                            </linearGradient>
+                            <linearGradient id="csl-accent" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stop-color="var(--sysPrimaryDefault, #7dd3fc)" stop-opacity="0.95"/>
+                                <stop offset="1" stop-color="var(--sysPrimaryDefault, #7dd3fc)" stop-opacity="0.35"/>
+                            </linearGradient>
+                            <linearGradient id="csl-neutral" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stop-color="#e8eef6" stop-opacity="0.26"/>
+                                <stop offset="1" stop-color="#e8eef6" stop-opacity="0.08"/>
+                            </linearGradient>
+                        </defs>
+                        <rect width="600" height="340" fill="url(#csl-bg)"/>
+                        <text x="40" y="44" fill="#e8eef6" fill-opacity="0.5" font-size="11" letter-spacing="2">SAME EXAMPLES · SAME SCORING · AUGUST 2026</text>
+                        <text x="40" y="76" fill="#e8eef6" font-size="20" font-weight="600">The local models trail by about a tenth</text>
+
+                        <!-- frontier reference line at 0.78: y = 270 - 180 * score -->
+                        <line x1="40" y1="129.6" x2="560" y2="129.6" stroke="var(--sysPrimaryDefault, #7dd3fc)" stroke-opacity="0.45" stroke-dasharray="5 6"/>
+
+                        <!-- bars -->
+                        <rect x="70"  y="129.6" width="120" height="140.4" rx="6" fill="url(#csl-accent)"/>
+                        <rect x="240" y="147.6" width="120" height="122.4" rx="6" fill="url(#csl-neutral)"/>
+                        <rect x="410" y="151.2" width="120" height="118.8" rx="6" fill="url(#csl-neutral)"/>
+
+                        <g fill="#e8eef6" font-size="20" font-weight="600" text-anchor="middle">
+                            <text x="130" y="118">0.78</text>
+                            <text x="300" y="136">0.68</text>
+                            <text x="470" y="140">0.66</text>
+                        </g>
+
+                        <!-- gap bracket -->
+                        <line x1="385" y1="129.6" x2="385" y2="149.4" stroke="#e8eef6" stroke-opacity="0.45"/>
+                        <line x1="380" y1="129.6" x2="390" y2="129.6" stroke="#e8eef6" stroke-opacity="0.45"/>
+                        <line x1="380" y1="149.4" x2="390" y2="149.4" stroke="#e8eef6" stroke-opacity="0.45"/>
+                        <text x="385" y="112" text-anchor="middle" fill="#e8eef6" fill-opacity="0.65" font-size="12">≈ 0.1</text>
+
+                        <line x1="40" y1="270" x2="560" y2="270" stroke="#e8eef6" stroke-opacity="0.25"/>
+
+                        <g fill="#e8eef6" fill-opacity="0.85" font-size="14" text-anchor="middle">
+                            <text x="130" y="294">Claude</text>
+                            <text x="300" y="294">gemma4 31B</text>
+                            <text x="470" y="294">qwen3.8 27B</text>
+                        </g>
+                        <g fill="#e8eef6" fill-opacity="0.45" font-size="12" text-anchor="middle">
+                            <text x="130" y="314">frontier · production</text>
+                            <text x="300" y="314">local · offline path</text>
+                            <text x="470" y="314">local · offline path</text>
+                        </g>
+                    </svg>
+                </div>
+                <div>
+                    <div class="cs-section-label">Where it runs</div>
+                    <h2 class="cs-section-title">Local when it can be, frontier when it must</h2>
+                    <p class="cs-section-text">The research stack runs on one machine. People describing how they cope is sensitive text, and I wanted the offline option to be real. It is, and I measured what it costs: the two best local models tie at 0.68 and 0.66, about a tenth of a point behind the frontier model on the same examples.</p>
+                    <p class="cs-section-text">For the companion app, that tenth matters. Production calls Claude through a provider-agnostic API, and the local models stay as the offline path. Either can be swapped without touching the rest.</p>
+                    <p class="cs-section-text"> Once the frontier model is reliably accurate it becomes the teacher, producing labeled examples and reasoning traces at a scale one expert never could, to train a small local model to do the same work faster and cheaper. An early probe with 161 teacher-written examples came out a tie, so for now that's a plan, not a result.</p>
+                </div>
+            </div>
+
+            <div class="cs-section cs-section--no-chapter-tint">
+                <div class="cs-section-label">What I learned</div>
+                <h2 class="cs-section-title">Honest numbers are a feature</h2>
+                <p class="cs-section-text">This project's log has a run marked INVALID, DO NOT CITE, a retracted headline, and a candidate that failed its gate and got parked. Those entries are what make the 0.85 worth anything. A system that knows how good it is can get better on purpose. One that doesn't can only get lucky.</p>
+                <p class="cs-section-text"><em>This is a research and self-reflection tool grounded in the expert's framework. It is not a diagnostic instrument, and it makes no clinical claims.</em></p>
+            </div>
+
+        </div>
+
+        <div class="cs-next">
+            <div class="cs-next-label">Next Project</div>
+            <a href="design-system.html" class="cs-next-link">
+                Reclaimed $3M+ annually by unifying 5 products under one design system <span class="cs-next-arrow">&rarr;</span>
+            </a>
+        </div>
+
+    </div>
+
+    <footer>
+            <span>
+                <a href="mailto:hello@felixjanemalm.com">hello@felixjanemalm.com</a>
+            </span>
+            <span>
+                <a href="../Resume.pdf" target="_blank" download>
+                    Resume.pdf
+                    <svg width="18" height="22" viewBox="0 0 18 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9.85 2C9.85 1.53056 9.46944 1.15 9 1.15C8.53056 1.15 8.15 1.53056 8.15 2L9.85 2ZM8.39896 17.601C8.73091 17.933 9.2691 17.933 9.60104 17.601L15.0104 12.1917C15.3424 11.8597 15.3424 11.3215 15.0104 10.9896C14.6785 10.6576 14.1403 10.6576 13.8083 10.9896L9 15.7979L4.19167 10.9896C3.85973 10.6576 3.32154 10.6576 2.98959 10.9896C2.65765 11.3215 2.65765 11.8597 2.98959 12.1917L8.39896 17.601ZM8.15 2L8.15 17L9.85 17L9.85 2L8.15 2Z" fill="currentColor"/>
+                        <path d="M1.21094 20.9688H17.0004" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                    </svg>
+                </a>
+            </span>
+            <span>
+                <a href="https://www.linkedin.com/in/felixjanemalm/" target="_blank">
+                    <svg width="20" height="21" viewBox="0 0 20 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M0 6.53138H4.42553V20.9687H0V6.53138ZM16.9787 7.4231C17.8582 7.90435 18.5816 8.63329 19.1489 9.60994C19.7163 10.5866 20 11.5845 20 12.6036V20.9687H15.5319V12.6036C15.5319 12.3771 15.4468 12.1223 15.2766 11.8392C15.1064 11.5562 14.9504 11.3721 14.8085 11.2872C14.5816 11.1457 14.2695 11.0749 13.8723 11.0749C13.4752 11.0749 13.1631 11.1315 12.9362 11.2448L11.1064 12.1365V20.9687H6.6383V6.53138H11.1064V7.21079C11.9858 6.81447 12.9787 6.63046 14.0851 6.65877C15.1915 6.68708 16.156 6.94186 16.9787 7.4231ZM2.21277 0.96875C2.83688 0.96875 3.3617 1.18106 3.78723 1.60569C4.21277 2.03032 4.42553 2.55403 4.42553 3.17682C4.42553 3.79961 4.21277 4.33039 3.78723 4.76917C3.3617 5.20796 2.83688 5.42735 2.21277 5.42735C1.58865 5.42735 1.06383 5.20796 0.638298 4.76917C0.212766 4.33039 0 3.79961 0 3.17682C0 2.55403 0.212766 2.03032 0.638298 1.60569C1.06383 1.18106 1.58865 0.96875 2.21277 0.96875Z" fill="currentColor"/>
+                    </svg>
+                </a>
+            </span>
+            <span>
+                <a href="https://maps.app.goo.gl/ar51QZTdsHNgS3Ej8" target="_blank">
+                    <svg width="16" height="20" viewBox="0 0 16 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7.77618 20C6.37306 18.8032 5.0725 17.4911 3.88809 16.0775C2.11068 13.9546 9.81645e-07 10.793 9.81645e-07 7.7803C-0.00157443 4.63378 1.89322 1.79641 4.8002 0.592222C7.70718 -0.611966 11.0534 0.0543808 13.2773 2.28032C14.7397 3.73625 15.5589 5.71671 15.5524 7.7803C15.5524 10.793 13.4417 13.9546 11.6643 16.0775C10.4799 17.4911 9.1793 18.8032 7.77618 20ZM7.77618 4.44765C6.58554 4.44765 5.48534 5.08285 4.89002 6.11398C4.2947 7.1451 4.2947 8.4155 4.89002 9.44662C5.48534 10.4777 6.58554 11.1129 7.77618 11.1129C9.61675 11.1129 11.1088 9.62087 11.1088 7.7803C11.1088 5.93973 9.61675 4.44765 7.77618 4.44765Z" fill="currentColor"/>
+                    </svg>
+                    Los Angeles
+                </a>
+            </span>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tinycolor/1.4.2/tinycolor.min.js"></script>
+    <script src="../js/color-shade-calculator.js"></script>
+    <script src="../js/header.js"></script>
+    <script src="../js/drawer.js"></script>
+
+</body>
+</html>
