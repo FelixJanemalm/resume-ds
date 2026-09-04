@@ -19,6 +19,14 @@
 
   var params = new URLSearchParams(location.search);
 
+  // QA exclusion: open any page once with ?qa=1 and this browser is never
+  // counted again (the flag persists in localStorage). Felix's own reviews
+  // must not look like recruiter views.
+  try {
+    if (params.get("qa") === "1") localStorage.setItem("fj_qa", "1");
+    if (localStorage.getItem("fj_qa") === "1") return;
+  } catch (e) { /* no storage: count normally */ }
+
   // Stable-ish per-browser id so a forwarded link is distinguishable from the
   // same person reloading. Random, first-party, never leaves this origin's store.
   var visitor;
