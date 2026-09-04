@@ -263,41 +263,39 @@
             <div class="teaser-visual">
                 <svg viewBox="0 0 800 450" preserveAspectRatio="xMidYMid slice" aria-hidden="true" style="display:block;width:100%;height:100%;font-family:inherit;">
                     <defs>
-                        <linearGradient id="tsf-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#121821"/><stop offset="1" stop-color="#0a0d12"/></linearGradient>
-                        <linearGradient id="tsf-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--sysPrimaryDefault, #7dd3fc)" stop-opacity="0.28"/><stop offset="1" stop-color="var(--sysPrimaryDefault, #7dd3fc)" stop-opacity="0"/></linearGradient>
+                        <linearGradient id="tsr-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#121821"/><stop offset="1" stop-color="#0a0d12"/></linearGradient>
+                        <linearGradient id="tsr-accent" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--sysPrimaryDefault, #7dd3fc)" stop-opacity="0.95"/><stop offset="1" stop-color="var(--sysPrimaryDefault, #7dd3fc)" stop-opacity="0.35"/></linearGradient>
+                        <linearGradient id="tsr-neutral" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8eef6" stop-opacity="0.26"/><stop offset="1" stop-color="#e8eef6" stop-opacity="0.08"/></linearGradient>
                     </defs>
-                    <rect width="800" height="450" fill="url(#tsf-bg)"/>
-                    <text x="48" y="54" fill="#e8eef6" fill-opacity="0.5" font-size="11" letter-spacing="2">F1 VS EXPERT LABELS · JUL–AUG 2026</text>
-                    <text x="48" y="92" fill="#e8eef6" font-size="24" font-weight="600">0.34 to 0.85, with one retraction on the way</text>
-                    <!-- y = 370 - 240 * score -->
-                    <g stroke="#e8eef6" stroke-opacity="0.1">
-                        <line x1="60" y1="130" x2="752" y2="130"/><line x1="60" y1="178" x2="752" y2="178"/><line x1="60" y1="226" x2="752" y2="226"/><line x1="60" y1="274" x2="752" y2="274"/><line x1="60" y1="322" x2="752" y2="322"/>
-                    </g>
-                    <line x1="60" y1="370" x2="752" y2="370" stroke="#e8eef6" stroke-opacity="0.25"/>
-                    <polygon points="100,288.4 356,247.6 484,199.6 612,182.8 740,166 740,370 100,370" fill="url(#tsf-area)"/>
-                    <polyline points="100,288.4 356,247.6 484,199.6 612,182.8 740,166" fill="none" stroke="var(--sysPrimaryDefault, #7dd3fc)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
-                    <g fill="var(--sysPrimaryDefault, #7dd3fc)" stroke="#0a0d12" stroke-width="3">
-                        <circle cx="100" cy="288.4" r="7"/><circle cx="356" cy="247.6" r="7"/><circle cx="484" cy="199.6" r="7"/><circle cx="612" cy="182.8" r="7"/><circle cx="740" cy="166" r="8"/>
-                    </g>
+                    <rect width="800" height="450" fill="url(#tsr-bg)"/>
+                    <text x="48" y="54" fill="#e8eef6" fill-opacity="0.5" font-size="11" letter-spacing="2">EVAL HARNESS · 6 LOCAL MODELS</text>
+                    <text x="48" y="92" fill="#e8eef6" font-size="24" font-weight="600">8B to 120B. Nearly the same score.</text>
+                    <line x1="48" y1="170" x2="752" y2="170" stroke="var(--sysPrimaryDefault, #7dd3fc)" stroke-opacity="0.65" stroke-dasharray="7 6" stroke-width="1.5"/>
+                    <text x="752" y="164" text-anchor="end" fill="var(--sysPrimaryDefault, #7dd3fc)" font-size="11" font-weight="600">production bar · 8.5</text>
+                    <!-- baseline 380, top(10)=140 -> h = score*24 -->
+                    <rect x="72"  y="221.6" width="80" height="158.4" rx="5" fill="url(#tsr-accent)"/>
+                    <rect x="192" y="221.6" width="80" height="158.4" rx="5" fill="url(#tsr-neutral)"/>
+                    <rect x="312" y="231.2" width="80" height="148.8" rx="5" fill="url(#tsr-neutral)"/>
+                    <rect x="432" y="221.6" width="80" height="158.4" rx="5" fill="url(#tsr-neutral)"/>
+                    <rect x="552" y="226.4" width="80" height="153.6" rx="5" fill="url(#tsr-neutral)"/>
+                    <rect x="672" y="216.8" width="80" height="163.2" rx="5" fill="url(#tsr-accent)"/>
                     <g fill="#e8eef6" font-size="17" font-weight="600" text-anchor="middle">
-                        <text x="100" y="268">0.34</text><text x="356" y="228">0.51</text><text x="484" y="180">0.71</text><text x="612" y="163">0.78</text><text x="740" y="146">0.85</text>
+                        <text x="112" y="245">6.6</text><text x="232" y="245">6.6</text><text x="352" y="254">6.2</text><text x="472" y="245">6.6</text><text x="592" y="250">6.4</text><text x="712" y="240">6.8</text>
                     </g>
-                    <circle cx="228" cy="317.2" r="7" fill="none" stroke="#e8eef6" stroke-opacity="0.7" stroke-width="2"/>
-                    <line x1="220" y1="325.2" x2="236" y2="309.2" stroke="#e8eef6" stroke-opacity="0.7" stroke-width="2"/>
-                    <text x="228" y="345" text-anchor="middle" fill="#e8eef6" fill-opacity="0.55" font-size="11" font-style="italic">retracted (p = .75)</text>
-                    <g fill="#e8eef6" fill-opacity="0.55" font-size="12" text-anchor="middle">
-                        <text x="100" y="396">Jul 2</text><text x="228" y="396">Jul 3</text><text x="356" y="396">Jul</text><text x="484" y="396">Jul 10</text><text x="612" y="396">Aug 11</text><text x="740" y="396">Aug 21</text>
+                    <line x1="48" y1="380" x2="752" y2="380" stroke="#e8eef6" stroke-opacity="0.25"/>
+                    <g fill="#e8eef6" fill-opacity="0.55" font-size="13" text-anchor="middle">
+                        <text x="112" y="406">8B</text><text x="232" y="406">14B</text><text x="352" y="406">20B</text><text x="472" y="406">30B</text><text x="592" y="406">30B</text><text x="712" y="406">120B</text>
                     </g>
                 </svg>
             </div>
             <div class="teaser-body">
-                <span class="teaser-label">AI Product Design · Applied AI / Solo build · ongoing</span>
-                <h3 class="teaser-title">Teaching an AI a psychologist's framework, one honest number at a time</h3>
-                <p class="teaser-summary">An expert's 12-style framework, a 107,000-word manuscript, and five labeled examples to start. I designed the annotation tool that grew the ground truth to 79 examples, then the evaluation protocol that promotes a change only when the math clears P ≥ 0.95.</p>
+                <span class="teaser-label">AI Platform / Solo build · in progress</span>
+                <h3 class="teaser-title">A classifier that knows exactly how good it is</h3>
+                <p class="teaser-summary">Self-hosted platform for psychological text classification, grounded in an expert's 107,000-word manuscript. Semantic retrieval, LoRA fine-tuning, and an evaluation harness that scores every prompt and model change against practitioner-diagnosed cases.</p>
                 <div class="teaser-metrics">
-                    <div class="metric"><strong>5 → 79</strong> expert-labeled examples, made with a tool I designed for her</div>
-                    <div class="metric"><strong>0.34 → 0.85</strong> F1 against expert labels, first prompt to current model</div>
-                    <div class="metric"><strong>17 of 79</strong> expert labels revised after reviewing the model's disagreements</div>
+                    <div class="metric"><strong>6</strong> local models benchmarked head-to-head on expert-labeled cases</div>
+                    <div class="metric"><strong>15×</strong> bigger model, 0.2 points better</div>
+                    <div class="metric"><strong>100%</strong> local. Sensitive text never leaves the machine</div>
                 </div>
                 <span class="teaser-cta">View case study &rarr;</span>
             </div>
