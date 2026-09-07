@@ -68,10 +68,7 @@
 /* The h1 paints its gradient through its own glyphs; a transformed child inherits the
    transparent fill but not that paint, so the span paints its own gradient. */
 .fjc-for {
-  display: inline-block; position: relative; z-index: 3;
-  font-family: 'Permanent Marker', cursive; font-weight: 400;
-  font-size: 0.55em; letter-spacing: 0; line-height: 1.1; transform: rotate(-2deg);
-  margin-left: 0.1em; vertical-align: 0.15em; white-space: nowrap;
+  display: inline; position: relative; z-index: 3; white-space: nowrap;
   background: linear-gradient(var(--button-color, #4faad1), var(--text, currentColor));
   -webkit-background-clip: text; background-clip: text;
   -webkit-text-fill-color: transparent; color: var(--text, currentColor);
