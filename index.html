@@ -24,10 +24,17 @@
     <link rel="stylesheet" href="css/cards.css">
     <link rel="stylesheet" href="css/reader.css">
     <link rel="stylesheet" href="css/image-text.css">
+    <link rel="stylesheet" href="css/work-spine.css">
     <link rel="stylesheet" href="css/footer.css">
     <link rel="stylesheet" href="css/figma-iframe.css">
-    <link rel="stylesheet" href="/chat/chat.css?v=8">
+    <link rel="stylesheet" href="/chat/chat.css?v=9">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap">
+    <script type="importmap">
+    { "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    } }
+    </script>
     <script src="https://unpkg.com/@dotlottie/player-component@2.7.12/dist/dotlottie-player.mjs" type="module"></script>
 </head>
 <body>
@@ -136,6 +143,13 @@
 
     <h2 class="h2-gradient work-heading" id="work">Work</h2>
 
+    <section class="work-spine" data-work-spine aria-label="Case studies">
+    <div class="work-spine__stage">
+        <canvas class="work-spine__gl" aria-hidden="true"></canvas>
+        <div class="work-spine__css"></div>
+        <div class="work-spine__rail" aria-hidden="true"></div>
+        <div class="work-spine__count" aria-hidden="true"></div>
+    </div>
     <div class="case-study-teasers">
 
         <a href="work/ai-sourcing.html" class="case-study-teaser">
@@ -238,6 +252,7 @@
         </a>
 
     </div>
+    </section>
 
     <section class="reader" id="read">
         <div class="content">
@@ -398,7 +413,8 @@
     <script src="js/reader.js"></script>
     <script src="js/grid.js"></script>
     <script src="/track/beacon.js?v=2" data-endpoint="https://jobmachine.felixacat.workers.dev/v"></script>
-    <script src="/chat/chat.js?v=8" data-endpoint="https://jobmachine-chat.felixacat.workers.dev" defer></script>
+    <script src="/chat/chat.js?v=9" data-endpoint="https://jobmachine-chat.felixacat.workers.dev" defer></script>
+    <script type="module" src="js/work-spine.js"></script>
 
 </body>
 </html>

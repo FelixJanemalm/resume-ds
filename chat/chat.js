@@ -18,9 +18,10 @@
  * while docked, so nothing on the page jumps.
  *
  * The assistant speaks first only when it has something the page doesn't:
- * on /for/<variant>?a=<id> links it names the posting the visitor came from.
- * On plain pages the input's placeholder asks what they are hiring for and
- * the chips answer it in one click, so no API call is made until they type.
+ * on a signed ?a= link it shows the posting's first line, which is written
+ * by the pipeline (push_context.py), not generated: no model call happens
+ * until the visitor types. On plain pages the input's placeholder asks what
+ * they are hiring for.
  * The signed reference in ?a= is remembered by the browser (localStorage
  * fj_app, shared with the beacon), so a recruiter who comes back by typing
  * the domain still gets their opener, their h1 stamp, and their case-study
@@ -183,6 +184,12 @@
         if (!j) { if (refParam !== ctx.application_id) local.remove("fj_app"); return; }   // stale stored reference
         if (j.company) markFor(j.company);
         leadWith(j.lead);
+        if (j.opener && !history.length) {
+          history.push({ role: "assistant", text: j.opener });
+          save();
+          addMsg("assistant", j.opener);
+          updateFold();
+        }
       })
       .catch(function () { /* no stamp, no harm */ });
   }
@@ -472,13 +479,12 @@
   }
 
   // ---- conversation ----------------------------------------------------------
-  var busy = false, openerRequested = history.length > 0;
+  var busy = false;
 
   function send(text) {
     text = (text || "").trim();
     if (!text || busy) return;
     busy = true; sendBtn.disabled = true;
-    openerRequested = true;
     if (!history.length) history.push({ role: "assistant", text: FALLBACK_OPENER, hidden: true });
     addMsg("user", text);
     history.push({ role: "user", text: text });
@@ -508,30 +514,6 @@
         renderText(bot, friendly(e));
       })
       .then(function () { busy = false; sendBtn.disabled = false; input.focus(); });
-  }
-
-  function requestOpener() {
-    if (openerRequested || history.length) return;
-    openerRequested = true;
-    var bot = addMsg("assistant", "");
-    showDots(bot);
-    var acc = "";
-    request({ session: sessionId, context: ctx, history: [], opener: true }, function (t) {
-      acc += t;
-      renderText(bot, acc);
-    }, function () { /* the opener takes no page actions */ })
-      .then(function (done) {
-        var stored = (done && done.history_text) || acc;
-        if (!stored) throw new Error("empty opener");
-        if (!history.length) { history.push({ role: "assistant", text: stored }); save(); }
-        updateFold();
-      })
-      .catch(function () {
-        // Nothing worth showing: drop the bubble, the placeholder already asks the question.
-        if (bot.parentNode) bot.parentNode.removeChild(bot);
-        openerRequested = false;
-        updateFold();
-      });
   }
 
   // ---- states ----------------------------------------------------------------
@@ -578,16 +560,4 @@
 
   renderAll();
 
-  // The assistant speaks first only when it knows the posting the visitor came
-  // from (?a=). That line is information the page doesn't have. Everywhere else
-  // the placeholder asks the question and no API call is made until they type.
-  function whenVisible(fn) {
-    if (document.visibilityState === "visible") { fn(); return; }
-    document.addEventListener("visibilitychange", function once() {
-      if (document.visibilityState === "visible") { document.removeEventListener("visibilitychange", once); fn(); }
-    });
-  }
-  if (!history.length && ctx.application_id && !navigator.webdriver && !BOT_UA.test(navigator.userAgent || "")) {
-    setTimeout(function () { whenVisible(requestOpener); }, 600);
-  }
 })();
