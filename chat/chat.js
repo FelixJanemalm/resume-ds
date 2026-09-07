@@ -156,14 +156,14 @@
   var ARROW = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
   var CHEVRON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>';
 
-  // On an application link, stamp a handwritten "for <Company>?" after the h1
-  // ("Build better products faster for Anthropic?"). The opener then only
-  // needs to name the role.
+  // On an application link, stamp "at <Company>?" after the h1, in the
+  // heading's own font ("Ship better products faster at Anthropic?"). The
+  // first bubble then never needs to name the company.
   function markFor(company) {
     var h1 = document.querySelector(".hero h1");
     if (!h1 || !company || h1.querySelector(".fjc-for")) return;
     h1.appendChild(document.createTextNode(" "));
-    h1.appendChild(el("span", { "class": "fjc-for", text: "for " + company + "?" }));
+    h1.appendChild(el("span", { "class": "fjc-for", text: "at " + company + "?" }));
   }
   // Lead with the case studies that matter for the visitor's track (what the
   // retired /for/* pages did statically).
