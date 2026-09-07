@@ -67,11 +67,16 @@
 /* Handwritten "for <Company>?" after the h1, on application links and company pages. */
 /* The h1 paints its gradient through its own glyphs; a transformed child inherits the
    transparent fill but not that paint, so the span paints its own gradient. */
+/* An annotation on the heading, not part of it: marker font, ink-colored, a
+   slight tilt. It paints its own color because the h1 fills its text with a
+   gradient that transformed children do not inherit. */
 .fjc-for {
-  display: inline; position: relative; z-index: 3; white-space: nowrap;
-  background: linear-gradient(var(--button-color, #4faad1), var(--text, currentColor));
-  -webkit-background-clip: text; background-clip: text;
-  -webkit-text-fill-color: transparent; color: var(--text, currentColor);
+  display: inline-block; position: relative; z-index: 3; white-space: nowrap;
+  font-family: 'Permanent Marker', cursive; font-weight: 400; letter-spacing: 0;
+  font-size: 0.6em; line-height: 1.1; transform: rotate(-2deg);
+  margin-left: 0.15em; vertical-align: 0.12em;
+  background: none; -webkit-background-clip: border-box; background-clip: border-box;
+  color: var(--button-color, #4faad1); -webkit-text-fill-color: var(--button-color, #4faad1);
 }
 .fjc-body { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .fjc-body p { margin: 0 0 0.5em !important; }
