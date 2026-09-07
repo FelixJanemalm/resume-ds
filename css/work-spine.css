@@ -1,0 +1,165 @@
+/* ─── Work spine: case-study cards orbit a spine as you scroll ───
+   Layout math mirrors Active Theory's "Work" page (see js/work-spine.js).
+   Without JS, reduced motion, or if three.js fails to load, none of the
+   .is-3d rules apply and the cards render as the normal vertical list. */
+
+.work-spine { position: relative; }
+
+.work-spine__stage { display: none; }
+
+.work-spine.is-3d {
+    height: calc(var(--ws-count, 4) * 90vh + 100vh);
+    height: calc(var(--ws-count, 4) * 90svh + 100svh);
+}
+.work-spine.is-3d .case-study-teasers { display: none; }
+.work-spine.is-3d .work-spine__stage {
+    display: block;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    height: 100svh;
+    overflow: hidden;
+}
+
+.work-spine__gl,
+.work-spine__css {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+.work-spine__gl { z-index: 0; display: block; }
+.work-spine__css { z-index: 1; }
+.work-spine__css,
+.work-spine__css > div { pointer-events: none; }
+
+/* Each card lives in a CSS3D-positioned wrapper. --ws-s is "pixels per world
+   unit", set by JS so the card's natural size matches its on-screen size. */
+.ws-card {
+    --s: var(--ws-s, 240px);
+    pointer-events: auto;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    font-size: max(12px, calc(var(--s) * 0.058));
+    will-change: transform;
+}
+
+.ws-card .case-study-teaser {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    height: 100%;
+    box-sizing: border-box;
+    text-align: left;
+    background: var(--bgMedium, rgba(255,255,255,0.03));
+    border-radius: calc(var(--s) * 0.066);
+    box-shadow: 0 calc(var(--s) * 0.12) calc(var(--s) * 0.3) rgba(0, 0, 0, 0.35);
+    transition: box-shadow 0.35s ease, border-color 0.35s ease;
+}
+.ws-card .case-study-teaser:hover { transform: none; }
+.ws-card.is-front .case-study-teaser { border-color: var(--button-color, var(--sysPrimaryDefault)); }
+
+.ws-card .teaser-visual {
+    aspect-ratio: auto;
+    height: 100%;
+    min-height: 0;
+}
+.ws-card .teaser-visual svg { height: 100%; }
+
+.ws-card .teaser-body {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+    padding: calc(var(--s) * 0.12) calc(var(--s) * 0.13);
+}
+.ws-card .teaser-label {
+    font-size: max(10px, calc(var(--s) * 0.046));
+    margin-bottom: calc(var(--s) * 0.03);
+}
+.ws-card .teaser-title {
+    font-size: max(17px, calc(var(--s) * 0.095));
+    margin: 0 0 calc(var(--s) * 0.035);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.ws-card .teaser-summary {
+    font-size: max(12px, calc(var(--s) * 0.06));
+    margin: 0 0 calc(var(--s) * 0.06);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.ws-card .teaser-metrics {
+    gap: calc(var(--s) * 0.07);
+    margin-bottom: calc(var(--s) * 0.06);
+    flex-wrap: nowrap;
+}
+.ws-card .teaser-metrics .metric {
+    font-size: max(10px, calc(var(--s) * 0.05));
+    flex: 1 1 0;
+    min-width: 0;
+    display: block;
+}
+.ws-card .teaser-metrics .metric strong {
+    display: block;
+    font-size: 1.7em;
+}
+.ws-card .teaser-cta { font-size: max(11px, calc(var(--s) * 0.056)); }
+
+/* Orientation marks inside the stage, sized from the page's own tokens */
+.work-spine__rail {
+    position: absolute;
+    right: var(--marginSides, 7.5vw);
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    pointer-events: none;
+}
+.work-spine__rail i {
+    display: block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--border, rgba(255,255,255,0.3));
+    transition: background 0.3s ease, transform 0.3s ease;
+}
+.work-spine__rail i.is-on {
+    background: var(--button-color, var(--sysPrimaryDefault));
+    transform: scale(1.5);
+}
+.work-spine__count {
+    position: absolute;
+    left: var(--marginSides, 7.5vw);
+    bottom: 28px;
+    z-index: 2;
+    font-size: 0.75em;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--textSubtle);
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+}
+
+/* Portrait phones: stack the visual over the body, like their mobile pane */
+@media (orientation: portrait) {
+    .ws-card .case-study-teaser {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+    }
+    .ws-card .teaser-visual { aspect-ratio: 16 / 9; height: auto; }
+    .ws-card .teaser-body { padding: calc(var(--s) * 0.1) calc(var(--s) * 0.11); }
+    .ws-card .teaser-title { font-size: max(16px, calc(var(--s) * 0.13)); -webkit-line-clamp: 2; }
+    .ws-card .teaser-summary { font-size: max(12px, calc(var(--s) * 0.08)); -webkit-line-clamp: 2; }
+    .ws-card .teaser-metrics { flex-direction: row; gap: calc(var(--s) * 0.06); }
+    .ws-card .teaser-metrics .metric { font-size: max(10px, calc(var(--s) * 0.065)); }
+    .ws-card .teaser-metrics .metric strong { display: block; font-size: 1.5em; }
+    .work-spine__rail { right: 14px; }
+    .work-spine__count { left: 16px; bottom: 16px; }
+}
