@@ -1,4 +1,4 @@
-/* "Ask about Felix": the assistant widget on felixjanemalm.com.
+/* "Ask about Felix": the assistant on felixjanemalm.com.
  *
  * Source of truth: job-machine/chat/web/chat.js (build_portfolio.py copies it
  * to resume-ds/chat/). Include once, before </body>:
@@ -6,20 +6,31 @@
  *   <link rel="stylesheet" href="/chat/chat.css">
  *   <script src="/chat/chat.js" data-endpoint="https://jobmachine-chat.felixacat.workers.dev" defer></script>
  *
- * Until PUBLIC is flipped to true the widget only renders for browsers that
- * have opened any page with ?chat=1 (sticky; ?chat=0 clears it).
+ * One conversation, one DOM node, two states:
+ *   hero    - sits in the hero where "View Work" was (the button moves beside
+ *             the input). Shows the latest exchange only; earlier turns fold.
+ *   docked  - once the hero slot scrolls out of view the same node becomes a
+ *             slim bar at the bottom: last reply on one line plus the input.
+ *             Focus expands it into a sheet with the whole thread, never more
+ *             than about half the viewport, so the page stays visible while
+ *             the assistant scrolls it or recolors it.
+ * Pages without a hero start docked. The hero slot keeps its reserved height
+ * while docked, so nothing on the page jumps.
  *
- * The assistant speaks first: a short opener generated from the page and, on
- * /for/<variant>?a=<id> links, the posting the visitor came from. It can also
- * act on the page (scroll to a section, hand over a case-study link, recolor
- * the site through the same token pipeline the color picker uses).
+ * The assistant speaks first. On plain pages it asks what the visitor is
+ * hiring for; on /for/<variant>?a=<id> links it names the posting. A new ?a=
+ * link starts a fresh conversation; otherwise a thread with real messages in
+ * it follows the visitor across pages.
+ *
+ * Until PUBLIC is true the widget only renders for browsers that have opened
+ * any page with ?chat=1 (sticky; ?chat=0 clears it).
  */
 (function () {
   "use strict";
 
   var PUBLIC = false;
-  var OPENER_DELAY_MS = 2500;
-  var FALLBACK_OPENER = "I'm the assistant on this site. Ask me anything about Felix's work, including what he's bad at.";
+  var FALLBACK_OPENER = "What are you hiring for? Tell me the role and I'll say honestly whether Felix fits.";
+  var BOT_UA = /bot|crawl|spider|slurp|headless|lighthouse|prerender|facebookexternalhit|embedly|preview|whatsapp|telegram|discord/i;
 
   var script = document.currentScript;
   var endpoint = script && script.getAttribute("data-endpoint");
@@ -41,19 +52,7 @@
   if (params.get("chat") === "0") local.remove("fjc_on");
   if (!PUBLIC && local.get("fjc_on") !== "1") return;
 
-  // ---- state ---------------------------------------------------------------
-  var sessionId = session.get("fjc_s");
-  if (!sessionId) {
-    sessionId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
-      : String(Date.now()) + Math.random().toString(36).slice(2);
-    session.set("fjc_s", sessionId);
-  }
-  var history = [];
-  try { history = JSON.parse(session.get("fjc_h") || "[]") || []; } catch (e) { history = []; }
-  function saveHistory() { session.set("fjc_h", JSON.stringify(history.slice(-30))); }
-
-  var busy = false, panelOpen = false, openerRequested = history.length > 0;
-
+  // ---- context and session -------------------------------------------------
   function pageContext() {
     var sub = document.querySelector(".hero-subhead");
     var path = location.pathname.replace(/\/index\.html$/, "").replace(/\/+$/, "") || "/";
@@ -66,16 +65,39 @@
   }
   var ctx = pageContext();
 
-  var CHIPS_BY_PATH = {
-    "/for/ai": ["How did the 20-agent pipeline work?", "How is the classifier evaluated?", "What is he bad at?"],
-    "/for/design-systems": ["How do you prove a design system's ROI?", "Show me the tokens pipeline", "What is he bad at?"],
-    "/for/design-engineering": ["One Figma change, six platforms. How?", "Can he actually code?", "What is he bad at?"],
-    "/for/design-leadership": ["How does he get systems adopted?", "Who has he managed?", "What is he bad at?"],
-    "/for/product-design": ["What is his product design process?", "Show me a product case study", "What is he bad at?"]
+  function uuid() {
+    return (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+      : String(Date.now()) + Math.random().toString(36).slice(2);
+  }
+  function hasUserTurn(h) { return (h || []).some(function (m) { return m.role === "user"; }); }
+
+  // A conversation belongs to the page it started on. A new ?a= link is a new
+  // front door, so it starts fresh. A different page with no real messages yet
+  // just gets a fresh opener. A thread with real messages follows the visitor.
+  var stored = null;
+  try { stored = JSON.parse(session.get("fjc_state") || "null"); } catch (e) { stored = null; }
+  var history = [], sessionId = null;
+  if (stored && stored.application_id === ctx.application_id &&
+      (stored.path === ctx.path || hasUserTurn(stored.history))) {
+    history = stored.history || [];
+    sessionId = stored.session || null;
+  }
+  if (!sessionId) sessionId = uuid();
+  function save() {
+    session.set("fjc_state", JSON.stringify({
+      session: sessionId, application_id: ctx.application_id, path: ctx.path, history: history.slice(-30)
+    }));
+  }
+
+  var ROLE_CHIPS = ["Design systems", "Design engineering", "Applied AI / forward deployed", "Product design", "Design leadership"];
+  var QUESTION_CHIPS = {
+    "/for/ai": ["Is he a fit?", "How did the 20-agent pipeline work?", "What is he bad at?"],
+    "/for/design-systems": ["Is he a fit?", "How do you prove a design system's ROI?", "What is he bad at?"],
+    "/for/design-engineering": ["Is he a fit?", "One Figma change, six platforms. How?", "What is he bad at?"],
+    "/for/design-leadership": ["Is he a fit?", "How does he get systems adopted?", "What is he bad at?"],
+    "/for/product-design": ["Is he a fit?", "What is his product design process?", "What is he bad at?"]
   };
-  var DEFAULT_CHIPS = ["Why should we hire Felix?", "What is he bad at?", "Show me the design tokens work"];
-  var FIT_CHIP = "Is he a fit for our role?";
-  var FIT_HINT = "Paste the job description here. You'll get an honest read: what matches, what's partial, and what's a real gap.";
+  var DEFAULT_QUESTION_CHIPS = ["Is he a fit?", "What is he bad at?", "Show me the design tokens work"];
 
   var CASE = {
     "work/ai-sourcing": ["AI-powered supply chain traceability", "/work/ai-sourcing.html"],
@@ -95,33 +117,39 @@
     (children || []).forEach(function (c) { if (c) n.appendChild(c); });
     return n;
   }
+  var ARROW = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+  var CHEVRON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>';
 
-  var ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-    '<path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v8a2.5 2.5 0 0 1-2.5 2.5H10l-4.2 3.2c-.5.4-1.3 0-1.3-.6V17A2.5 2.5 0 0 1 4 14.5z"/>' +
-    '<path d="M8.5 9.5h7M8.5 12.5h4.5"/></svg>';
+  var viewWork = document.querySelector(".hero-content .primary-btn");
+  var hasHero = !!viewWork;
 
-  var root = el("div", { "class": "fjc" });
-  var launch = el("button", { "class": "fjc-launch", "type": "button", "aria-label": "Ask about Felix", "aria-expanded": "false", html: ICON });
-  var peekText = el("div", { "class": "fjc-peek-text" });
-  var peekX = el("button", { "class": "fjc-peek-x", "type": "button", "aria-label": "Dismiss", text: "×" });
-  var peek = el("div", { "class": "fjc-peek", hidden: "" }, [peekText, peekX]);
-
-  var log = el("div", { "class": "fjc-log", role: "log", "aria-live": "polite" });
+  var root = el("div", { "class": "fjc", "data-state": hasHero ? "hero" : "docked", "data-open": "0" });
+  var barText = el("button", { "class": "fjc-bar-text", type: "button", text: "Ask anything about Felix" });
+  var toggle = el("button", { "class": "fjc-toggle", type: "button", "aria-label": "Show the conversation", html: CHEVRON });
+  var bar = el("div", { "class": "fjc-bar" }, [el("span", { "class": "fjc-badge", text: "AI" }), barText, toggle]);
+  var earlier = el("button", { "class": "fjc-earlier", type: "button", hidden: "" });
+  var thread = el("div", { "class": "fjc-thread", role: "log", "aria-live": "polite" });
   var chips = el("div", { "class": "fjc-chips" });
-  var input = el("textarea", { rows: "1", placeholder: "Ask anything about Felix, or paste a job description", "aria-label": "Message" });
-  var sendBtn = el("button", { "type": "submit", "aria-label": "Send", text: "→" });
+  var input = el("textarea", { rows: "1", placeholder: "Ask anything, or paste a job description", "aria-label": "Ask about Felix" });
+  var sendBtn = el("button", { type: "submit", "aria-label": "Send", html: ARROW });
   var form = el("form", { "class": "fjc-form" }, [input, sendBtn]);
-  var closeBtn = el("button", { "class": "fjc-close", "type": "button", "aria-label": "Close", text: "×" });
-  var head = el("header", { "class": "fjc-head" }, [
-    el("div", null, [el("strong", { text: "Ask about Felix" }), el("span", { "class": "fjc-sub", text: "AI assistant. Knows his work, says when it doesn't." })]),
-    closeBtn
-  ]);
-  var panel = el("section", { "class": "fjc-panel", role: "dialog", "aria-label": "Ask about Felix", hidden: "" }, [head, log, chips, form]);
+  var slot = null;
 
-  root.appendChild(peek);
-  root.appendChild(panel);
-  root.appendChild(launch);
-  document.body.appendChild(root);
+  root.appendChild(bar);
+  root.appendChild(earlier);
+  root.appendChild(thread);
+  root.appendChild(chips);
+  root.appendChild(form);
+
+  if (hasHero) {
+    slot = el("div", { "class": "fjc-slot" });
+    viewWork.parentNode.insertBefore(slot, viewWork);
+    slot.appendChild(root);
+    viewWork.classList.add("fjc-secondary");   // the button moves beside the input
+    form.appendChild(viewWork);
+  } else {
+    document.body.appendChild(root);
+  }
 
   // ---- rendering -------------------------------------------------------------
   function esc(s) {
@@ -133,57 +161,75 @@
     h = h.replace(/(https?:\/\/[^\s<)]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
     h = h.replace(/(^|[\s(])([\w.+-]+@[\w-]+\.[\w.-]+\w)/g, '$1<a href="mailto:$2">$2</a>');
     h = h.replace(/\n{2,}/g, "</p><p>").replace(/\n/g, "<br>");
-    node.innerHTML = "<p>" + h + "</p>";
+    var body = node.querySelector(".fjc-body") || node;
+    body.innerHTML = "<p>" + h + "</p>";
   }
+  function stripNotes(text) { return String(text).replace(/(\n\[[^\]]*\])+$/, ""); }
+
   function addMsg(role, text) {
-    var n = el("div", { "class": "fjc-msg " + (role === "user" ? "fjc-user" : "fjc-bot") });
+    var n = el("div", { "class": "fjc-msg " + (role === "user" ? "fjc-user" : "fjc-bot") }, [
+      el("span", { "class": "fjc-who", text: role === "user" ? "You" : "AI" }),
+      el("div", { "class": "fjc-body" })
+    ]);
     if (text) renderText(n, text);
-    log.appendChild(n);
-    scrollLog();
+    thread.appendChild(n);
+    updateFold();
+    scrollThread();
     return n;
   }
   function addNote(text) {
     var n = el("div", { "class": "fjc-note", text: text });
-    log.appendChild(n);
-    scrollLog();
-    return n;
+    thread.appendChild(n);
+    scrollThread();
   }
   function showDots(node) {
-    node.innerHTML = '<span class="fjc-dots"><i></i><i></i><i></i></span>';
+    (node.querySelector(".fjc-body") || node).innerHTML = '<span class="fjc-dots"><i></i><i></i><i></i></span>';
   }
-  function linkCard(after, label, href) {
+  function linkCard(msg, label, href) {
     var a = el("a", { "class": "fjc-card", href: href, text: label + " ↗" });
     if (!/^mailto:/.test(href)) { a.setAttribute("target", "_blank"); a.setAttribute("rel", "noopener"); }
-    after.appendChild(a);
-    scrollLog();
+    (msg.querySelector(".fjc-body") || msg).appendChild(a);
+    scrollThread();
   }
-  function scrollLog() { log.scrollTop = log.scrollHeight; }
+  function scrollThread() { thread.scrollTop = thread.scrollHeight; }
+
+  // Hero state shows the latest exchange only; the rest folds behind "N earlier".
+  var unfolded = false;
+  function updateFold() {
+    var msgs = thread.querySelectorAll(".fjc-msg");
+    var hidden = Math.max(0, msgs.length - 2);
+    for (var i = 0; i < msgs.length; i++) {
+      msgs[i].classList.toggle("fjc-folded", !unfolded && i < hidden);
+    }
+    earlier.hidden = unfolded || hidden === 0;
+    earlier.textContent = hidden + (hidden === 1 ? " earlier message" : " earlier messages");
+    var last = lastBotText();
+    barText.textContent = last ? last.replace(/\s+/g, " ").slice(0, 140) : "Ask anything about Felix";
+  }
+  function lastBotText() {
+    for (var i = history.length - 1; i >= 0; i--) if (history[i].role === "assistant") return stripNotes(history[i].text);
+    return "";
+  }
+  earlier.addEventListener("click", function () { unfolded = true; updateFold(); });
 
   function renderChips() {
     chips.innerHTML = "";
-    if (history.length > 1) return;
-    var list = (CHIPS_BY_PATH[ctx.path] || DEFAULT_CHIPS).concat([FIT_CHIP]);
-    list.forEach(function (q) {
-      var b = el("button", { "class": "fjc-chip", "type": "button", text: q });
+    if (hasUserTurn(history)) return;
+    var list = ctx.application_id ? (QUESTION_CHIPS[ctx.path] || DEFAULT_QUESTION_CHIPS) : ROLE_CHIPS;
+    list.forEach(function (label) {
+      var b = el("button", { "class": "fjc-chip", type: "button", text: label });
       b.addEventListener("click", function () {
-        if (q === FIT_CHIP) {
-          chips.innerHTML = "";
-          addMsg("assistant", FIT_HINT);
-          history.push({ role: "assistant", text: FIT_HINT });
-          saveHistory();
-          input.focus();
-          return;
-        }
-        send(q);
+        send(ctx.application_id ? label : "We're hiring for " + label.toLowerCase() + ".");
       });
       chips.appendChild(b);
     });
   }
 
-  function renderHistory() {
-    log.innerHTML = "";
-    history.forEach(function (m) { addMsg(m.role, m.text.replace(/(\n\[[^\]]*\])+$/, "")); });
+  function renderAll() {
+    thread.innerHTML = "";
+    history.forEach(function (m) { addMsg(m.role, stripNotes(m.text)); });
     renderChips();
+    updateFold();
   }
 
   // ---- transport -------------------------------------------------------------
@@ -227,10 +273,9 @@
       return pump();
     });
   }
-
   function friendly(e) {
     var code = e && e.code;
-    if (code === "quiet" || code === "rate_limited" || code === "too_long" || code === "not_configured" || code === "session_cap" || code === "stream") return e.message;
+    if (["quiet", "rate_limited", "too_long", "not_configured", "session_cap", "stream"].indexOf(code) >= 0) return e.message;
     return "Something broke on my end. Email hello@felixjanemalm.com; Felix answers those himself.";
   }
 
@@ -243,36 +288,32 @@
     if (t.indexOf("work/") === 0) return "Here it is.";
     return "Here you go.";
   }
-
-  function runAction(a, botEl) {
+  function runAction(a, msg) {
     if (!a || !a.name) return;
     try {
-      if (a.name === "navigate") navigate(a.input && a.input.target, botEl);
-      else if (a.name === "set_accent_color") setAccent(a.input || {}, botEl);
+      if (a.name === "navigate") navigate(a.input && a.input.target, msg);
+      else if (a.name === "set_accent_color") setAccent(a.input || {});
     } catch (e) { /* an action failing must not break the answer */ }
   }
-
   function flash(node) {
     node.classList.add("fjc-flash");
     setTimeout(function () { node.classList.add("fjc-flash-out"); }, 1200);
     setTimeout(function () { node.classList.remove("fjc-flash", "fjc-flash-out"); }, 2800);
   }
-
-  function navigate(target, botEl) {
+  function navigate(target, msg) {
     if (!target) return;
     if (target === "home") { window.scrollTo({ top: 0, behavior: "smooth" }); return; }
-    if (target === "resume") { linkCard(botEl, "Resume.pdf", "/Resume.pdf"); return; }
+    if (target === "resume") { linkCard(msg, "Resume.pdf", "/Resume.pdf"); return; }
     if (target === "contact") {
       var f = document.querySelector("footer");
       if (f) f.scrollIntoView({ behavior: "smooth", block: "end" });
-      linkCard(botEl, "hello@felixjanemalm.com", "mailto:hello@felixjanemalm.com");
+      linkCard(msg, "hello@felixjanemalm.com", "mailto:hello@felixjanemalm.com");
       return;
     }
     if (CASE[target]) {
-      var slug = target.slice(5);
-      var teaser = document.querySelector('a.case-study-teaser[href*="' + slug + '"]');
+      var teaser = document.querySelector('a.case-study-teaser[href*="' + target.slice(5) + '"]');
       if (teaser) { teaser.scrollIntoView({ behavior: "smooth", block: "center" }); flash(teaser); }
-      linkCard(botEl, CASE[target][0], CASE[target][1]);
+      linkCard(msg, CASE[target][0], CASE[target][1]);
       return;
     }
     var sel = { work: "#work", principles: "#scalability", testimonials: "#testimonials, .testimonials, .testimonial-wrapper, .testimonial" }[target];
@@ -319,8 +360,7 @@
     else if (h < 240) { g = x; b = c; } else if (h < 300) { r = x; b = c; } else { r = c; b = x; }
     return rgbToHex((r + m) * 255, (g + m) * 255, (b + m) * 255);
   }
-
-  function setAccent(inp, botEl) {
+  function setAccent(inp) {
     var hex = toHex(inp.color);
     if (!hex) { addNote("Couldn't read that color."); return; }
     var hsl = hexToHsl(hex);
@@ -328,44 +368,47 @@
     if (inp.mode === "light") hsl[2] = Math.max(hsl[2], 64);
     hex = hslToHex(hsl[0], hsl[1], hsl[2]);
     var desc = Object.getOwnPropertyDescriptor(window, "currentColor");
-    if (desc && desc.set) window.currentColor = hex;        // the site's own token pipeline (color-shade-calculator.js)
+    if (desc && desc.set) window.currentColor = hex;        // the site's own token pipeline
     else document.documentElement.style.setProperty("--sysPrimaryDefault", hex);
     addNote("Accent set to " + hex.toUpperCase() + (inp.mode && inp.mode !== "auto" ? " (" + inp.mode + ")" : "") + ".");
   }
 
   // ---- conversation ----------------------------------------------------------
+  var busy = false, openerRequested = history.length > 0;
+
   function send(text) {
     text = (text || "").trim();
     if (!text || busy) return;
     busy = true; sendBtn.disabled = true;
+    openerRequested = true;
+    if (!history.length) history.push({ role: "assistant", text: FALLBACK_OPENER });
     chips.innerHTML = "";
-    if (!history.length) { history.push({ role: "assistant", text: FALLBACK_OPENER }); }
     addMsg("user", text);
     history.push({ role: "user", text: text });
-    saveHistory();
+    save();
     var prior = history.slice(0, -1);
     var bot = addMsg("assistant", "");
     showDots(bot);
+    if (root.getAttribute("data-state") === "docked") setOpen(true);
     var acc = "", acted = [];
     request({ session: sessionId, context: ctx, history: prior, text: text }, function (t) {
       acc += t;
       renderText(bot, acc);
-      scrollLog();
+      scrollThread();
     }, function (a) { acted.push(a); runAction(a, bot); })
       .then(function (done) {
         var stored = (done && done.history_text) || acc;
         if (!acc) {
-          // A tool-only reply: give the visitor a line so the bubble is never empty.
           var line = acted.length ? actionLine(acted[0]) : "…";
           renderText(bot, line);
           stored = line + (stored ? "\n" + stored : "");
         }
         history.push({ role: "assistant", text: stored || "…" });
-        saveHistory();
+        save();
+        updateFold();
       })
       .catch(function (e) {
         renderText(bot, friendly(e));
-        bot.classList.add("fjc-error");
       })
       .then(function () { busy = false; sendBtn.disabled = false; input.focus(); });
   }
@@ -373,64 +416,74 @@
   function requestOpener() {
     if (openerRequested || history.length) return;
     openerRequested = true;
+    var bot = addMsg("assistant", "");
+    showDots(bot);
     var acc = "";
-    var bubble = panelOpen ? addMsg("assistant", "") : null;
-    if (bubble) showDots(bubble);
     request({ session: sessionId, context: ctx, history: [], opener: true }, function (t) {
       acc += t;
-      if (panelOpen) { if (!bubble) bubble = addMsg("assistant", ""); renderText(bubble, acc); scrollLog(); }
-      else { peekText.textContent = acc; showPeek(); }
+      renderText(bot, acc);
     }, function () { /* the opener takes no page actions */ })
       .then(function (done) {
         var stored = (done && done.history_text) || acc;
         if (!stored) throw new Error("empty opener");
-        if (!history.length) { history.push({ role: "assistant", text: stored }); saveHistory(); }
-        if (panelOpen) renderHistory();
+        if (!history.length) { history.push({ role: "assistant", text: stored }); save(); }
+        updateFold();
       })
       .catch(function () {
-        if (!history.length) { history.push({ role: "assistant", text: FALLBACK_OPENER }); saveHistory(); }
-        if (panelOpen) renderHistory();
-        else { peekText.textContent = FALLBACK_OPENER; showPeek(); }
+        if (!history.length) { history.push({ role: "assistant", text: FALLBACK_OPENER }); save(); }
+        renderText(bot, FALLBACK_OPENER);
+        updateFold();
       });
   }
 
-  function showPeek() { peek.hidden = false; }
-  function hidePeek() { peek.hidden = true; }
-
-  function openPanel() {
-    panelOpen = true;
-    hidePeek();
-    root.classList.add("is-open");
-    panel.hidden = false;
-    launch.setAttribute("aria-expanded", "true");
-    renderHistory();
-    if (!history.length) requestOpener();
-    setTimeout(function () { input.focus(); }, 50);
+  // ---- states ----------------------------------------------------------------
+  function setOpen(open) {
+    root.setAttribute("data-open", open ? "1" : "0");
+    toggle.setAttribute("aria-label", open ? "Hide the conversation" : "Show the conversation");
+    if (open) { unfolded = true; updateFold(); scrollThread(); }
   }
-  function closePanel() {
-    panelOpen = false;
-    root.classList.remove("is-open");
-    panel.hidden = true;
-    launch.setAttribute("aria-expanded", "false");
-    launch.focus();
+  function setState(state) {
+    if (root.getAttribute("data-state") === state) return;
+    if (state === "docked" && slot) slot.style.minHeight = root.offsetHeight + "px";   // keep the hero's height
+    root.setAttribute("data-state", state);
+    document.documentElement.classList.toggle("fjc-docked-page", state === "docked");
+    if (state === "hero") { setOpen(false); unfolded = false; updateFold(); }
+  }
+  if (hasHero && "IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (entries) {
+      var r = entries[0].intersectionRatio;
+      if (r < 0.15) setState("docked");
+      else if (r > 0.5) setState("hero");
+    }, { threshold: [0, 0.15, 0.5, 1] });
+    io.observe(slot);
+  } else if (!hasHero) {
+    document.documentElement.classList.add("fjc-docked-page");
   }
 
-  launch.addEventListener("click", openPanel);
-  peek.addEventListener("click", function (e) { if (e.target !== peekX) openPanel(); });
-  peekX.addEventListener("click", function (e) { e.stopPropagation(); hidePeek(); });
-  closeBtn.addEventListener("click", closePanel);
-  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && panelOpen) closePanel(); });
+  barText.addEventListener("click", function () { setOpen(root.getAttribute("data-open") !== "1"); });
+  toggle.addEventListener("click", function () { setOpen(root.getAttribute("data-open") !== "1"); });
+  input.addEventListener("focus", function () {
+    if (root.getAttribute("data-state") === "docked") setOpen(true);
+    requestOpener();
+  });
+  document.addEventListener("click", function (e) {
+    if (root.getAttribute("data-state") === "docked" && !root.contains(e.target)) setOpen(false);
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && root.getAttribute("data-open") === "1") { setOpen(false); input.blur(); }
+  });
   form.addEventListener("submit", function (e) { e.preventDefault(); var t = input.value; input.value = ""; autosize(); send(t); });
   input.addEventListener("keydown", function (e) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); form.dispatchEvent(new Event("submit", { cancelable: true })); }
   });
-  function autosize() { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 140) + "px"; }
+  function autosize() { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 120) + "px"; }
   input.addEventListener("input", autosize);
 
-  // The assistant speaks first, but only to visitors who show signs of life.
-  // A posting link (?a=) gets the opener after a short delay; everyone else
-  // after their first scroll, pointer or key. Crawlers and instant bounces
-  // never trigger an API call.
+  renderAll();
+
+  // The assistant speaks first. In the hero it is part of the first impression,
+  // so it fires on load (not for crawlers). On docked-only pages it waits for a
+  // sign of life so bounces cost nothing.
   function whenVisible(fn) {
     if (document.visibilityState === "visible") { fn(); return; }
     document.addEventListener("visibilitychange", function once() {
@@ -439,11 +492,12 @@
   }
   function armOpener() {
     if (history.length) return;
-    if (ctx.application_id) { setTimeout(function () { whenVisible(requestOpener); }, OPENER_DELAY_MS); return; }
+    if (navigator.webdriver || BOT_UA.test(navigator.userAgent || "")) return;
+    if (hasHero || ctx.application_id) { setTimeout(function () { whenVisible(requestOpener); }, 600); return; }
     var events = ["scroll", "pointerdown", "keydown", "touchstart"];
     var onFirst = function () {
       events.forEach(function (ev) { window.removeEventListener(ev, onFirst); });
-      setTimeout(function () { whenVisible(requestOpener); }, 800);
+      setTimeout(function () { whenVisible(requestOpener); }, 500);
     };
     events.forEach(function (ev) { window.addEventListener(ev, onFirst, { passive: true }); });
   }
