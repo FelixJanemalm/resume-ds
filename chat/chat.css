@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@500;600&display=swap');
 /* "Ask about Felix" widget. Source of truth: job-machine/chat/web/chat.css
  * (build_portfolio.py copies it to resume-ds/chat/).
  *
@@ -26,7 +27,8 @@
   line-height: 1.5;
   text-align: left;
 }
-.fjc *, .fjc *::before, .fjc *::after { box-sizing: border-box; }
+.fjc *, .fjc *::before, .fjc *::after { box-sizing: border-box; min-width: 0; }
+.fjc, .fjc-slot { max-width: 100%; min-width: 0; }
 .fjc [hidden] { display: none !important; }
 
 /* ---- resets against the site's global element rules ---------------------- */
@@ -67,14 +69,15 @@
 /* Handwritten "for <Company>?" after the h1, on application links and company pages. */
 /* The h1 paints its gradient through its own glyphs; a transformed child inherits the
    transparent fill but not that paint, so the span paints its own gradient. */
-/* An annotation on the heading, not part of it: marker font, ink-colored, a
+/* An annotation on the heading, not part of it: a pen font, ink-colored, a
    slight tilt. It paints its own color because the h1 fills its text with a
-   gradient that transformed children do not inherit. */
+   gradient that transformed children do not inherit. The font is loaded by the
+   @import at the top of this sheet, so the homepage markup needs no change. */
 .fjc-for {
-  display: inline-block; position: relative; z-index: 3; white-space: nowrap;
-  font-family: 'Permanent Marker', cursive; font-weight: 400; letter-spacing: 0;
-  font-size: 0.6em; line-height: 1.1; transform: rotate(-2deg);
-  margin-left: 0.15em; vertical-align: 0.12em;
+  display: inline-block; position: relative; z-index: 3; white-space: nowrap; max-width: 100%;
+  font-family: 'Caveat', 'Permanent Marker', cursive; font-weight: 600; letter-spacing: 0.01em;
+  font-size: 0.72em; line-height: 1; transform: rotate(-2deg);
+  margin-left: 0.15em; vertical-align: 0.06em;
   background: none; -webkit-background-clip: border-box; background-clip: border-box;
   color: var(--button-color, #4faad1); -webkit-text-fill-color: var(--button-color, #4faad1);
 }
@@ -158,7 +161,10 @@ html.fjc-docked-page body { padding-bottom: 110px; }
 
 @media (max-width: 767px) {
   .fjc-slot { width: 100%; }
-  .fjc[data-state="docked"] { left: 8px; right: 8px; bottom: 8px; width: auto; transform: none; }
+  .fjc-msg { max-width: 100%; }
+  .fjc-form textarea { width: 100%; }
+  .fjc-for { display: inline; white-space: normal; transform: none; }
+  .fjc[data-state="docked"] { left: 8px; right: 8px; bottom: 8px; width: auto; transform: none; padding: 0.5em 0.6em 0.6em; }
   .fjc[data-state="docked"][data-open="1"] .fjc-thread { max-height: 60vh; }
 }
 @media (prefers-reduced-motion: reduce) {
