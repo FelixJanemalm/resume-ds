@@ -8,8 +8,9 @@
 .work-spine__stage { display: none; }
 
 .work-spine.is-3d {
-    height: calc(var(--ws-count, 4) * 90vh + 100vh);
-    height: calc(var(--ws-count, 4) * 90svh + 100svh);
+    /* scroll length: one --ws-vh (default 60vh) per card, plus the pinned stage */
+    height: calc(var(--ws-count, 4) * var(--ws-vh, 60vh) + 100vh);
+    height: calc(var(--ws-count, 4) * var(--ws-vh, 60vh) + 100svh);
 }
 .work-spine.is-3d .case-study-teasers { display: none; }
 .work-spine.is-3d .work-spine__stage {
@@ -133,19 +134,6 @@
     background: var(--button-color, var(--sysPrimaryDefault));
     transform: scale(1.5);
 }
-.work-spine__count {
-    position: absolute;
-    left: var(--marginSides, 7.5vw);
-    bottom: 28px;
-    z-index: 2;
-    font-size: 0.75em;
-    font-weight: 600;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    color: var(--textSubtle);
-    font-variant-numeric: tabular-nums;
-    pointer-events: none;
-}
 
 /* Portrait phones: stack the visual over the body, like their mobile pane */
 @media (orientation: portrait) {
@@ -161,5 +149,4 @@
     .ws-card .teaser-metrics .metric { font-size: max(10px, calc(var(--s) * 0.065)); }
     .ws-card .teaser-metrics .metric strong { display: block; font-size: 1.5em; }
     .work-spine__rail { right: 14px; }
-    .work-spine__count { left: 16px; bottom: 16px; }
 }

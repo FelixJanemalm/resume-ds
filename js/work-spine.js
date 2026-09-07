@@ -74,6 +74,9 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
         spineScale: num(ds.spineScale, 1),
         spineSpacing: num(ds.spineSpacing, 0.65),   // their SpineInstancer: y = 4 - 0.65 i
         spineTwist: num(ds.spineTwist, 0.4),        // rotation.y = 0.4 i
+        scrollPerCard: num(ds.scrollPerCard, 60),   // vh of scrolling per card
+        // what sits on the helix axis: 'none' | 'axis' (a line with a node per card) | 'spine' (their vertebrae)
+        centerpiece: new URLSearchParams(location.search).get('centerpiece') || ds.centerpiece || 'none',
     };
 
     const { MathUtils: M } = THREE;
@@ -97,6 +100,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
     const dots = [...rail.children];
 
     section.style.setProperty('--ws-count', n);
+    section.style.setProperty('--ws-vh', cfg.scrollPerCard + 'vh');
     section.classList.add('is-3d');
 
     /* ---------- WebGL layer: the spine ---------- */
@@ -111,7 +115,12 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
         const pmrem = new THREE.PMREMGenerator(gl);
         glScene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
         glScene.add(world);
-        queueMicrotask(buildSpine);   // runs after the declarations below
+        queueMicrotask(() => {        // runs after the declarations below
+            if (cfg.centerpiece === 'spine') buildSpine();
+            else if (cfg.centerpiece === 'axis') buildAxis();
+            buildParticles();
+            applyTheme();
+        });
     } catch (err) {
         console.warn('work-spine: WebGL unavailable, cards only.', err);
         gl = null;
@@ -141,16 +150,43 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
         keyLight.position.set(4, 6, 5);
         glScene.add(keyLight, new THREE.HemisphereLight(0xffffff, 0x223344, 0.35));
 
-        // Their "flower" particle layer, reduced to a drifting cloud that turns with the scroll.
+    }
+
+    // Their "flower" particle layer, reduced to a drifting cloud that turns with the scroll.
+    function buildParticles() {
         const P = 500, pos = new Float32Array(P * 3);
         for (let i = 0; i < P; i++) {
-            const a = Math.random() * Math.PI * 2, r = 1.2 + Math.random() * 2.6, h = TOP + 1 - Math.random() * (SPACING * COUNT + 2);
+            const a = Math.random() * Math.PI * 2, r = 1.2 + Math.random() * 2.6, h = 9 - Math.random() * 28;
             pos.set([Math.cos(a) * r, h, Math.sin(a) * r], i * 3);
         }
         const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
         particles = new THREE.Points(pg, new THREE.PointsMaterial({ color: 0x4faad1, size: 0.045 * S, transparent: true, opacity: 0.75, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true }));
         world.add(particles);
-        applyTheme();
+    }
+
+    /* Centerpiece 'axis': the single source of truth every case study hangs off — a thin line
+       down the helix axis with one node per card. The front card's node lights up. */
+    let axis = null;
+    function buildAxis() {
+        const lineMat = new THREE.MeshBasicMaterial({ color: 0x4faad1, transparent: true, opacity: 0.35, depthWrite: false });
+        const nodeMat = new THREE.MeshBasicMaterial({ color: 0x4faad1 });
+        const haloMat = new THREE.MeshBasicMaterial({ color: 0x4faad1, transparent: true, opacity: 0.18, depthWrite: false, blending: THREE.AdditiveBlending });
+        const line = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1, 8), lineMat);
+        const nodes = [], halos = [];
+        for (let i = 0; i < n; i++) {
+            const nd = new THREE.Mesh(new THREE.SphereGeometry(0.09, 20, 16), nodeMat); nodes.push(nd); world.add(nd);
+            const h = new THREE.Mesh(new THREE.SphereGeometry(0.26, 20, 16), haloMat); halos.push(h); world.add(h);
+        }
+        world.add(line);
+        axis = { line, nodes, halos, lineMat, nodeMat, haloMat };
+        layoutAxis();
+    }
+    function layoutAxis() {
+        if (!axis) return;
+        const span = yStep * (n - 1), pad = 6;
+        axis.line.scale.set(1, span + pad * 2, 1);
+        axis.line.position.y = -span / 2;
+        axis.nodes.forEach((nd, i) => { nd.position.y = -yStep * i; axis.halos[i].position.y = nd.position.y; });
     }
 
     let spine = null;
@@ -193,6 +229,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
         }
         if (keyLight) keyLight.color.copy(accent).lerp(new THREE.Color(0xffffff), 0.5);
         if (particles) { particles.material.color.copy(accent); particles.material.opacity = light ? 0.55 : 0.75; }
+        if (axis) { axis.lineMat.color.copy(accent); axis.nodeMat.color.copy(accent); axis.haloMat.color.copy(accent); axis.lineMat.opacity = light ? 0.45 : 0.35; }
     }
     new MutationObserver(applyTheme).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
@@ -232,6 +269,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
         });
         world.scale.setScalar(S);
         if (particles) particles.material.size = 0.045 * S;
+        layoutAxis();
 
         cssRenderer.setSize(w, h);
         if (gl) gl.setSize(w, h, false);
@@ -240,6 +278,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
 
     /* ---------- scroll → camera ---------- */
     const camGroup = new THREE.Object3D();
+    const _s = new THREE.Vector3();
     const target = new THREE.Object3D();
     const offset = new THREE.Vector3();
     let first = true, dirty = true, running = false, active = false, tStart = performance.now(), frontIndex = -1, tuneLive = null, frames = 0;
@@ -282,10 +321,15 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
                 if (item.video) { if (i === front) item.video.play?.().catch?.(() => {}); else item.video.pause?.(); }
             });
             dots.forEach((d, i) => d.classList.toggle('is-on', i === front));
-            count.textContent = String(front + 1).padStart(2, '0') + ' / ' + String(n).padStart(2, '0');
+            if (count) count.textContent = String(front + 1).padStart(2, '0') + ' / ' + String(n).padStart(2, '0');
         }
 
         if (particles) particles.rotation.y = p * Math.PI * 1.2 + now * 0.00004;
+        if (axis) axis.nodes.forEach((nd, i) => {
+            const k = i === frontIndex ? 1 : 0;
+            nd.scale.lerp(_s.setScalar(1 + k * 0.8), 0.12);
+            axis.halos[i].scale.lerp(_s.setScalar(k ? 1 + 0.15 * Math.sin(now * 0.004) : 0.001), 0.12);
+        });
         cssRenderer.render(cssScene, camera);
         if (gl) gl.render(glScene, camera);
     }
@@ -330,7 +374,8 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
             ['radius', 'helix radius', 2, 8, 0.05], ['step', 'step (deg)', 15, 90, 1], ['stepPortrait', 'step portrait', 15, 90, 1],
             ['fov', 'fov', 20, 70, 1], ['fovPortrait', 'fov portrait', 30, 90, 1], ['camOffset', 'camera offset', 0, 5, 0.05],
             ['cardFrac', 'card width', 0.3, 0.95, 0.01], ['drift', 'entry drift', 0, 1.5, 0.05], ['lerp', 'camera lerp', 0.02, 0.5, 0.01],
-            ['edge', 'scroll edge', 0, 0.2, 0.005], ['spineScale', 'spine scale', 0.4, 1.8, 0.02], ['spineSpacing', 'vertebra gap', 0.3, 1.2, 0.01], ['spineTwist', 'vertebra twist', 0, 1, 0.01],
+            ['edge', 'scroll edge', 0, 0.2, 0.005], ['scrollPerCard', 'scroll per card (vh)', 25, 120, 5],
+            ['spineScale', 'spine scale', 0.4, 1.8, 0.02], ['spineSpacing', 'vertebra gap', 0.3, 1.2, 0.01], ['spineTwist', 'vertebra twist', 0, 1, 0.01],
         ];
         const el = document.createElement('div');
         el.setAttribute('style', 'position:fixed;left:12px;top:96px;z-index:99999;width:292px;max-height:calc(100vh - 120px);overflow:auto;box-sizing:border-box;padding:10px 12px;background:rgba(10,12,16,.92);color:#e8ecf1;font:12px/1.4 ui-monospace,Menlo,monospace;text-align:left;border-radius:8px;border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(8px)');
@@ -338,15 +383,20 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
             + rows.map(([k, l, min, max, st]) => `<label style="display:grid;grid-template-columns:1fr 96px 46px;gap:8px;align-items:center;margin:3px 0"><span>${l}</span><input type="range" data-k="${k}" min="${min}" max="${max}" step="${st}" value="${cfg[k]}" style="width:96px"><output style="text-align:right">${cfg[k]}</output></label>`).join('')
             + '<div style="display:flex;gap:8px;margin:10px 0 6px"><button type="button" data-copy style="position:static;display:inline-block;margin:0;height:auto;width:auto;line-height:1.3;font:inherit;text-transform:none;letter-spacing:0;box-shadow:none;transform:none;flex:1;padding:6px;border:1px solid rgba(255,255,255,.25);background:none;color:inherit;border-radius:6px;cursor:pointer">Copy as data-attributes</button><button type="button" data-reset style="position:static;display:inline-block;margin:0;height:auto;width:auto;line-height:1.3;font:inherit;text-transform:none;letter-spacing:0;box-shadow:none;transform:none;padding:6px 10px;border:1px solid rgba(255,255,255,.25);background:none;color:inherit;border-radius:6px;cursor:pointer">Reset</button></div>'
             + '<textarea readonly rows="4" style="width:100%;box-sizing:border-box;font:11px/1.35 ui-monospace,Menlo,monospace;background:rgba(0,0,0,.35);color:#cfd6df;border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:6px" placeholder="paste these onto <section class=&quot;work-spine&quot; …>"></textarea>'
+            + '<div style="margin-top:8px;display:flex;gap:6px;align-items:center"><span>centerpiece</span>' + ['none', 'axis', 'spine'].map(c => `<a href="#" data-cp="${c}" style="color:${c === cfg.centerpiece ? '#fff' : '#9aa4b2'};text-decoration:${c === cfg.centerpiece ? 'underline' : 'none'}">${c}</a>`).join('') + '</div>'
             + '<small data-live style="display:block;margin-top:6px;color:#9aa4b2"></small>';
-        const attrs = () => rows.map(([k]) => `data-${k.replace(/[A-Z]/g, m => '-' + m.toLowerCase())}="${cfg[k]}"`).join(' ');
+        const attrs = () => rows.map(([k]) => `data-${k.replace(/[A-Z]/g, m => '-' + m.toLowerCase())}="${cfg[k]}"`).join(' ') + ` data-scroll-per-card="${cfg.scrollPerCard}" data-centerpiece="${cfg.centerpiece}"`;
         const ta = el.querySelector('textarea');
         el.addEventListener('input', e => {
             const k = e.target.dataset.k; if (!k) return;
             cfg[k] = +e.target.value; e.target.nextElementSibling.value = cfg[k];
+            if (k === 'scrollPerCard') section.style.setProperty('--ws-vh', cfg.scrollPerCard + 'vh');
             layout(); layoutSpine(); ta.value = attrs(); wake();
         });
         el.querySelector('[data-copy]').addEventListener('click', () => { ta.value = attrs(); ta.select(); navigator.clipboard?.writeText(ta.value).catch(() => {}); });
+        el.querySelectorAll('[data-cp]').forEach(a => a.addEventListener('click', e => {
+            e.preventDefault(); const u = new URL(location.href); u.searchParams.set('centerpiece', a.dataset.cp); u.searchParams.set('ws', String(progress().toFixed(3))); location.href = u.toString();
+        }));
         el.querySelector('[data-reset]').addEventListener('click', () => { const u = new URL(location.href); u.searchParams.set('ws', String(progress().toFixed(3))); location.href = u.toString(); });
         document.body.appendChild(el);
         tuneLive = el.querySelector('[data-live]');
