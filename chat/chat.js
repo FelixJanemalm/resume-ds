@@ -313,9 +313,28 @@
       linkCard(msg, CASE[target][0], CASE[target][1]);
       return;
     }
-    var sel = { work: "#work", principles: "#scalability", testimonials: "#testimonials, .testimonials, .testimonial-wrapper, .testimonial" }[target];
-    var node = sel && document.querySelector(sel);
-    if (node) node.scrollIntoView({ behavior: "smooth", block: "start" });
+    var node = findSection(target);
+    if (node) scrollToNode(node);
+  }
+  // Sections by selector first, then by heading text, so a markup change on the
+  // site degrades to "no scroll" rather than a wrong scroll.
+  var SECTIONS = {
+    work: { sel: "#work, .case-study-teasers", heading: /^work$/i },
+    principles: { sel: "#scalability, .card-wrapper", heading: /principles/i },
+    testimonials: { sel: "#testimonials, .testimonials-wrapper, .testimonials", heading: /take my word|colleagues|testimonial/i }
+  };
+  function findSection(target) {
+    var spec = SECTIONS[target];
+    if (!spec) return null;
+    var node = document.querySelector(spec.sel);
+    if (node) return node;
+    var heads = document.querySelectorAll("h2, h3");
+    for (var i = 0; i < heads.length; i++) if (spec.heading.test(heads[i].textContent.trim())) return heads[i];
+    return null;
+  }
+  function scrollToNode(node) {
+    var top = node.getBoundingClientRect().top + window.pageYOffset - 96;   // clear the fixed header
+    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
   }
 
   function toHex(c) {
