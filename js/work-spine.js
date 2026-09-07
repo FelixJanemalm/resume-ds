@@ -58,17 +58,22 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
     const ds = section.dataset;
 
     // Their numbers. Override any of them with data-* attributes on the section.
+    const num = (v, d) => (v !== undefined && v !== '' && !Number.isNaN(+v)) ? +v : d;
     const cfg = {
-        radius: +ds.radius || 3.8,
-        step: +ds.step || 50,            // degrees between cards
-        stepPortrait: +ds.stepPortrait || 35,
-        fov: +ds.fov || 35,
-        fovPortrait: +ds.fovPortrait || 55,
-        camOffset: +ds.camOffset || 2,   // camera's local z offset inside its group
-        edge: 0.06, edgePortrait: 0.1,   // scroll dead zone at both ends
-        lerp: 0.2,
-        cardFrac: +ds.cardFrac || 0.6,   // card width as a fraction of the visible width
+        radius: num(ds.radius, 3.8),
+        step: num(ds.step, 50),                 // degrees between cards
+        stepPortrait: num(ds.stepPortrait, 35),
+        fov: num(ds.fov, 35),
+        fovPortrait: num(ds.fovPortrait, 55),
+        camOffset: num(ds.camOffset, 2),        // camera's local z offset inside its group
+        edge: num(ds.edge, 0.06), edgePortrait: 0.1,   // scroll dead zone at both ends
+        lerp: num(ds.lerp, 0.2),
+        drift: num(ds.drift, 0.8),              // units the camera enters above / leaves below (theirs: 1)
+        cardFrac: num(ds.cardFrac, 0.6),        // card width as a fraction of the visible width
         cardFracPortrait: 0.86,
+        spineScale: num(ds.spineScale, 1),
+        spineSpacing: num(ds.spineSpacing, 0.65),   // their SpineInstancer: y = 4 - 0.65 i
+        spineTwist: num(ds.spineTwist, 0.4),        // rotation.y = 0.4 i
     };
 
     const { MathUtils: M } = THREE;
@@ -106,7 +111,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
         const pmrem = new THREE.PMREMGenerator(gl);
         glScene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
         glScene.add(world);
-        buildSpine();
+        queueMicrotask(buildSpine);   // runs after the declarations below
     } catch (err) {
         console.warn('work-spine: WebGL unavailable, cards only.', err);
         gl = null;
@@ -124,25 +129,11 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
             iridescence: 0.35, iridescenceIOR: 1.4, iridescenceThicknessRange: [140, 420],
             envMapIntensity: 1,
         });
-        const COUNT = 40, SPACING = 0.65, TWIST = 0.4, TOP = 8;   // their SpineInstancer: y = 4 - 0.65 i, rotation.y = 0.4 i
+        const COUNT = 40, SPACING = 0.65, TOP = 8;
         const bodies = new THREE.InstancedMesh(body, mat, COUNT);
         const procs = new THREE.InstancedMesh(proc, mat, COUNT * 3);
-        const d = new THREE.Object3D();
-        const angles = [Math.PI / 2, Math.PI / 2 + 2.15, Math.PI / 2 - 2.15];
-        for (let i = 0; i < COUNT; i++) {
-            const y = TOP - SPACING * i, rot = TWIST * i;
-            d.position.set(0, y, 0); d.rotation.set(0, rot, 0); d.scale.setScalar(1); d.updateMatrix();
-            bodies.setMatrixAt(i, d.matrix);
-            angles.forEach((a, k) => {
-                const ang = a + rot, len = k === 0 ? 0.62 : 0.5;
-                d.position.set(Math.cos(ang) * len, y - 0.03, Math.sin(ang) * len);
-                d.rotation.set(0, -ang, Math.PI / 2 - 0.15);
-                d.scale.set(1, k === 0 ? 1.15 : 1, 1);
-                d.updateMatrix();
-                procs.setMatrixAt(i * 3 + k, d.matrix);
-            });
-        }
-        bodies.instanceMatrix.needsUpdate = true; procs.instanceMatrix.needsUpdate = true;
+        spine = { bodies, procs, count: COUNT, top: TOP };
+        layoutSpine();
         world.add(bodies, procs);
         spineParts = [bodies, procs];
 
@@ -157,9 +148,31 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
             pos.set([Math.cos(a) * r, h, Math.sin(a) * r], i * 3);
         }
         const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-        particles = new THREE.Points(pg, new THREE.PointsMaterial({ color: 0x4faad1, size: 0.045, transparent: true, opacity: 0.75, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true }));
+        particles = new THREE.Points(pg, new THREE.PointsMaterial({ color: 0x4faad1, size: 0.045 * S, transparent: true, opacity: 0.75, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true }));
         world.add(particles);
         applyTheme();
+    }
+
+    let spine = null;
+    function layoutSpine() {
+        if (!spine) return;
+        const { bodies, procs, count, top } = spine;
+        const d = new THREE.Object3D(), sc = cfg.spineScale;
+        const angles = [Math.PI / 2, Math.PI / 2 + 2.15, Math.PI / 2 - 2.15];
+        for (let i = 0; i < count; i++) {
+            const y = top - cfg.spineSpacing * i, rot = cfg.spineTwist * i;
+            d.position.set(0, y, 0); d.rotation.set(0, rot, 0); d.scale.setScalar(sc); d.updateMatrix();
+            bodies.setMatrixAt(i, d.matrix);
+            angles.forEach((a, k) => {
+                const ang = a + rot, len = (k === 0 ? 0.62 : 0.5) * sc;
+                d.position.set(Math.cos(ang) * len, y - 0.03 * sc, Math.sin(ang) * len);
+                d.rotation.set(0, -ang, Math.PI / 2 - 0.15);
+                d.scale.set(sc, (k === 0 ? 1.15 : 1) * sc, sc);
+                d.updateMatrix();
+                procs.setMatrixAt(i * 3 + k, d.matrix);
+            });
+        }
+        bodies.instanceMatrix.needsUpdate = true; procs.instanceMatrix.needsUpdate = true;
     }
 
     /* ---------- theme: follow the page's light / dark tokens ---------- */
@@ -229,7 +242,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
     const camGroup = new THREE.Object3D();
     const target = new THREE.Object3D();
     const offset = new THREE.Vector3();
-    let first = true, dirty = true, running = false, active = false, tStart = performance.now(), frontIndex = -1;
+    let first = true, dirty = true, running = false, active = false, tStart = performance.now(), frontIndex = -1, tuneLive = null, frames = 0;
 
     function progress() {
         const total = section.offsetHeight - stage.clientHeight;
@@ -244,8 +257,9 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
         const seg = sv * (n - 1), i0 = Math.floor(seg), i1 = Math.min(i0 + 1, n - 1), f = seg - i0;
         target.position.copy(targets[i0].position).lerp(targets[i1].position, f);
         target.quaternion.copy(targets[i0].quaternion).slerp(targets[i1].quaternion, f);
-        target.position.y += -0.8 * S * smooth(p, 0, 0.15);    // drop in from above (theirs is a full unit)
-        target.position.y += 0.8 * S * (1 - smooth(p, 0.85, 1)); // and leave below
+        target.position.y += -cfg.drift * S * smooth(p, 0, 0.15);    // drop in from above
+        target.position.y += cfg.drift * S * (1 - smooth(p, 0.85, 1)); // and leave below
+        if (tuneLive && (frames++ % 10 === 0)) tuneLive.textContent = 'progress ' + p.toFixed(3) + ' · front ' + (Math.round(seg) + 1) + ' · S ' + S.toFixed(0) + 'px · ' + (portrait ? 'portrait' : 'landscape');
         if (first) { camGroup.position.copy(target.position); camGroup.quaternion.copy(target.quaternion); first = false; }
         else { camGroup.position.lerp(target.position, cfg.lerp); camGroup.quaternion.slerp(target.quaternion, cfg.lerp); }
         offset.set(0, 0, cfg.camOffset * S).applyQuaternion(camGroup.quaternion);
@@ -308,8 +322,38 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
 
     layout();
 
+    /* ---------- ?tune=1: sliders for every number, copy them out as data-attributes ---------- */
+    const params = new URLSearchParams(location.search);
+    if (params.has('tune')) tunePanel();
+    function tunePanel() {
+        const rows = [
+            ['radius', 'helix radius', 2, 8, 0.05], ['step', 'step (deg)', 15, 90, 1], ['stepPortrait', 'step portrait', 15, 90, 1],
+            ['fov', 'fov', 20, 70, 1], ['fovPortrait', 'fov portrait', 30, 90, 1], ['camOffset', 'camera offset', 0, 5, 0.05],
+            ['cardFrac', 'card width', 0.3, 0.95, 0.01], ['drift', 'entry drift', 0, 1.5, 0.05], ['lerp', 'camera lerp', 0.02, 0.5, 0.01],
+            ['edge', 'scroll edge', 0, 0.2, 0.005], ['spineScale', 'spine scale', 0.4, 1.8, 0.02], ['spineSpacing', 'vertebra gap', 0.3, 1.2, 0.01], ['spineTwist', 'vertebra twist', 0, 1, 0.01],
+        ];
+        const el = document.createElement('div');
+        el.setAttribute('style', 'position:fixed;left:12px;top:96px;z-index:99999;width:292px;max-height:calc(100vh - 120px);overflow:auto;box-sizing:border-box;padding:10px 12px;background:rgba(10,12,16,.92);color:#e8ecf1;font:12px/1.4 ui-monospace,Menlo,monospace;text-align:left;border-radius:8px;border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(8px)');
+        el.innerHTML = '<div style="font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">work-spine tune</div>'
+            + rows.map(([k, l, min, max, st]) => `<label style="display:grid;grid-template-columns:1fr 96px 46px;gap:8px;align-items:center;margin:3px 0"><span>${l}</span><input type="range" data-k="${k}" min="${min}" max="${max}" step="${st}" value="${cfg[k]}" style="width:96px"><output style="text-align:right">${cfg[k]}</output></label>`).join('')
+            + '<div style="display:flex;gap:8px;margin:10px 0 6px"><button type="button" data-copy style="flex:1;padding:6px;border:1px solid rgba(255,255,255,.25);background:none;color:inherit;border-radius:6px;cursor:pointer">Copy as data-attributes</button><button type="button" data-reset style="padding:6px 10px;border:1px solid rgba(255,255,255,.25);background:none;color:inherit;border-radius:6px;cursor:pointer">Reset</button></div>'
+            + '<textarea readonly rows="4" style="width:100%;box-sizing:border-box;font:11px/1.35 ui-monospace,Menlo,monospace;background:rgba(0,0,0,.35);color:#cfd6df;border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:6px" placeholder="paste these onto <section class=&quot;work-spine&quot; …>"></textarea>'
+            + '<small data-live style="display:block;margin-top:6px;color:#9aa4b2"></small>';
+        const attrs = () => rows.map(([k]) => `data-${k.replace(/[A-Z]/g, m => '-' + m.toLowerCase())}="${cfg[k]}"`).join(' ');
+        const ta = el.querySelector('textarea');
+        el.addEventListener('input', e => {
+            const k = e.target.dataset.k; if (!k) return;
+            cfg[k] = +e.target.value; e.target.nextElementSibling.value = cfg[k];
+            layout(); layoutSpine(); ta.value = attrs(); wake();
+        });
+        el.querySelector('[data-copy]').addEventListener('click', () => { ta.value = attrs(); ta.select(); navigator.clipboard?.writeText(ta.value).catch(() => {}); });
+        el.querySelector('[data-reset]').addEventListener('click', () => { const u = new URL(location.href); u.searchParams.set('ws', String(progress().toFixed(3))); location.href = u.toString(); });
+        document.body.appendChild(el);
+        tuneLive = el.querySelector('[data-live]');
+    }
+
     // ?ws=0.5 lands at 50% of the section (handy while tuning)
-    const ws = parseFloat(new URLSearchParams(location.search).get('ws'));
+    const ws = parseFloat(params.get('ws'));
     if (!Number.isNaN(ws)) {
         document.documentElement.style.scrollBehavior = 'auto';
         const total = section.offsetHeight - stage.clientHeight;
