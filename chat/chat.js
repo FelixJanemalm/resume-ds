@@ -21,7 +21,12 @@
  * on /for/<variant>?a=<id> links it names the posting the visitor came from.
  * On plain pages the input's placeholder asks what they are hiring for and
  * the chips answer it in one click, so no API call is made until they type.
- * A new ?a= link starts a fresh conversation; otherwise a thread with real
+ * The signed reference in ?a= is remembered by the browser (localStorage
+ * fj_app, shared with the beacon), so a recruiter who comes back by typing
+ * the domain still gets their opener, their h1 stamp, and their case-study
+ * order. A newer link overwrites it; ?a=clear forgets it. Links go to the
+ * root; there are no per-track pages any more.
+ * A new reference starts a fresh conversation; otherwise a thread with real
  * messages in it follows the visitor across pages.
  *
  * Until PUBLIC is true the widget only renders for browsers that have opened
@@ -55,13 +60,20 @@
   if (!PUBLIC && local.get("fjc_on") !== "1") return;
 
   // ---- context and session -------------------------------------------------
+  // Signed application reference: from the link, else the one this browser was
+  // given before. A newer link overwrites; ?a=clear forgets.
+  var refParam = params.get("a");
+  if (refParam === "clear") { local.remove("fj_app"); refParam = null; }
+  else if (refParam) local.set("fj_app", refParam);
+  var appRef = refParam || local.get("fj_app") || null;
+
   function pageContext() {
     var sub = document.querySelector(".hero-subhead");
     var path = location.pathname.replace(/\/index\.html$/, "").replace(/\/+$/, "") || "/";
     return {
       path: path,
       headline: (sub && sub.textContent.trim()) || document.title,
-      application_id: params.get("a") || null,   // signed reference "<id>.<sig>", minted by chat/link.py
+      application_id: appRef,                      // "<id>.<sig>", minted by chat/link.py
       qa: local.get("fj_qa") === "1"
     };
   }
@@ -152,10 +164,26 @@
     h1.appendChild(document.createTextNode(" "));
     h1.appendChild(el("span", { "class": "fjc-for", text: "for " + company + "?" }));
   }
+  // Lead with the case studies that matter for the visitor's track (what the
+  // retired /for/* pages did statically).
+  function leadWith(slugs) {
+    var wrap = document.querySelector(".case-study-teasers");
+    if (!wrap || !slugs || !slugs.length) return;
+    var picked = [];
+    slugs.forEach(function (slug) {
+      var a = wrap.querySelector('a.case-study-teaser[href*="' + slug + '"]');
+      if (a) picked.push(a);
+    });
+    for (var i = picked.length - 1; i >= 0; i--) wrap.insertBefore(picked[i], wrap.firstChild);
+  }
   if (ctx.application_id) {
     fetch(endpoint + "/posting?a=" + encodeURIComponent(ctx.application_id))
       .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (j) { if (j && j.company) markFor(j.company); })
+      .then(function (j) {
+        if (!j) { if (refParam !== ctx.application_id) local.remove("fj_app"); return; }   // stale stored reference
+        if (j.company) markFor(j.company);
+        leadWith(j.lead);
+      })
       .catch(function () { /* no stamp, no harm */ });
   }
 

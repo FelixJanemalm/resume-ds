@@ -41,10 +41,19 @@
     visitor = "no-storage";   // private window or blocked storage
   }
 
+  // Signed application reference (chat/link.py): from the link, else the one
+  // this browser was given before (shared with the assistant widget), so a
+  // recruiter who comes back by typing the domain is still attributed.
+  var refParam = params.get("a");
+  if (refParam === "clear") { try { localStorage.removeItem("fj_app"); } catch (e) {} refParam = null; }
+  else if (refParam) { try { localStorage.setItem("fj_app", refParam); } catch (e) {} }
+  var appRef = refParam;
+  if (!appRef) { try { appRef = localStorage.getItem("fj_app"); } catch (e) { appRef = null; } }
+
   function send(event, extra) {
     var body = JSON.stringify({
       event: event,
-      application_id: params.get("a") || null,   // ties back to the ledger row
+      application_id: appRef || null,            // "<id>.<sig>"; sync_views.py reads the id prefix
       variant: location.pathname,
       referrer: document.referrer || null,
       visitor: visitor,
