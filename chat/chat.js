@@ -61,7 +61,7 @@
     return {
       path: path,
       headline: (sub && sub.textContent.trim()) || document.title,
-      application_id: params.get("a") || null,
+      application_id: params.get("a") || null,   // signed reference "<id>.<sig>", minted by chat/link.py
       qa: local.get("fj_qa") === "1"
     };
   }
@@ -99,6 +99,35 @@
     "work/design-system": ["One design system for five products", "/work/design-system.html"],
     "work/design-tokens": ["One change, six platforms", "/work/design-tokens.html"]
   };
+  // Sections inside case studies open via text fragments (#:~:text=), so the
+  // case-study pages need no anchors. Label, then the heading text on the page.
+  var DEEP = {
+    "work/ai-sourcing#pipeline": ["One pipeline, end to end", "One pipeline. End to end."],
+    "work/ai-sourcing#agents": ["Specialized AI agents", "Specialized AI agents"],
+    "work/ai-sourcing#human-in-the-loop": ["Human in the loop", "Human in the Loop"],
+    "work/ai-sourcing#records": ["Permanent records", "Permanent records, a checkpoint in time"],
+    "work/ai-classifier#architecture": ["Retrieval as a service, generation as a workflow", "Retrieval is a service"],
+    "work/ai-classifier#evaluation": ["The harness came first", "The harness came first"],
+    "work/ai-classifier#results": ["Four things the numbers said", "Four things the numbers said"],
+    "work/ai-classifier#honesty": ["Honest numbers are a feature", "Honest numbers are a feature"],
+    "work/design-system#governance": ["How teams would trust the system", "How teams would trust the system in practice"],
+    "work/design-system#accessibility": ["Accessibility built in", "Simple APIs, accessibility built in"],
+    "work/design-system#results": ["Every target exceeded", "Every target exceeded"],
+    "work/design-system#adoption": ["Adoption was uneven at first", "Adoption was uneven at first"],
+    "work/design-tokens#architecture": ["Four layers from raw values to code", "Four layers from raw values"],
+    "work/design-tokens#naming": ["Names describe purpose, not appearance", "Names describe purpose"],
+    "work/design-tokens#results": ["Moving faster added $6M", "Moving faster added"],
+    "work/design-tokens#trust": ["The hardest part was the trust", "The hardest part"]
+  };
+  var TRACK = {
+    "for/design-systems": "Design systems", "for/design-engineering": "Design engineering", "for/ai": "AI systems",
+    "for/product-design": "Product design", "for/design-leadership": "Design leadership"
+  };
+  function deepUrl(target) {
+    var page = target.split("#")[0];
+    var base = CASE[page] ? CASE[page][1] : "/" + page + ".html";
+    return base + "#:~:text=" + encodeURIComponent(DEEP[target][1]);
+  }
 
   // ---- DOM -------------------------------------------------------------------
   function el(tag, attrs, children) {
@@ -288,33 +317,58 @@
   function runAction(a, msg) {
     if (!a || !a.name) return;
     try {
-      if (a.name === "navigate") navigate(a.input && a.input.target, msg);
+      if (a.name === "navigate") navigate(a.input && a.input.target, (a.input && a.input.mode) || "go", msg);
       else if (a.name === "set_accent_color") setAccent(a.input || {});
+      else if (a.name === "email_felix") emailCard(a.input || {}, msg);
     } catch (e) { /* an action failing must not break the answer */ }
+  }
+  function emailCard(inp, msg) {
+    var href = "mailto:hello@felixjanemalm.com?subject=" + encodeURIComponent(inp.subject || "About a role") +
+      "&body=" + encodeURIComponent(inp.body || "");
+    linkCard(msg, "Email Felix", href);
   }
   function flash(node) {
     node.classList.add("fjc-flash");
     setTimeout(function () { node.classList.add("fjc-flash-out"); }, 1200);
     setTimeout(function () { node.classList.remove("fjc-flash", "fjc-flash-out"); }, 2800);
   }
-  function navigate(target, msg) {
+  // mode "go": the visitor asked. Same-page sections scroll; track pages open in
+  // place (the thread follows); case studies open from a link, because a page
+  // without the widget would strand the conversation and a new tab needs a click.
+  // mode "offer": only a link, the visitor decides.
+  function navigate(target, mode, msg) {
     if (!target) return;
-    if (target === "home") { window.scrollTo({ top: 0, behavior: "smooth" }); return; }
-    if (target === "resume") { linkCard(msg, "Resume.pdf", "/Resume.pdf"); return; }
-    if (target === "contact") {
-      var f = document.querySelector("footer");
-      if (f) f.scrollIntoView({ behavior: "smooth", block: "end" });
-      linkCard(msg, "hello@felixjanemalm.com", "mailto:hello@felixjanemalm.com");
-      return;
-    }
+    var go = mode !== "offer";
+    if (DEEP[target]) { linkCard(msg, DEEP[target][0], deepUrl(target)); return; }
     if (CASE[target]) {
       var teaser = document.querySelector('a.case-study-teaser[href*="' + target.slice(5) + '"]');
-      if (teaser) { teaser.scrollIntoView({ behavior: "smooth", block: "center" }); flash(teaser); }
+      if (go && teaser) { teaser.scrollIntoView({ behavior: "smooth", block: "center" }); flash(teaser); }
       linkCard(msg, CASE[target][0], CASE[target][1]);
       return;
     }
+    if (TRACK[target]) {
+      var href = "/" + target + "/";
+      if (go && location.pathname.replace(/\/+$/, "") !== "/" + target) { save(); location.href = href; return; }
+      linkCard(msg, TRACK[target] + " version of this site", href);
+      return;
+    }
+    if (target === "resume") { linkCard(msg, "Resume.pdf", "/Resume.pdf"); return; }
+    if (target === "contact") {
+      var f = document.querySelector("footer");
+      if (go && f) f.scrollIntoView({ behavior: "smooth", block: "end" });
+      linkCard(msg, "hello@felixjanemalm.com", "mailto:hello@felixjanemalm.com");
+      return;
+    }
+    if (target === "home") { if (go) window.scrollTo({ top: 0, behavior: "smooth" }); return; }
     var node = findSection(target);
-    if (node) scrollToNode(node);
+    if (!node) return;
+    if (go) { scrollToNode(node); return; }
+    var card = el("a", { "class": "fjc-card", href: "#", text: sectionLabel(target) + " ↓" });
+    card.addEventListener("click", function (e) { e.preventDefault(); scrollToNode(node); });
+    (msg.querySelector(".fjc-body") || msg).appendChild(card);
+  }
+  function sectionLabel(target) {
+    return { work: "The work", principles: "Principles that scale", testimonials: "What colleagues say" }[target] || target;
   }
   // Sections by selector first, then by heading text, so a markup change on the
   // site degrades to "no scroll" rather than a wrong scroll.
