@@ -114,6 +114,22 @@
   var ARROW = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
   var CHEVRON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>';
 
+  // On an application link, stamp a handwritten "for <Company>?" after the h1
+  // ("Build better products faster for Anthropic?"). The opener then only
+  // needs to name the role.
+  function markFor(company) {
+    var h1 = document.querySelector(".hero h1");
+    if (!h1 || !company || h1.querySelector(".fjc-for")) return;
+    h1.appendChild(document.createTextNode(" "));
+    h1.appendChild(el("span", { "class": "fjc-for", text: "for " + company + "?" }));
+  }
+  if (ctx.application_id) {
+    fetch(endpoint + "/posting?a=" + encodeURIComponent(ctx.application_id))
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { if (j && j.company) markFor(j.company); })
+      .catch(function () { /* no stamp, no harm */ });
+  }
+
   var viewWork = document.querySelector(".hero-content .primary-btn");
   var hasHero = !!viewWork;
 
