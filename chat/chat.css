@@ -2,9 +2,14 @@
  * (build_portfolio.py copies it to resume-ds/chat/).
  *
  * One node, two states, set by data-state on .fjc:
- *   hero    inline in the hero, inherits the hero's type; latest exchange only
+ *   hero    inline in the hero under "View Work"; latest exchange only
  *   docked  fixed bar at the bottom; data-open="1" expands it into a sheet
- * Colors come from the site's tokens so the widget recolors with the picker. */
+ * Colors come from the site's tokens so the widget recolors with the picker.
+ *
+ * The site has global element rules (testimonials.css makes every <button>
+ * absolutely positioned at the left middle of its container, with 40px
+ * padding). The widget resets what it needs on its own elements with
+ * !important and leaves the site's CSS alone. */
 
 .fjc {
   --fjc-accent: var(--sysPrimaryDefault, #4faad1);
@@ -15,13 +20,26 @@
   --fjc-line: var(--line, rgba(127, 127, 127, 0.3));
   --fjc-shadow: 2px 6px 8px 2px rgba(0, 0, 0, 0.33);
   --fjc-field: rgba(127, 127, 127, 0.14);
-  pointer-events: auto;              /* .hero-content disables pointer events; re-enable for the widget */
+  pointer-events: auto !important;   /* .hero-content disables pointer events */
   font-family: inherit;
+  font-size: inherit;
   line-height: 1.5;
+  text-align: left;
 }
 .fjc *, .fjc *::before, .fjc *::after { box-sizing: border-box; }
-.fjc button, .fjc textarea { font-family: inherit; }
 .fjc [hidden] { display: none !important; }
+
+/* ---- resets against the site's global element rules ---------------------- */
+.fjc button {
+  position: static !important; top: auto !important; left: auto !important; right: auto !important;
+  transform: none !important; width: auto !important; height: auto !important; padding: 0 !important;
+  margin: 0 !important; z-index: auto !important; background: transparent !important; border: 0 !important;
+  color: inherit !important; font: inherit !important; line-height: 1.3 !important; opacity: 1 !important;
+  cursor: pointer !important; transition: none !important; box-shadow: none !important;
+}
+.fjc svg { fill: none !important; display: block; }
+.fjc textarea { position: static !important; margin: 0 !important; width: auto !important; }
+.fjc p { width: auto !important; max-width: none !important; }
 
 /* ---- shared pieces ------------------------------------------------------- */
 .fjc-badge {
@@ -36,8 +54,8 @@
   opacity: 0.6; padding-top: 0.55em;
 }
 .fjc-body { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.fjc-body p { margin: 0 0 0.5em; }
-.fjc-body p:last-child { margin: 0; }
+.fjc-body p { margin: 0 0 0.5em !important; }
+.fjc-body p:last-child { margin: 0 !important; }
 .fjc-body a { color: inherit; text-decoration: underline; }
 .fjc-user .fjc-body { opacity: 0.75; }
 .fjc-note { font-size: 0.8em; opacity: 0.6; padding-left: 3.2em; }
@@ -51,39 +69,39 @@
 .fjc-dots i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.35; animation: fjc-blink 1.1s infinite; }
 .fjc-dots i:nth-child(2) { animation-delay: 0.18s; }
 .fjc-dots i:nth-child(3) { animation-delay: 0.36s; }
-.fjc-earlier {
-  align-self: flex-start; border: 0; background: transparent; color: inherit; opacity: 0.6;
-  font-size: 0.8em; padding: 0; margin: 0 0 0.4em 3.2em; cursor: pointer; text-decoration: underline;
+.fjc button.fjc-earlier {
+  align-self: flex-start; opacity: 0.6 !important; font-size: 0.8em !important;
+  margin: 0 0 0.4em 3.2em !important; text-decoration: underline;
 }
 .fjc-chips { display: flex; flex-wrap: wrap; gap: 0.4em; }
-.fjc-chip {
-  border: 1px solid var(--fjc-line); background: transparent; color: inherit;
-  border-radius: 999px; padding: 0.35em 0.8em; font-size: 0.85em; cursor: pointer;
+.fjc button.fjc-chip {
+  border: 1px solid var(--fjc-line) !important; border-radius: 999px;
+  padding: 0.35em 0.8em !important; font-size: 0.85em !important; line-height: 1.3 !important;
 }
-.fjc-chip:hover { border-color: var(--fjc-accent); }
+.fjc button.fjc-chip:hover { border-color: var(--fjc-accent) !important; }
 
 .fjc-form { display: flex; align-items: flex-end; gap: 0.5em; }
 .fjc-form textarea {
-  flex: 1 1 auto; min-width: 0; resize: none; min-height: 2.6em; max-height: 120px;
+  flex: 1 1 auto !important; min-width: 0; resize: none; min-height: 2.6em; max-height: 120px;
   border: 1px solid var(--fjc-line); background: var(--fjc-field); color: inherit;
-  border-radius: 0.7em; padding: 0.55em 0.8em; font: inherit; line-height: 1.4; outline: none;
+  border-radius: 0.7em; padding: 0.55em 0.8em; font: inherit; font-weight: 300; line-height: 1.4; outline: none;
 }
-.fjc-form textarea::placeholder { color: inherit; opacity: 0.5; }
+.fjc-form textarea::placeholder { color: inherit; opacity: 0.55; }
 .fjc-form textarea:focus { border-color: var(--fjc-accent); }
-.fjc-form button[type="submit"] {
-  flex: 0 0 2.6em; width: 2.6em; height: 2.6em; border: 0; border-radius: 0.7em; cursor: pointer;
-  background: var(--fjc-btn); color: var(--fjc-on-btn); display: grid; place-items: center;
+.fjc button.fjc-send {
+  flex: 0 0 2.6em; width: 2.6em !important; height: 2.6em !important; border-radius: 0.7em;
+  background: var(--fjc-btn) !important; color: var(--fjc-on-btn) !important;
+  display: grid; place-items: center;
 }
-.fjc-form button[type="submit"] svg { width: 1.2em; height: 1.2em; }
-.fjc-form button[type="submit"]:disabled { opacity: 0.5; cursor: default; }
-.fjc-form .fjc-secondary { margin-top: 0; white-space: nowrap; }   /* "View Work", moved beside the input */
+.fjc button.fjc-send svg { width: 1.2em; height: 1.2em; stroke: currentColor; }
+.fjc button.fjc-send:disabled { opacity: 0.5 !important; cursor: default !important; }
 
 /* ---- hero state ---------------------------------------------------------- */
-.fjc-slot { width: 80%; margin-top: 1em; }
+.fjc-slot { width: 80%; margin-top: 1.4em; }
 .fjc[data-state="hero"] .fjc-bar { display: none; }
 .fjc[data-state="hero"] .fjc-thread { max-height: 40vh; overflow-y: auto; margin-bottom: 0.9em; }
+.fjc[data-state="hero"] .fjc-thread:empty { display: none; }
 .fjc[data-state="hero"] .fjc-chips { margin-top: 0.7em; }
-.fjc[data-state="hero"] .fjc-form .fjc-secondary { display: inline-block; }
 
 /* ---- docked state -------------------------------------------------------- */
 html.fjc-docked-page { scroll-padding-bottom: 120px; }
@@ -95,20 +113,19 @@ html.fjc-docked-page body { padding-bottom: 110px; }
   backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--fjc-line); border-radius: 18px; box-shadow: var(--fjc-shadow);
   padding: 0.6em 0.8em 0.7em;
-  animation: fjc-in 0.2s ease;
 }
 .fjc[data-state="docked"] .fjc-bar { display: flex; align-items: center; gap: 0.6em; padding: 0.2em 0.2em 0.5em; }
-.fjc-bar-text {
-  flex: 1; min-width: 0; border: 0; background: transparent; color: inherit; text-align: left;
-  font: inherit; cursor: pointer; padding: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+.fjc button.fjc-bar-text {
+  flex: 1 1 auto; min-width: 0; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-weight: 300 !important;
 }
-.fjc-toggle {
-  flex: 0 0 2em; height: 2em; border: 0; background: transparent; color: inherit; opacity: 0.7; cursor: pointer;
-  display: grid; place-items: center; transition: transform 0.2s ease;
+.fjc button.fjc-toggle {
+  flex: 0 0 2em; width: 2em !important; height: 2em !important; opacity: 0.7 !important;
+  display: grid; place-items: center; transition: transform 0.2s ease !important;
 }
-.fjc-toggle svg { width: 1.2em; height: 1.2em; }
-.fjc[data-state="docked"][data-open="1"] .fjc-toggle { transform: rotate(180deg); }
-.fjc[data-state="docked"] .fjc-earlier { display: none; }
+.fjc button.fjc-toggle svg { width: 1.2em; height: 1.2em; stroke: currentColor; }
+.fjc[data-state="docked"][data-open="1"] button.fjc-toggle { transform: rotate(180deg) !important; }
+.fjc[data-state="docked"] .fjc-earlier { display: none !important; }
 .fjc[data-state="docked"] .fjc-thread,
 .fjc[data-state="docked"] .fjc-chips { display: none; }
 .fjc[data-state="docked"][data-open="1"] .fjc-bar-text { display: none; }
@@ -117,23 +134,17 @@ html.fjc-docked-page body { padding-bottom: 110px; }
 }
 .fjc[data-state="docked"][data-open="1"] .fjc-msg.fjc-folded { display: flex; }
 .fjc[data-state="docked"][data-open="1"] .fjc-chips { display: flex; margin: 0 0 0.6em; }
-.fjc[data-state="docked"] .fjc-form .fjc-secondary { display: none; }
 
 .fjc-flash { outline: 3px solid var(--fjc-accent); outline-offset: 6px; transition: outline-color 1.5s ease; }
 .fjc-flash.fjc-flash-out { outline-color: transparent; }
 
-@keyframes fjc-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
 @keyframes fjc-blink { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
 
 @media (max-width: 767px) {
   .fjc-slot { width: 100%; }
-  .fjc[data-state="hero"] .fjc-form { flex-wrap: wrap; }
-  .fjc[data-state="hero"] .fjc-form textarea { flex-basis: calc(100% - 3.1em); }
-  .fjc[data-state="hero"] .fjc-form .fjc-secondary { margin-top: 0.4em; }
-  .fjc[data-state="docked"] { left: 8px; right: 8px; bottom: 8px; width: auto; transform: none; animation: none; }
+  .fjc[data-state="docked"] { left: 8px; right: 8px; bottom: 8px; width: auto; transform: none; }
   .fjc[data-state="docked"][data-open="1"] .fjc-thread { max-height: 60vh; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .fjc[data-state="docked"] { animation: none; }
-  .fjc-toggle { transition: none; }
+  .fjc button.fjc-toggle { transition: none !important; }
 }

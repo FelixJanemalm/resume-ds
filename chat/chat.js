@@ -17,10 +17,12 @@
  * Pages without a hero start docked. The hero slot keeps its reserved height
  * while docked, so nothing on the page jumps.
  *
- * The assistant speaks first. On plain pages it asks what the visitor is
- * hiring for; on /for/<variant>?a=<id> links it names the posting. A new ?a=
- * link starts a fresh conversation; otherwise a thread with real messages in
- * it follows the visitor across pages.
+ * The assistant speaks first only when it has something the page doesn't:
+ * on /for/<variant>?a=<id> links it names the posting the visitor came from.
+ * On plain pages the input's placeholder asks what they are hiring for and
+ * the chips answer it in one click, so no API call is made until they type.
+ * A new ?a= link starts a fresh conversation; otherwise a thread with real
+ * messages in it follows the visitor across pages.
  *
  * Until PUBLIC is true the widget only renders for browsers that have opened
  * any page with ?chat=1 (sticky; ?chat=0 clears it).
@@ -130,8 +132,11 @@
   var earlier = el("button", { "class": "fjc-earlier", type: "button", hidden: "" });
   var thread = el("div", { "class": "fjc-thread", role: "log", "aria-live": "polite" });
   var chips = el("div", { "class": "fjc-chips" });
-  var input = el("textarea", { rows: "1", placeholder: "Ask anything, or paste a job description", "aria-label": "Ask about Felix" });
-  var sendBtn = el("button", { type: "submit", "aria-label": "Send", html: ARROW });
+  var placeholder = ctx.application_id
+    ? "Ask anything, or paste a job description"
+    : "What are you hiring for? Ask anything, or paste the job description";
+  var input = el("textarea", { rows: "1", placeholder: placeholder, "aria-label": "Ask about Felix" });
+  var sendBtn = el("button", { "class": "fjc-send", type: "submit", "aria-label": "Send", html: ARROW });
   var form = el("form", { "class": "fjc-form" }, [input, sendBtn]);
   var slot = null;
 
@@ -143,10 +148,8 @@
 
   if (hasHero) {
     slot = el("div", { "class": "fjc-slot" });
-    viewWork.parentNode.insertBefore(slot, viewWork);
+    viewWork.parentNode.insertBefore(slot, viewWork.nextSibling);   // View Work stays the primary CTA, untouched
     slot.appendChild(root);
-    viewWork.classList.add("fjc-secondary");   // the button moves beside the input
-    form.appendChild(viewWork);
   } else {
     document.body.appendChild(root);
   }
@@ -204,10 +207,12 @@
     earlier.hidden = unfolded || hidden === 0;
     earlier.textContent = hidden + (hidden === 1 ? " earlier message" : " earlier messages");
     var last = lastBotText();
-    barText.textContent = last ? last.replace(/\s+/g, " ").slice(0, 140) : "Ask anything about Felix";
+    barText.textContent = last ? last.replace(/\s+/g, " ").slice(0, 140) : placeholder;
   }
   function lastBotText() {
-    for (var i = history.length - 1; i >= 0; i--) if (history[i].role === "assistant") return stripNotes(history[i].text);
+    for (var i = history.length - 1; i >= 0; i--) {
+      if (history[i].role === "assistant" && !history[i].hidden) return stripNotes(history[i].text);
+    }
     return "";
   }
   earlier.addEventListener("click", function () { unfolded = true; updateFold(); });
@@ -227,7 +232,7 @@
 
   function renderAll() {
     thread.innerHTML = "";
-    history.forEach(function (m) { addMsg(m.role, stripNotes(m.text)); });
+    history.forEach(function (m) { if (!m.hidden) addMsg(m.role, stripNotes(m.text)); });
     renderChips();
     updateFold();
   }
@@ -381,7 +386,7 @@
     if (!text || busy) return;
     busy = true; sendBtn.disabled = true;
     openerRequested = true;
-    if (!history.length) history.push({ role: "assistant", text: FALLBACK_OPENER });
+    if (!history.length) history.push({ role: "assistant", text: FALLBACK_OPENER, hidden: true });
     chips.innerHTML = "";
     addMsg("user", text);
     history.push({ role: "user", text: text });
@@ -430,8 +435,9 @@
         updateFold();
       })
       .catch(function () {
-        if (!history.length) { history.push({ role: "assistant", text: FALLBACK_OPENER }); save(); }
-        renderText(bot, FALLBACK_OPENER);
+        // Nothing worth showing: drop the bubble, the placeholder already asks the question.
+        if (bot.parentNode) bot.parentNode.removeChild(bot);
+        openerRequested = false;
         updateFold();
       });
   }
@@ -464,7 +470,6 @@
   toggle.addEventListener("click", function () { setOpen(root.getAttribute("data-open") !== "1"); });
   input.addEventListener("focus", function () {
     if (root.getAttribute("data-state") === "docked") setOpen(true);
-    requestOpener();
   });
   document.addEventListener("click", function (e) {
     if (root.getAttribute("data-state") === "docked" && !root.contains(e.target)) setOpen(false);
@@ -481,25 +486,16 @@
 
   renderAll();
 
-  // The assistant speaks first. In the hero it is part of the first impression,
-  // so it fires on load (not for crawlers). On docked-only pages it waits for a
-  // sign of life so bounces cost nothing.
+  // The assistant speaks first only when it knows the posting the visitor came
+  // from (?a=). That line is information the page doesn't have. Everywhere else
+  // the placeholder asks the question and no API call is made until they type.
   function whenVisible(fn) {
     if (document.visibilityState === "visible") { fn(); return; }
     document.addEventListener("visibilitychange", function once() {
       if (document.visibilityState === "visible") { document.removeEventListener("visibilitychange", once); fn(); }
     });
   }
-  function armOpener() {
-    if (history.length) return;
-    if (navigator.webdriver || BOT_UA.test(navigator.userAgent || "")) return;
-    if (hasHero || ctx.application_id) { setTimeout(function () { whenVisible(requestOpener); }, 600); return; }
-    var events = ["scroll", "pointerdown", "keydown", "touchstart"];
-    var onFirst = function () {
-      events.forEach(function (ev) { window.removeEventListener(ev, onFirst); });
-      setTimeout(function () { whenVisible(requestOpener); }, 500);
-    };
-    events.forEach(function (ev) { window.addEventListener(ev, onFirst, { passive: true }); });
+  if (!history.length && ctx.application_id && !navigator.webdriver && !BOT_UA.test(navigator.userAgent || "")) {
+    setTimeout(function () { whenVisible(requestOpener); }, 600);
   }
-  armOpener();
 })();
