@@ -76,30 +76,22 @@
   // A conversation belongs to the page it started on. A new ?a= link is a new
   // front door, so it starts fresh. A different page with no real messages yet
   // just gets a fresh opener. A thread with real messages follows the visitor.
+  var STATE_VERSION = 4;
   var stored = null;
   try { stored = JSON.parse(session.get("fjc_state") || "null"); } catch (e) { stored = null; }
   var history = [], sessionId = null;
-  if (stored && stored.application_id === ctx.application_id &&
-      (stored.path === ctx.path || hasUserTurn(stored.history))) {
+  // Only a thread the visitor actually spoke in survives, and only for the same ?a= link.
+  // Anything else (an opener alone, a failed opener, an older widget version) starts fresh.
+  if (stored && stored.v === STATE_VERSION && stored.application_id === ctx.application_id && hasUserTurn(stored.history)) {
     history = stored.history || [];
     sessionId = stored.session || null;
   }
   if (!sessionId) sessionId = uuid();
   function save() {
     session.set("fjc_state", JSON.stringify({
-      session: sessionId, application_id: ctx.application_id, path: ctx.path, history: history.slice(-30)
+      v: STATE_VERSION, session: sessionId, application_id: ctx.application_id, path: ctx.path, history: history.slice(-30)
     }));
   }
-
-  var ROLE_CHIPS = ["Design systems", "Design engineering", "Applied AI / forward deployed", "Product design", "Design leadership"];
-  var QUESTION_CHIPS = {
-    "/for/ai": ["Is he a fit?", "How did the 20-agent pipeline work?", "What is he bad at?"],
-    "/for/design-systems": ["Is he a fit?", "How do you prove a design system's ROI?", "What is he bad at?"],
-    "/for/design-engineering": ["Is he a fit?", "One Figma change, six platforms. How?", "What is he bad at?"],
-    "/for/design-leadership": ["Is he a fit?", "How does he get systems adopted?", "What is he bad at?"],
-    "/for/product-design": ["Is he a fit?", "What is his product design process?", "What is he bad at?"]
-  };
-  var DEFAULT_QUESTION_CHIPS = ["Is he a fit?", "What is he bad at?", "Show me the design tokens work"];
 
   var CASE = {
     "work/ai-sourcing": ["AI-powered supply chain traceability", "/work/ai-sourcing.html"],
@@ -131,7 +123,6 @@
   var bar = el("div", { "class": "fjc-bar" }, [el("span", { "class": "fjc-badge", text: "AI" }), barText, toggle]);
   var earlier = el("button", { "class": "fjc-earlier", type: "button", hidden: "" });
   var thread = el("div", { "class": "fjc-thread", role: "log", "aria-live": "polite" });
-  var chips = el("div", { "class": "fjc-chips" });
   var placeholder = ctx.application_id
     ? "Ask anything, or paste a job description"
     : "What are you hiring for? Ask anything, or paste the job description";
@@ -143,7 +134,6 @@
   root.appendChild(bar);
   root.appendChild(earlier);
   root.appendChild(thread);
-  root.appendChild(chips);
   root.appendChild(form);
 
   if (hasHero) {
@@ -171,7 +161,7 @@
 
   function addMsg(role, text) {
     var n = el("div", { "class": "fjc-msg " + (role === "user" ? "fjc-user" : "fjc-bot") }, [
-      el("span", { "class": "fjc-who", text: role === "user" ? "You" : "AI" }),
+      role === "user" ? null : el("span", { "class": "fjc-badge", text: "AI" }),
       el("div", { "class": "fjc-body" })
     ]);
     if (text) renderText(n, text);
@@ -217,23 +207,9 @@
   }
   earlier.addEventListener("click", function () { unfolded = true; updateFold(); });
 
-  function renderChips() {
-    chips.innerHTML = "";
-    if (hasUserTurn(history)) return;
-    var list = ctx.application_id ? (QUESTION_CHIPS[ctx.path] || DEFAULT_QUESTION_CHIPS) : ROLE_CHIPS;
-    list.forEach(function (label) {
-      var b = el("button", { "class": "fjc-chip", type: "button", text: label });
-      b.addEventListener("click", function () {
-        send(ctx.application_id ? label : "We're hiring for " + label.toLowerCase() + ".");
-      });
-      chips.appendChild(b);
-    });
-  }
-
   function renderAll() {
     thread.innerHTML = "";
     history.forEach(function (m) { if (!m.hidden) addMsg(m.role, stripNotes(m.text)); });
-    renderChips();
     updateFold();
   }
 
@@ -387,7 +363,6 @@
     busy = true; sendBtn.disabled = true;
     openerRequested = true;
     if (!history.length) history.push({ role: "assistant", text: FALLBACK_OPENER, hidden: true });
-    chips.innerHTML = "";
     addMsg("user", text);
     history.push({ role: "user", text: text });
     save();
