@@ -27,8 +27,10 @@
  * the domain still gets their opener, their h1 stamp, and their case-study
  * order. A newer link overwrites it; ?a=clear forgets it. Links go to the
  * root; there are no per-track pages any more.
- * A new reference starts a fresh conversation; otherwise a thread with real
- * messages in it follows the visitor across pages.
+ * A thread the visitor actually spoke in is kept in localStorage for 30 days
+ * on that device, keyed by the reference, so they can come back on Thursday
+ * and continue. A new reference starts fresh. A forwarded link never shows a
+ * colleague's questions: the thread lives only in the browser that had it.
  *
  * Until PUBLIC is true the widget only renders for browsers that have opened
  * any page with ?chat=1 (sticky; ?chat=0 clears it).
@@ -53,7 +55,6 @@
     };
   }
   var local = storage(window.localStorage);
-  var session = storage(window.sessionStorage);
   var params = new URLSearchParams(location.search);
 
   if (params.get("chat") === "1") local.set("fjc_on", "1");
@@ -89,20 +90,24 @@
   // A conversation belongs to the page it started on. A new ?a= link is a new
   // front door, so it starts fresh. A different page with no real messages yet
   // just gets a fresh opener. A thread with real messages follows the visitor.
-  var STATE_VERSION = 4;
+  var STATE_VERSION = 5;
+  var KEEP_MS = 30 * 24 * 3600 * 1000, SESSION_MS = 6 * 3600 * 1000;
   var stored = null;
-  try { stored = JSON.parse(session.get("fjc_state") || "null"); } catch (e) { stored = null; }
+  try { stored = JSON.parse(local.get("fjc_state") || "null"); } catch (e) { stored = null; }
   var history = [], sessionId = null;
-  // Only a thread the visitor actually spoke in survives, and only for the same ?a= link.
-  // Anything else (an opener alone, a failed opener, an older widget version) starts fresh.
-  if (stored && stored.v === STATE_VERSION && stored.application_id === ctx.application_id && hasUserTurn(stored.history)) {
+  // Only a thread the visitor actually spoke in survives, only for the same ?a= link,
+  // and only for 30 days. A thread older than a few hours gets a new session id, so the
+  // per-conversation message cap starts over when they come back.
+  if (stored && stored.v === STATE_VERSION && stored.application_id === ctx.application_id &&
+      hasUserTurn(stored.history) && Date.now() - (stored.ts || 0) < KEEP_MS) {
     history = stored.history || [];
-    sessionId = stored.session || null;
+    sessionId = Date.now() - (stored.ts || 0) < SESSION_MS ? (stored.session || null) : null;
   }
   if (!sessionId) sessionId = uuid();
   function save() {
-    session.set("fjc_state", JSON.stringify({
-      v: STATE_VERSION, session: sessionId, application_id: ctx.application_id, path: ctx.path, history: history.slice(-30)
+    local.set("fjc_state", JSON.stringify({
+      v: STATE_VERSION, ts: Date.now(), session: sessionId, application_id: ctx.application_id,
+      path: ctx.path, history: history.slice(-30)
     }));
   }
 
@@ -184,6 +189,11 @@
         if (!j) { if (refParam !== ctx.application_id) local.remove("fj_app"); return; }   // stale stored reference
         if (j.company) markFor(j.company);
         leadWith(j.lead);
+        if (j.brand_color && local.get("fj_app_color") !== ctx.application_id) {
+          // The site in their colors: same token pipeline the picker uses, applied once per link.
+          setAccent({ color: j.brand_color, mode: "auto", quiet: true });
+          local.set("fj_app_color", ctx.application_id);
+        }
         if (j.opener && !history.length) {
           history.push({ role: "assistant", text: j.opener });
           save();
@@ -467,15 +477,19 @@
   }
   function setAccent(inp) {
     var hex = toHex(inp.color);
-    if (!hex) { addNote("Couldn't read that color."); return; }
+    if (!hex) { if (!inp.quiet) addNote("Couldn't read that color."); return; }
     var hsl = hexToHsl(hex);
     if (inp.mode === "dark") hsl[2] = Math.min(hsl[2], 34);
     if (inp.mode === "light") hsl[2] = Math.max(hsl[2], 64);
+    if (inp.quiet) {            // a brand color arriving on load: keep it inside a range that reads well
+      hsl[1] = Math.min(hsl[1], 85);
+      hsl[2] = Math.max(28, Math.min(hsl[2], 66));
+    }
     hex = hslToHex(hsl[0], hsl[1], hsl[2]);
     var desc = Object.getOwnPropertyDescriptor(window, "currentColor");
     if (desc && desc.set) window.currentColor = hex;        // the site's own token pipeline
     else document.documentElement.style.setProperty("--sysPrimaryDefault", hex);
-    addNote("Accent set to " + hex.toUpperCase() + (inp.mode && inp.mode !== "auto" ? " (" + inp.mode + ")" : "") + ".");
+    if (!inp.quiet) addNote("Accent set to " + hex.toUpperCase() + (inp.mode && inp.mode !== "auto" ? " (" + inp.mode + ")" : "") + ".");
   }
 
   // ---- conversation ----------------------------------------------------------
