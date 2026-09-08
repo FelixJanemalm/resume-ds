@@ -323,29 +323,141 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
         dive.shafts.forEach(m => { m.lookAt(cx, m.position.y, cz); m.position.x = Math.cos(m.userData.a + 0.05 * Math.sin(t * 0.3 + m.userData.phase)) * m.userData.r; m.position.z = Math.sin(m.userData.a + 0.05 * Math.sin(t * 0.3 + m.userData.phase)) * m.userData.r; });
     }
 
-    /* Centerpiece 'axis': the single source of truth every case study hangs off — a thin line
-       down the helix axis with one node per card. The front card's node lights up. */
+    /* Centerpiece 'axis': one line down the helix, one node per card. Cheap tricks only:
+       sprites with canvas-drawn glows, additive ribbons, a shader with travelling pulses, chrome
+       iridescent nodes off the environment map, rings and satellites on the lit node, a spark that
+       jumps node to node when the front card changes, a callout to the card, a faint dot grid behind. */
     let axis = null;
+    function glowTexture(kind) {
+        const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
+        const rad = g.createRadialGradient(128, 128, 0, 128, 128, 128);
+        rad.addColorStop(0, 'rgba(255,255,255,1)'); rad.addColorStop(0.18, 'rgba(255,255,255,0.55)'); rad.addColorStop(0.5, 'rgba(255,255,255,0.12)'); rad.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = rad; g.fillRect(0, 0, 256, 256);
+        if (kind === 'flare') {
+            const h = g.createLinearGradient(0, 128, 256, 128);
+            h.addColorStop(0, 'rgba(255,255,255,0)'); h.addColorStop(0.5, 'rgba(255,255,255,0.9)'); h.addColorStop(1, 'rgba(255,255,255,0)');
+            g.fillStyle = h; g.fillRect(0, 124, 256, 8);
+            g.globalAlpha = 0.5; g.fillRect(0, 126, 256, 4); g.globalAlpha = 1;
+            g.strokeStyle = 'rgba(255,255,255,0.25)'; g.lineWidth = 2; g.beginPath(); g.arc(128, 128, 78, 0, Math.PI * 2); g.stroke();
+        }
+        const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+    }
+    const LINE_VS = 'varying float vY; varying vec2 vUv; void main(){ vUv = uv; vec4 w = modelMatrix * vec4(position, 1.0); vY = w.y; gl_Position = projectionMatrix * viewMatrix * w; }';
+    const LINE_FS = `uniform vec3 uColor; uniform float uTime, uCamY, uTop, uBottom, uS, uRibbon, uIntro;
+        varying float vY; varying vec2 vUv;
+        void main(){
+            float y = vY / uS;
+            float edge = smoothstep(uBottom, uBottom + 2.5, y) * smoothstep(uTop, uTop - 2.5, y);
+            float lit = mix(0.22, 1.0, smoothstep(uCamY - 0.45, uCamY + 0.25, y));          // above you: visited and bright
+            float pulse = 0.0;
+            for (int k = 0; k < 3; k++) { float pk = fract(uTime * 0.09 + float(k) * 0.37); float py = uTop - pk * (uTop - uBottom); pulse += exp(-pow((y - py) * 4.5, 2.0)); }
+            pulse = min(pulse, 1.0);
+            vec3 c = mix(uColor, vec3(1.0), pulse * 0.85);
+            float a = edge * uIntro;
+            if (uRibbon > 0.5) { float w = pow(sin(vUv.x * 3.14159), 2.4); a *= w * (0.16 * lit + 0.75 * pulse); }
+            else { a *= 0.55 + 0.45 * lit + pulse; }
+            gl_FragColor = vec4(c, a);
+        }`;
     function buildAxis() {
-        const lineMat = new THREE.MeshBasicMaterial({ color: 0x4faad1, transparent: true, opacity: 0.35, depthWrite: false });
-        const nodeMat = new THREE.MeshBasicMaterial({ color: 0x4faad1 });
-        const haloMat = new THREE.MeshBasicMaterial({ color: 0x4faad1, transparent: true, opacity: 0.18, depthWrite: false, blending: THREE.AdditiveBlending });
-        const line = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1, 8), lineMat);
+        const accent = new THREE.Color(0x4faad1);
+        const uni = () => ({ uColor: { value: accent.clone() }, uTime: { value: 0 }, uCamY: { value: 0 }, uTop: { value: 6 }, uBottom: { value: -6 }, uS: { value: S }, uRibbon: { value: 0 }, uIntro: { value: 0 } });
+        const coreMat = new THREE.ShaderMaterial({ uniforms: uni(), vertexShader: LINE_VS, fragmentShader: LINE_FS, transparent: true, depthWrite: false });
+        const ribbonMat = new THREE.ShaderMaterial({ uniforms: uni(), vertexShader: LINE_VS, fragmentShader: LINE_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+        ribbonMat.uniforms.uRibbon.value = 1;
+        const core = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.013, 1, 10, 1, true), coreMat);
+        const ribbon = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 1, 1, 1), ribbonMat);
+        world.add(core, ribbon);
+
+        const haloTex = glowTexture('halo'), flareTex = glowTexture('flare');
+        const nodeMat = new THREE.MeshPhysicalMaterial({ color: 0xdfe8f2, metalness: 1, roughness: 0.16, iridescence: 0.7, iridescenceIOR: 1.5, iridescenceThicknessRange: [120, 420], envMapIntensity: 1.1 });
+        const ringMat = new THREE.MeshPhysicalMaterial({ color: 0xcfd9e6, metalness: 1, roughness: 0.22, iridescence: 0.6, envMapIntensity: 1 });
         const nodes = [], halos = [];
         for (let i = 0; i < n; i++) {
-            const nd = new THREE.Mesh(new THREE.SphereGeometry(0.09, 20, 16), nodeMat); nodes.push(nd); world.add(nd);
-            const h = new THREE.Mesh(new THREE.SphereGeometry(0.26, 20, 16), haloMat); halos.push(h); world.add(h);
+            const nd = new THREE.Mesh(new THREE.SphereGeometry(0.075, 28, 20), nodeMat); world.add(nd); nodes.push(nd);
+            const h = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTex, color: accent.clone(), transparent: true, opacity: 0.3, depthWrite: false, blending: THREE.AdditiveBlending }));
+            h.scale.setScalar(0.55); world.add(h); halos.push(h);
         }
-        world.add(line);
-        axis = { line, nodes, halos, lineMat, nodeMat, haloMat };
+        const flare = new THREE.Sprite(new THREE.SpriteMaterial({ map: flareTex, color: accent.clone().lerp(new THREE.Color(0xffffff), 0.4), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
+        flare.scale.setScalar(1.15); world.add(flare);
+        const rings = [0, 1].map(k => { const r = new THREE.Mesh(new THREE.TorusGeometry(0.2 + k * 0.08, 0.005, 10, 96), ringMat); r.scale.setScalar(0.001); world.add(r); return r; });
+        const sats = [0, 1, 2].map(k => {
+            const g = new THREE.Group();
+            const m = new THREE.Mesh(new THREE.SphereGeometry(0.022, 14, 10), new THREE.MeshBasicMaterial({ color: accent.clone().lerp(new THREE.Color(0xffffff), 0.5) }));
+            const h = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTex, color: accent.clone(), transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending })); h.scale.setScalar(0.16);
+            g.add(m, h); g.visible = false; world.add(g); return g;
+        });
+        const callout = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 1, 6), new THREE.MeshBasicMaterial({ color: accent.clone(), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
+        world.add(callout);
+        const spark = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTex, color: new THREE.Color(0xffffff), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
+        spark.scale.setScalar(0.4); world.add(spark);
+        // dot grid backdrop, like the hero's grid canvas: a billboard behind the axis, fading out radially
+        const gridMat = new THREE.ShaderMaterial({
+            uniforms: { uColor: { value: accent.clone() }, uAlpha: { value: 0.16 }, uTime: { value: 0 } },
+            vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+            fragmentShader: 'uniform vec3 uColor; uniform float uAlpha, uTime; varying vec2 vUv; void main(){ vec2 q = (vUv - 0.5) * 24.0; vec2 f = fract(q + vec2(0.0, uTime * 0.02)) - 0.5; float d = length(f); float dot = smoothstep(0.09, 0.03, d); float fade = 1.0 - smoothstep(0.15, 0.5, length(vUv - 0.5)); gl_FragColor = vec4(uColor, dot * fade * uAlpha); }',
+            transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+        });
+        const grid = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), gridMat); world.add(grid);
+        axis = { core, ribbon, coreMat, ribbonMat, nodes, halos, nodeMat, ringMat, flare, rings, sats, callout, spark, grid, gridMat, sparkT: 1, sparkFrom: 0, sparkTo: 0, intro: 0 };
         layoutAxis();
     }
     function layoutAxis() {
         if (!axis) return;
-        const span = yStep * (n - 1), pad = 6;
-        axis.line.scale.set(1, span + pad * 2, 1);
-        axis.line.position.y = -span / 2;
-        axis.nodes.forEach((nd, i) => { nd.position.y = -yStep * i; axis.halos[i].position.y = nd.position.y; });
+        const span = yStep * (n - 1), pad = 6, top = pad, bottom = -span - pad;
+        for (const m of [axis.core, axis.ribbon]) { m.scale.y = top - bottom; m.position.y = (top + bottom) / 2; }
+        for (const mat of [axis.coreMat, axis.ribbonMat]) { mat.uniforms.uTop.value = top; mat.uniforms.uBottom.value = bottom; mat.uniforms.uS.value = S; }
+        // the node sits on the axis, farther from the camera than the card plane, so a gap above the card's top
+        // edge must be scaled by that depth ratio to still clear the edge on screen
+        const crown = (lastCardH / 2 + 0.15) * (2 * cfg.radius + cfg.camOffset) / (cfg.radius + cfg.camOffset);
+        axis.nodes.forEach((nd, i) => { nd.position.y = -yStep * i + crown; axis.halos[i].position.y = nd.position.y; });
+    }
+    function axisSpark(from, to) {
+        if (!axis || from < 0 || from === to) return;
+        axis.sparkFrom = from; axis.sparkTo = to; axis.sparkT = 0;
+    }
+    const _q = new THREE.Quaternion(), _up = new THREE.Vector3(0, 1, 0), _dir = new THREE.Vector3();
+    function updateAxis(now, dt) {
+        const t = now * 0.001, camY = camGroup.position.y / S, cx = camera.position.x / S, cz = camera.position.z / S;
+        axis.intro = Math.min(1, axis.intro + dt * 0.8);
+        for (const mat of [axis.coreMat, axis.ribbonMat]) { mat.uniforms.uTime.value = t; mat.uniforms.uCamY.value = camY; mat.uniforms.uIntro.value = axis.intro; }
+        axis.ribbon.lookAt(cx, axis.ribbon.position.y, cz);
+        axis.grid.lookAt(cx, axis.grid.position.y, cz); axis.grid.position.y = camY; axis.gridMat.uniforms.uTime.value = t;
+        const fi = frontIndex < 0 ? 0 : frontIndex, fn = axis.nodes[fi];
+        axis.nodes.forEach((nd, i) => {
+            const k = i === fi ? 1 : 0, visited = nd.position.y > camY - 0.2 ? 1 : 0;
+            nd.scale.lerp(_s.setScalar((0.8 + 0.2 * visited + k * 0.9) * axis.intro), 0.1);
+            const h = axis.halos[i]; h.material.opacity += ((k ? 0.55 + 0.1 * Math.sin(t * 2.2) : 0.12 + 0.12 * visited) * axis.intro - h.material.opacity) * 0.1;
+            h.scale.setScalar((k ? 1.1 + 0.05 * Math.sin(t * 2.2) : 0.5) * axis.intro);
+        });
+        // front node dressing: flare, rings, satellites
+        axis.flare.position.copy(fn.position); axis.flare.material.opacity += ((0.5 + 0.12 * Math.sin(t * 1.7)) * axis.intro - axis.flare.material.opacity) * 0.08;
+        axis.flare.material.rotation = t * 0.05;
+        axis.rings.forEach((r, k) => {
+            r.position.copy(fn.position); r.scale.lerp(_s.setScalar(axis.intro), 0.08);
+            r.rotation.set(1.1 + 0.5 * k + t * (0.15 + 0.1 * k), t * (0.35 - 0.2 * k), 0.4 * k);
+        });
+        axis.sats.forEach((g, k) => {
+            g.visible = axis.intro > 0.05;
+            const a = t * (0.9 + 0.15 * k) + k * 2.094, r = 0.15 + 0.04 * k, tilt = 0.5 + 0.5 * k;
+            g.position.set(fn.position.x + Math.cos(a) * r, fn.position.y + Math.sin(a) * r * Math.sin(tilt), fn.position.z + Math.sin(a) * r * Math.cos(tilt));
+            g.scale.setScalar(axis.intro);
+        });
+        // callout: from the lit node to its card (the DOM card is drawn on top, so the line disappears behind it)
+        const card = items[fi].obj.position;
+        _dir.set(card.x / S, card.y / S + lastCardH / 2, card.z / S).sub(fn.position);   // to the card's top edge: the card hangs from its node
+        const len = _dir.length();
+        axis.callout.position.copy(fn.position).addScaledVector(_dir, 0.5);
+        axis.callout.quaternion.setFromUnitVectors(_up, _dir.normalize());
+        axis.callout.scale.set(1, len, 1);
+        axis.callout.material.opacity += (0.35 * axis.intro - axis.callout.material.opacity) * 0.08;
+        // spark: shoots along the line when the front card changes
+        if (axis.sparkT < 1) {
+            axis.sparkT = Math.min(1, axis.sparkT + dt * 1.8);
+            const e = axis.sparkT < 0.5 ? 2 * axis.sparkT * axis.sparkT : 1 - Math.pow(-2 * axis.sparkT + 2, 2) / 2;
+            axis.spark.position.set(0, M.lerp(axis.nodes[axis.sparkFrom].position.y, axis.nodes[axis.sparkTo].position.y, e), 0);
+            axis.spark.material.opacity = Math.sin(axis.sparkT * Math.PI);
+            axis.spark.scale.setScalar(0.35 + 0.25 * Math.sin(axis.sparkT * Math.PI));
+        } else axis.spark.material.opacity = 0;
     }
 
     let spine = null;
@@ -388,7 +500,17 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
         }
         if (keyLight) keyLight.color.copy(accent).lerp(new THREE.Color(0xffffff), 0.5);
         if (particles) { particles.material.color.copy(accent); particles.material.opacity = light ? 0.55 : 0.75; }
-        if (axis) { axis.lineMat.color.copy(accent); axis.nodeMat.color.copy(accent); axis.haloMat.color.copy(accent); axis.lineMat.opacity = light ? 0.45 : 0.35; }
+        if (axis) {
+            const soft = accent.clone().lerp(new THREE.Color(0xffffff), light ? 0.0 : 0.25);
+            for (const mat of [axis.coreMat, axis.ribbonMat]) mat.uniforms.uColor.value.copy(soft);
+            axis.halos.forEach(h => h.material.color.copy(accent));
+            axis.flare.material.color.copy(accent).lerp(new THREE.Color(0xffffff), 0.4);
+            axis.sats.forEach(g => { g.children[0].material.color.copy(accent).lerp(new THREE.Color(0xffffff), 0.5); g.children[1].material.color.copy(accent); });
+            axis.callout.material.color.copy(accent); axis.spark.material.color.set(0xffffff);
+            axis.gridMat.uniforms.uColor.value.copy(accent); axis.gridMat.uniforms.uAlpha.value = light ? 0.28 : 0.16;
+            axis.nodeMat.color.set(light ? 0xb9c6d6 : 0xdfe8f2); axis.ringMat.color.set(light ? 0xa9b7c8 : 0xcfd9e6);
+            if (light) { [axis.ribbonMat].forEach(m => m.blending = THREE.NormalBlending); axis.halos.forEach(h => h.material.blending = THREE.NormalBlending); }
+        }
         if (polystar) {
             const bg = new THREE.Color(); try { bg.setStyle(cssVar('--bg', light ? '#ffffff' : '#101012')); } catch (e) { bg.set(light ? 0xffffff : 0x101012); }
             polystar.mat.uniforms.uA.value.copy(accent);
@@ -410,7 +532,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
 
     /* ---------- layout: helix + camera targets ---------- */
     const targets = [];
-    let portrait = false, S = 240, yStep = 0, lastCardW = 0, lastCap = '';
+    let portrait = false, S = 240, yStep = 0, lastCardW = 0, lastCardH = 0, lastCap = '';
     function layout() {
         const w = stage.clientWidth, h = stage.clientHeight;
         portrait = h > w;
@@ -436,6 +558,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
         const cardW = Math.max(0.8, Math.min(wantW, clearW, fitW));
         lastCardW = cardW; lastCap = cardW === wantW ? 'width share' : cardW === clearW ? 'neighbour clearance' : 'height fit';
         const cardH = cardW * ratio;
+        lastCardH = cardH;
         section.style.setProperty('--ws-s', S + 'px');
         section.classList.toggle('ws-compact', cardH * S < 420);     // not enough pixels for the summary line
         yStep = (portrait ? 0.16 : 0.12) * Math.min(7, n);
@@ -467,7 +590,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
     const _s = new THREE.Vector3();
     const target = new THREE.Object3D();
     const offset = new THREE.Vector3();
-    let first = true, dirty = true, running = false, active = false, tStart = performance.now(), frontIndex = -1, tuneLive = null, frames = 0;
+    let first = true, dirty = true, running = false, active = false, tStart = performance.now(), frontIndex = -1, tuneLive = null, frames = 0, lastNow = performance.now();
 
     function progress() {
         const total = section.offsetHeight - stage.clientHeight;
@@ -503,7 +626,8 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
 
         const front = Math.round(seg);
         if (front !== frontIndex) {
-            frontIndex = front;
+            const prevFront = frontIndex; frontIndex = front;
+            if (axis) axisSpark(prevFront, front);
             items.forEach((item, i) => {
                 item.wrap.classList.toggle('is-front', i === front);
                 if (item.video) { if (i === front) item.video.play?.().catch?.(() => {}); else item.video.pause?.(); }
@@ -522,11 +646,8 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
             g.position.set(_s.x, camGroup.position.y / S + _s.y, _s.z);
         }
         if (dive) updateDive(p, now);
-        if (axis) axis.nodes.forEach((nd, i) => {
-            const k = i === frontIndex ? 1 : 0;
-            nd.scale.lerp(_s.setScalar(1 + k * 0.8), 0.12);
-            axis.halos[i].scale.lerp(_s.setScalar(k ? 1 + 0.15 * Math.sin(now * 0.004) : 0.001), 0.12);
-        });
+        if (axis) updateAxis(now, Math.min(0.05, (now - lastNow) / 1000));
+        lastNow = now;
         cssRenderer.render(cssScene, camera);
         if (gl) gl.render(glScene, camera);
     }
