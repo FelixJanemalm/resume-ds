@@ -573,7 +573,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
             angle -= step;
             obj.position.y = out.y = -yStep * i * S;
             const t = { position: out, quaternion: obj.quaternion.clone() };
-            if (portrait) t.position.y -= 0.7 * S;
+            if (portrait) t.position.y += (cfg.centerpiece === 'axis' ? 0.45 : -0.7) * S;   // axis: camera a little above the card so its node clears the header; otherwise theirs
             targets.push(t);
         });
         world.scale.setScalar(S);
