@@ -66,9 +66,9 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
         fov: num(ds.fov, 35),
         fovPortrait: num(ds.fovPortrait, 55),
         camOffset: num(ds.camOffset, 2),        // camera's local z offset inside its group
-        edge: num(ds.edge, 0.06), edgePortrait: 0.1,   // scroll dead zone at both ends
+        edge: num(ds.edge, 0.03), edgePortrait: 0.06,  // scroll dead zone at both ends
         lerp: num(ds.lerp, 0.2),
-        drift: num(ds.drift, 0.8),              // units the camera enters above / leaves below (theirs: 1)
+        drift: num(ds.drift, -0.7),            // entry/exit camera offset in units; theirs is +1 (card low on entry), negative keeps the first card up under the heading and the last card near the bottom edge
         cardFrac: num(ds.cardFrac, 0.6),        // card width as a fraction of the visible width (upper bound; see layout())
         gap: num(ds.gap, 0.45),                 // minimum clearance between neighbouring cards, in units
         cardFracPortrait: 0.86,
@@ -81,6 +81,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
         diveSurface: num(ds.diveSurface, 1.5),      // 'dive': water surface height above the first card, in units
         diveLight: num(ds.diveLight, 1.0),          // 'dive': light shaft intensity
         divePitch: num(ds.divePitch, 14),           // 'dive': degrees the camera looks up at the hull on entry and exit
+        axisOrbs: num(ds.axisOrbs, 0),              // 'axis': 1 adds a chrome node per card with rings, satellites, flare and a hanger
         // what sits on the helix axis: 'none' | 'axis' (a line with a node per card) | 'spine' (their vertebrae)
         // | 'polystar' (the hero Lottie's language: 22 rounded pentagons with a fat gradient stroke)
         centerpiece: new URLSearchParams(location.search).get('centerpiece') || ds.centerpiece || 'none',
@@ -354,7 +355,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
             pulse = min(pulse, 1.0);
             vec3 c = mix(uColor, vec3(1.0), pulse * 0.85);
             float a = edge * uIntro;
-            if (uRibbon > 0.5) { float w = pow(sin(vUv.x * 3.14159), 2.4); a *= w * (0.16 * lit + 0.75 * pulse); }
+            if (uRibbon > 0.5) { float w = pow(sin(vUv.x * 3.14159), 2.4); a *= w * (0.16 * lit + 0.45 * pulse); }
             else { a *= 0.55 + 0.45 * lit + pulse; }
             gl_FragColor = vec4(c, a);
         }`;
@@ -369,27 +370,28 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
         world.add(core, ribbon);
 
         const haloTex = glowTexture('halo'), flareTex = glowTexture('flare');
+        const orbs = cfg.axisOrbs > 0.5;
         const nodeMat = new THREE.MeshPhysicalMaterial({ color: 0xdfe8f2, metalness: 1, roughness: 0.16, iridescence: 0.7, iridescenceIOR: 1.5, iridescenceThicknessRange: [120, 420], envMapIntensity: 1.1 });
         const ringMat = new THREE.MeshPhysicalMaterial({ color: 0xcfd9e6, metalness: 1, roughness: 0.22, iridescence: 0.6, envMapIntensity: 1 });
         const nodes = [], halos = [];
-        for (let i = 0; i < n; i++) {
+        for (let i = 0; i < n && orbs; i++) {
             const nd = new THREE.Mesh(new THREE.SphereGeometry(0.075, 28, 20), nodeMat); world.add(nd); nodes.push(nd);
             const h = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTex, color: accent.clone(), transparent: true, opacity: 0.3, depthWrite: false, blending: THREE.AdditiveBlending }));
             h.scale.setScalar(0.55); world.add(h); halos.push(h);
         }
         const flare = new THREE.Sprite(new THREE.SpriteMaterial({ map: flareTex, color: accent.clone().lerp(new THREE.Color(0xffffff), 0.4), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
-        flare.scale.setScalar(1.15); world.add(flare);
-        const rings = [0, 1].map(k => { const r = new THREE.Mesh(new THREE.TorusGeometry(0.2 + k * 0.08, 0.005, 10, 96), ringMat); r.scale.setScalar(0.001); world.add(r); return r; });
-        const sats = [0, 1, 2].map(k => {
+        flare.scale.setScalar(1.15); if (orbs) world.add(flare);
+        const rings = !orbs ? [] : [0, 1].map(k => { const r = new THREE.Mesh(new THREE.TorusGeometry(0.2 + k * 0.08, 0.005, 10, 96), ringMat); r.scale.setScalar(0.001); world.add(r); return r; });
+        const sats = !orbs ? [] : [0, 1, 2].map(k => {
             const g = new THREE.Group();
             const m = new THREE.Mesh(new THREE.SphereGeometry(0.022, 14, 10), new THREE.MeshBasicMaterial({ color: accent.clone().lerp(new THREE.Color(0xffffff), 0.5) }));
             const h = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTex, color: accent.clone(), transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending })); h.scale.setScalar(0.16);
             g.add(m, h); g.visible = false; world.add(g); return g;
         });
         const callout = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 1, 6), new THREE.MeshBasicMaterial({ color: accent.clone(), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
-        world.add(callout);
+        if (orbs) world.add(callout);
         const spark = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTex, color: new THREE.Color(0xffffff), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
-        spark.scale.setScalar(0.4); world.add(spark);
+        spark.scale.set(orbs ? 0.4 : 0.14, orbs ? 0.4 : 0.9, 1); world.add(spark);   // without orbs the spark is a dash of light on the line
         // dot grid backdrop, like the hero's grid canvas: a billboard behind the axis, fading out radially
         const gridMat = new THREE.ShaderMaterial({
             uniforms: { uColor: { value: accent.clone() }, uAlpha: { value: 0.16 }, uTime: { value: 0 } },
@@ -398,7 +400,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
             transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
         });
         const grid = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), gridMat); world.add(grid);
-        axis = { core, ribbon, coreMat, ribbonMat, nodes, halos, nodeMat, ringMat, flare, rings, sats, callout, spark, grid, gridMat, sparkT: 1, sparkFrom: 0, sparkTo: 0, intro: 0 };
+        axis = { orbs, core, ribbon, coreMat, ribbonMat, nodes, halos, nodeMat, ringMat, flare, rings, sats, callout, spark, grid, gridMat, nodeY: [], sparkT: 1, sparkFrom: 0, sparkTo: 0, intro: 0 };
         layoutAxis();
     }
     function layoutAxis() {
@@ -409,7 +411,8 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
         // the node sits on the axis, farther from the camera than the card plane, so a gap above the card's top
         // edge must be scaled by that depth ratio to still clear the edge on screen
         const crown = (lastCardH / 2 + 0.15) * (2 * cfg.radius + cfg.camOffset) / (cfg.radius + cfg.camOffset);
-        axis.nodes.forEach((nd, i) => { nd.position.y = -yStep * i + crown; axis.halos[i].position.y = nd.position.y; });
+        axis.nodeY = items.map((_, i) => -yStep * i + (axis.orbs ? crown : 0));
+        axis.nodes.forEach((nd, i) => { nd.position.y = axis.nodeY[i]; axis.halos[i].position.y = nd.position.y; });
     }
     function axisSpark(from, to) {
         if (!axis || from < 0 || from === to) return;
@@ -423,13 +426,14 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
         axis.ribbon.lookAt(cx, axis.ribbon.position.y, cz);
         axis.grid.lookAt(cx, axis.grid.position.y, cz); axis.grid.position.y = camY; axis.gridMat.uniforms.uTime.value = t;
         const fi = frontIndex < 0 ? 0 : frontIndex, fn = axis.nodes[fi];
-        axis.nodes.forEach((nd, i) => {
+        if (axis.orbs) axis.nodes.forEach((nd, i) => {
             const k = i === fi ? 1 : 0, visited = nd.position.y > camY - 0.2 ? 1 : 0;
             nd.scale.lerp(_s.setScalar((0.8 + 0.2 * visited + k * 0.9) * axis.intro), 0.1);
             const h = axis.halos[i]; h.material.opacity += ((k ? 0.55 + 0.1 * Math.sin(t * 2.2) : 0.12 + 0.12 * visited) * axis.intro - h.material.opacity) * 0.1;
             h.scale.setScalar((k ? 1.1 + 0.05 * Math.sin(t * 2.2) : 0.5) * axis.intro);
         });
         // front node dressing: flare, rings, satellites
+        if (axis.orbs) {
         axis.flare.position.copy(fn.position); axis.flare.material.opacity += ((0.5 + 0.12 * Math.sin(t * 1.7)) * axis.intro - axis.flare.material.opacity) * 0.08;
         axis.flare.material.rotation = t * 0.05;
         axis.rings.forEach((r, k) => {
@@ -450,13 +454,15 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
         axis.callout.quaternion.setFromUnitVectors(_up, _dir.normalize());
         axis.callout.scale.set(1, len, 1);
         axis.callout.material.opacity += (0.35 * axis.intro - axis.callout.material.opacity) * 0.08;
+        }
         // spark: shoots along the line when the front card changes
         if (axis.sparkT < 1) {
             axis.sparkT = Math.min(1, axis.sparkT + dt * 1.8);
             const e = axis.sparkT < 0.5 ? 2 * axis.sparkT * axis.sparkT : 1 - Math.pow(-2 * axis.sparkT + 2, 2) / 2;
-            axis.spark.position.set(0, M.lerp(axis.nodes[axis.sparkFrom].position.y, axis.nodes[axis.sparkTo].position.y, e), 0);
+            axis.spark.position.set(0, M.lerp(axis.nodeY[axis.sparkFrom], axis.nodeY[axis.sparkTo], e), 0);
             axis.spark.material.opacity = Math.sin(axis.sparkT * Math.PI);
-            axis.spark.scale.setScalar(0.35 + 0.25 * Math.sin(axis.sparkT * Math.PI));
+            const sz = 0.35 + 0.25 * Math.sin(axis.sparkT * Math.PI);
+            if (axis.orbs) axis.spark.scale.setScalar(sz); else axis.spark.scale.set(0.14, 0.9 * sz / 0.6, 1);
         } else axis.spark.material.opacity = 0;
     }
 
@@ -573,7 +579,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
             angle -= step;
             obj.position.y = out.y = -yStep * i * S;
             const t = { position: out, quaternion: obj.quaternion.clone() };
-            if (portrait) t.position.y += (cfg.centerpiece === 'axis' ? 0.45 : -0.7) * S;   // axis: camera a little above the card so its node clears the header; otherwise theirs
+            if (portrait) t.position.y += (cfg.centerpiece === 'axis' && cfg.axisOrbs > 0.5 ? 0.45 : -0.7) * S;   // axis: camera a little above the card so its node clears the header; otherwise theirs
             targets.push(t);
         });
         world.scale.setScalar(S);
@@ -691,7 +697,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
         const rows = [
             ['radius', 'helix radius', 2, 8, 0.05], ['step', 'step (deg)', 15, 90, 1], ['stepPortrait', 'step portrait', 15, 90, 1],
             ['fov', 'fov', 20, 70, 1], ['fovPortrait', 'fov portrait', 30, 90, 1], ['camOffset', 'camera offset', 0, 5, 0.05],
-            ['cardFrac', 'card width', 0.3, 0.95, 0.01], ['gap', 'card gap', 0, 1.5, 0.05], ['drift', 'entry drift', 0, 1.5, 0.05], ['lerp', 'camera lerp', 0.02, 0.5, 0.01],
+            ['cardFrac', 'card width', 0.3, 0.95, 0.01], ['gap', 'card gap', 0, 1.5, 0.05], ['drift', 'entry drift', -1.5, 1.5, 0.05], ['lerp', 'camera lerp', 0.02, 0.5, 0.01],
             ['edge', 'scroll edge', 0, 0.2, 0.005], ['scrollPerCard', 'scroll per card (vh)', 25, 120, 5],
             ['polyScale', 'polystar size', 0.4, 3, 0.05], ['polyOpacity', 'polystar opacity', 0, 1, 0.02],
             ['diveSurface', 'dive: surface height', 0.5, 3, 0.05], ['diveLight', 'dive: light shafts', 0, 1.5, 0.05], ['divePitch', 'dive: look-up (deg)', 0, 30, 1],
