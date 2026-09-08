@@ -110,6 +110,12 @@
 }
 .ws-card .teaser-cta { font-size: max(11px, calc(var(--s) * 0.056)); }
 
+/* Compact cards (short viewports): drop the summary, tighten the body */
+.work-spine.ws-compact .ws-card .teaser-summary { display: none; }
+.work-spine.ws-compact .ws-card .teaser-body { padding: calc(var(--s) * 0.09) calc(var(--s) * 0.11); }
+.work-spine.ws-compact .ws-card .teaser-title { -webkit-line-clamp: 2; }
+.work-spine.ws-compact .ws-card .teaser-metrics { margin-bottom: calc(var(--s) * 0.04); }
+
 /* Orientation marks inside the stage, sized from the page's own tokens */
 .work-spine__rail {
     position: absolute;
