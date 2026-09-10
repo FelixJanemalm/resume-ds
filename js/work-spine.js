@@ -19,20 +19,167 @@
 
 const section = document.querySelector('[data-work-spine]');
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const numAttr = (v, d) => (v !== undefined && v !== '' && !Number.isNaN(+v)) ? +v : d;
+const coarse = matchMedia('(pointer: coarse)').matches;
+
+// Particle settings, shared by the page-wide layer and the tune panel (data-p-* on the section)
+const pcfg = section ? {
+    mode: new URLSearchParams(location.search).get('particles') || section.dataset.particles || 'page',   // 'page': one fixed layer behind the whole page | 'stage': inside the work stage | 'none'
+    pCount: numAttr(section.dataset.pCount, coarse ? 128 : 256),
+    pCurl: numAttr(section.dataset.pCurl, 1.4), pReturn: numAttr(section.dataset.pReturn, 1.2), pPull: numAttr(section.dataset.pPull, 5), pDamp: numAttr(section.dataset.pDamp, 0.92),
+    pSize: numAttr(section.dataset.pSize, 1.7), pGlow: numAttr(section.dataset.pGlow, 1.0), pRadius: numAttr(section.dataset.pRadius, 1.6),
+    pParallax: numAttr(section.dataset.pParallax, 0.0012),   // units of field per scrolled pixel
+} : null;
+let layer = null;
+
+const SIM_NOISE = `
+    vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;} vec4 mod289(vec4 x){return x-floor(x*(1.0/289.0))*289.0;}
+    vec4 permute(vec4 x){return mod289(((x*34.0)+1.0)*x);} vec4 taylorInvSqrt(vec4 r){return 1.79284291400159-0.85373472095314*r;}
+    float snoise(vec3 v){ const vec2 C=vec2(1.0/6.0,1.0/3.0); const vec4 D=vec4(0.0,0.5,1.0,2.0);
+      vec3 i=floor(v+dot(v,C.yyy)); vec3 x0=v-i+dot(i,C.xxx); vec3 g=step(x0.yzx,x0.xyz); vec3 l=1.0-g; vec3 i1=min(g.xyz,l.zxy); vec3 i2=max(g.xyz,l.zxy);
+      vec3 x1=x0-i1+C.xxx; vec3 x2=x0-i2+C.yyy; vec3 x3=x0-D.yyy; i=mod289(i);
+      vec4 p=permute(permute(permute(i.z+vec4(0.0,i1.z,i2.z,1.0))+i.y+vec4(0.0,i1.y,i2.y,1.0))+i.x+vec4(0.0,i1.x,i2.x,1.0));
+      float n_=0.142857142857; vec3 ns=n_*D.wyz-D.xzx; vec4 j=p-49.0*floor(p*ns.z*ns.z); vec4 x_=floor(j*ns.z); vec4 y_=floor(j-7.0*x_);
+      vec4 x=x_*ns.x+ns.yyyy; vec4 y=y_*ns.x+ns.yyyy; vec4 h=1.0-abs(x)-abs(y); vec4 b0=vec4(x.xy,y.xy); vec4 b1=vec4(x.zw,y.zw);
+      vec4 s0=floor(b0)*2.0+1.0; vec4 s1=floor(b1)*2.0+1.0; vec4 sh=-step(h,vec4(0.0)); vec4 a0=b0.xzyw+s0.xzyw*sh.xxyy; vec4 a1=b1.xzyw+s1.xzyw*sh.zzww;
+      vec3 p0=vec3(a0.xy,h.x); vec3 p1=vec3(a0.zw,h.y); vec3 p2=vec3(a1.xy,h.z); vec3 p3=vec3(a1.zw,h.w);
+      vec4 norm=taylorInvSqrt(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3))); p0*=norm.x; p1*=norm.y; p2*=norm.z; p3*=norm.w;
+      vec4 m=max(0.6-vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)),0.0); m=m*m; return 42.0*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3))); }
+    vec3 curlNoise(vec3 p){ const float e=0.08; vec3 dx=vec3(e,0,0), dy=vec3(0,e,0), dz=vec3(0,0,e); vec3 o1=vec3(31.4), o2=vec3(62.8);
+      float pz_y=snoise(p+dy+o2)-snoise(p-dy+o2), py_z=snoise(p+dz+o1)-snoise(p-dz+o1);
+      float px_z=snoise(p+dz)-snoise(p-dz), pz_x=snoise(p+dx+o2)-snoise(p-dx+o2);
+      float py_x=snoise(p+dx+o1)-snoise(p-dx+o1), px_y=snoise(p+dy)-snoise(p-dy);
+      return vec3(pz_y-py_z, px_z-pz_x, py_x-px_y)/(2.0*e); }`;
+const SIM_VEL = SIM_NOISE + `
+    uniform sampler2D tHome; uniform float uTime, uDelta, uCurl, uReturn, uDamp, uPull, uRadius, uScroll, uH; uniform vec3 uCam, uDir;
+    void main(){ vec2 uv=gl_FragCoord.xy/resolution.xy; vec3 p=texture2D(tPos,uv).xyz; vec3 v=texture2D(tVel,uv).xyz; vec4 h=texture2D(tHome,uv);
+      vec3 f=(h.xyz-p)*uReturn;
+      f+=curlNoise(p*0.28+vec3(0.0,uTime*0.05,0.0))*uCurl*(0.4+0.6*h.w);
+      vec3 pw=p; pw.y=mod(p.y+uScroll+uH*0.5,uH)-uH*0.5;     // where the particle is drawn (the field wraps vertically with the page scroll)
+      vec3 rel=pw-uCam; float along=dot(rel,uDir); vec3 perp=rel-uDir*along; float d=length(perp);
+      float infl=smoothstep(uRadius,0.0,d)*step(0.5,along);
+      vec3 toRay=-perp/max(d,1e-4);
+      f+=toRay*infl*uPull+cross(uDir,toRay)*infl*uPull*0.8;
+      v=v*uDamp+f*uDelta; gl_FragColor=vec4(v,1.0); }`;
+const SIM_POS = `
+    uniform sampler2D tHome; uniform float uDelta;
+    void main(){ vec2 uv=gl_FragCoord.xy/resolution.xy; vec4 p=texture2D(tPos,uv); vec3 v=texture2D(tVel,uv).xyz; float w=texture2D(tHome,uv).w;
+      p.xyz+=v*uDelta; gl_FragColor=vec4(p.xyz,w); }`;
+const PTS_VS = `
+    uniform sampler2D tPos, tVel; uniform float uSize, uDPR, uP, uRadius, uIntro, uScroll, uH; uniform vec3 uCam, uDir; attribute vec2 ref; attribute float aSize;
+    varying float vLit, vRand, vSpeed;
+    void main(){ vec4 p=texture2D(tPos,ref); vec3 v=texture2D(tVel,ref).xyz;
+      vec3 pw=p.xyz; pw.y=mod(p.y+uScroll+uH*0.5,uH)-uH*0.5;
+      vec3 rel=pw-uCam; float along=dot(rel,uDir); vec3 perp=rel-uDir*along; float d=length(perp);
+      vLit=smoothstep(uRadius,0.0,d)*step(0.5,along); vRand=p.w; vSpeed=length(v);
+      vec4 mv=modelViewMatrix*vec4(pw,1.0);
+      gl_PointSize=uSize*uDPR*aSize*(1.0+1.4*vLit)*uP/max(-mv.z,1.0)*uIntro;
+      gl_Position=projectionMatrix*mv; }`;
+const PTS_FS = `
+    uniform vec3 uColorA, uColorB, uColorLit; uniform float uGlow; varying float vLit, vRand, vSpeed;
+    void main(){ vec2 c=gl_PointCoord-0.5; float d=length(c); if(d>0.5) discard; float disc=smoothstep(0.5,0.08,d);
+      vec3 col=mix(uColorA,uColorB,smoothstep(0.25,0.85,vRand)); col=mix(col,uColorLit,clamp(vLit*0.9+smoothstep(0.8,3.0,vSpeed)*0.15,0.0,1.0));
+      float a=disc*(0.2+0.75*vLit)*uGlow; gl_FragColor=vec4(col*(0.85+0.6*vLit),a); }`;
+
+/* The picked colour, pushed to a vivid tint: the page's --button-color is derived from the picker with
+   lightness tweaks that can leave it muted, and additive blending over a grey ground washes it out further. */
+function vividAccent(THREE, light) {
+    const c = new THREE.Color();
+    try { c.setStyle((getComputedStyle(document.body).getPropertyValue('--button-color') || '').trim() || '#4faad1'); } catch (e) { c.set(0x4faad1); }
+    const hsl = { h: 0, s: 0, l: 0 }; c.getHSL(hsl);
+    return c.setHSL(hsl.h, Math.max(hsl.s, 0.8), light ? 0.38 : 0.6);
+}
+
+/* Page-wide particle layer: a fixed canvas behind everything (z-index -1, no pointer events), the same
+   simulation as the lab, with the field wrapping vertically so it follows the page scroll with a little parallax. */
+function startParticleLayer(THREE, GPUC) {
+    if (!GPUC) return;
+    const canvas = document.createElement('canvas');
+    canvas.id = 'ws-particles'; canvas.setAttribute('aria-hidden', 'true');
+    canvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none;opacity:0;transition:opacity 1.6s ease';
+    document.body.appendChild(canvas);   // appended last: z-index does the layering, and nothing else on the page sees it as the first canvas
+    let gl;
+    try { gl = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: 'high-performance' }); } catch (e) { canvas.remove(); return; }
+    if (!gl.capabilities.isWebGL2) { gl.dispose(); canvas.remove(); return; }
+    gl.setPixelRatio(Math.min(devicePixelRatio || 1, 2)); gl.setClearColor(0x000000, 0);
+    const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(35, 1, 0.5, 60);
+    camera.position.set(0, 0, 12);
+    const M = THREE.MathUtils, N = Math.max(32, Math.round(pcfg.pCount)), COUNT = N * N, H = 11;
+    const gpu = new GPUC.GPUComputationRenderer(N, N, gl);
+    if (coarse) gpu.setDataType(THREE.HalfFloatType);
+    const pos0 = gpu.createTexture(), vel0 = gpu.createTexture(), home = gpu.createTexture();
+    for (let i = 0; i < COUNT; i++) {
+        const x = (Math.random() * 2 - 1) * 10, y = (Math.random() - 0.5) * H, z = (Math.random() * 2 - 1) * 4, w = Math.random();
+        home.image.data.set([x, y, z, w], i * 4);
+        pos0.image.data.set([x + (Math.random() - 0.5) * 0.6, y + (Math.random() - 0.5) * 0.6, z, w], i * 4);
+    }
+    home.needsUpdate = true;
+    const velVar = gpu.addVariable('tVel', SIM_VEL, vel0), posVar = gpu.addVariable('tPos', SIM_POS, pos0);
+    gpu.setVariableDependencies(velVar, [posVar, velVar]); gpu.setVariableDependencies(posVar, [posVar, velVar]);
+    const velU = velVar.material.uniforms, posU = posVar.material.uniforms;
+    Object.assign(velU, { tHome: { value: home }, uTime: { value: 0 }, uDelta: { value: 0 }, uCurl: { value: pcfg.pCurl }, uReturn: { value: pcfg.pReturn }, uDamp: { value: pcfg.pDamp }, uPull: { value: pcfg.pPull }, uRadius: { value: pcfg.pRadius }, uScroll: { value: 0 }, uH: { value: H }, uCam: { value: new THREE.Vector3() }, uDir: { value: new THREE.Vector3(0, 0, -1) } });
+    Object.assign(posU, { tHome: { value: home }, uDelta: { value: 0 } });
+    const err = gpu.init(); if (err) { console.warn('work-spine: particle layer', err); gl.dispose(); canvas.remove(); return; }
+    const geo = new THREE.BufferGeometry(), ref = new Float32Array(COUNT * 2), sz = new Float32Array(COUNT);
+    for (let i = 0; i < COUNT; i++) { ref[i * 2] = ((i % N) + 0.5) / N; ref[i * 2 + 1] = (Math.floor(i / N) + 0.5) / N; sz[i] = Math.random() < 0.015 ? 1.4 + Math.random() * 0.5 : 0.5 + Math.random() * 0.5; }
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(COUNT * 3), 3));
+    geo.setAttribute('ref', new THREE.BufferAttribute(ref, 2)); geo.setAttribute('aSize', new THREE.BufferAttribute(sz, 1));
+    const mat = new THREE.ShaderMaterial({
+        uniforms: { tPos: { value: null }, tVel: { value: null }, uSize: { value: pcfg.pSize }, uDPR: { value: Math.min(devicePixelRatio || 1, 2) }, uP: { value: 1000 }, uRadius: { value: pcfg.pRadius }, uIntro: { value: 0 }, uScroll: { value: 0 }, uH: { value: H },
+            uCam: { value: new THREE.Vector3() }, uDir: { value: new THREE.Vector3(0, 0, -1) }, uColorA: { value: new THREE.Color(0x4faad1) }, uColorB: { value: new THREE.Color(0x4faad1) }, uColorLit: { value: new THREE.Color(0xffffff) }, uGlow: { value: pcfg.pGlow } },
+        vertexShader: PTS_VS, fragmentShader: PTS_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    });
+    const U = mat.uniforms;
+    const points = new THREE.Points(geo, mat); points.frustumCulled = false; scene.add(points);
+    const raycaster = new THREE.Raycaster();
+    const pointer = { ndc: new THREE.Vector2(), target: new THREE.Vector2(), active: false, last: 0 };
+    addEventListener('pointermove', e => { pointer.target.set((e.clientX / innerWidth) * 2 - 1, -((e.clientY / innerHeight) * 2 - 1)); pointer.active = true; pointer.last = performance.now(); }, { passive: true });
+    // point size = uSize * uP / depth; this world is in units (the stage's is in px), so the reference depth is the camera distance
+    function resize() { const w = innerWidth, h = innerHeight; gl.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); U.uP.value = camera.position.z; }
+    addEventListener('resize', resize); resize();
+    function applyTheme() {
+        const light = document.body.classList.contains('default-light') || document.body.classList.contains('default-light-colorblind');
+        const v = vividAccent(THREE, light);
+        U.uColorA.value.copy(v);
+        U.uColorB.value.copy(v).lerp(new THREE.Color(light ? 0x000000 : 0xffffff), light ? 0.15 : 0.2);
+        U.uColorLit.value.copy(v).lerp(new THREE.Color(0xffffff), light ? 0.2 : 0.55);
+        U.uGlow.value = pcfg.pGlow * (light ? 1.6 : 1);
+        mat.blending = light ? THREE.NormalBlending : THREE.AdditiveBlending; mat.needsUpdate = true;
+    }
+    applyTheme();
+    new MutationObserver(applyTheme).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    let last = performance.now(), shown = false;
+    function frame(now) {
+        const dt = Math.min(0.05, Math.max(0.001, (now - last) / 1000)); last = now; const t = now * 0.001;
+        const stale = !pointer.active || now - pointer.last > 2500;
+        if (stale) pointer.target.set(0.55 * Math.sin(t * 0.23), 0.35 * Math.sin(t * 0.31 + 1.0));
+        pointer.ndc.lerp(pointer.target, stale ? 0.03 : 0.12);
+        raycaster.setFromCamera(pointer.ndc, camera);
+        velU.uCam.value.copy(raycaster.ray.origin); velU.uDir.value.copy(raycaster.ray.direction);
+        U.uCam.value.copy(raycaster.ray.origin); U.uDir.value.copy(raycaster.ray.direction);
+        velU.uScroll.value = U.uScroll.value = -scrollY * pcfg.pParallax;
+        velU.uTime.value = t; velU.uDelta.value = dt; posU.uDelta.value = dt;
+        gpu.compute();
+        U.tPos.value = gpu.getCurrentRenderTarget(posVar).texture; U.tVel.value = gpu.getCurrentRenderTarget(velVar).texture;
+        U.uIntro.value = Math.min(1, U.uIntro.value + dt * 0.5);
+        gl.render(scene, camera);
+        if (!shown) { shown = true; canvas.style.opacity = '1'; }
+        requestAnimationFrame(frame);
+    }
+    let running = true; last = performance.now(); requestAnimationFrame(frame);   // a hidden tab simply stops getting animation frames
+    layer = {
+        sync() { velU.uCurl.value = pcfg.pCurl; velU.uReturn.value = pcfg.pReturn; velU.uDamp.value = pcfg.pDamp; velU.uPull.value = pcfg.pPull; velU.uRadius.value = pcfg.pRadius; U.uSize.value = pcfg.pSize; U.uRadius.value = pcfg.pRadius; applyTheme(); },
+    };
+}
 
 if (section && !reduced && 'IntersectionObserver' in window) boot();
 
 async function boot() {
     const cards = [...section.querySelectorAll('.case-study-teaser')];
-    if (cards.length < 2) return;
 
-    // Load three only once the section is within 1.5 viewports.
-    await new Promise(resolve => {
-        const io = new IntersectionObserver(entries => {
-            if (entries.some(e => e.isIntersecting)) { io.disconnect(); resolve(); }
-        }, { rootMargin: '150% 0px' });
-        io.observe(section);
-    });
+    // three loads after the page has loaded and the browser is idle, so it never competes with the hero
+    await new Promise(r => (document.readyState === 'complete' ? r() : addEventListener('load', r, { once: true })));
+    await new Promise(r => ('requestIdleCallback' in window) ? requestIdleCallback(r, { timeout: 2000 }) : setTimeout(r, 400));
 
     let THREE, CSS3D, ENV, GPUC = null;
     try {
@@ -46,6 +193,15 @@ async function boot() {
         return;
     }
     try { GPUC = await import('three/addons/misc/GPUComputationRenderer.js'); } catch (e) { console.warn('work-spine: no GPU particles', e); }
+    if (pcfg.mode === 'page') startParticleLayer(THREE, GPUC);
+    if (cards.length < 2) return;
+    // the work section itself waits until it is within 1.5 viewports
+    await new Promise(resolve => {
+        const io = new IntersectionObserver(entries => {
+            if (entries.some(e => e.isIntersecting)) { io.disconnect(); resolve(); }
+        }, { rootMargin: '150% 0px' });
+        io.observe(section);
+    });
     init(THREE, CSS3D, ENV, GPUC, cards);
 }
 
@@ -83,11 +239,8 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         diveLight: num(ds.diveLight, 1.0),          // 'dive': light shaft intensity
         divePitch: num(ds.divePitch, 14),           // 'dive': degrees the camera looks up at the hull on entry and exit
         axisOrbs: num(ds.axisOrbs, 0),              // 'axis': 1 adds a chrome node per card with rings, satellites, flare and a hanger
-        // GPU particles (the lab's "antimatter" system): count per side of the simulation texture, forces in units
-        pCount: num(ds.pCount, matchMedia('(pointer: coarse)').matches ? 128 : 256),
-        pCurl: num(ds.pCurl, 1.4), pReturn: num(ds.pReturn, 1.2), pPull: num(ds.pPull, 5), pDamp: num(ds.pDamp, 0.92),
-        pSize: num(ds.pSize, 1.7),                  // px at the card plane
-        pGlow: num(ds.pGlow, 0.8), pRadius: num(ds.pRadius, 1.6),   // how far from the cursor's ray particles light up, in units
+        // GPU particles: shared settings (see pcfg at the top; data-p-* attributes)
+        ...pcfg,
         // what sits on the helix axis: 'none' | 'axis' (a line with a node per card) | 'spine' (their vertebrae)
         // | 'polystar' (the hero Lottie's language: 22 rounded pentagons with a fat gradient stroke)
         centerpiece: new URLSearchParams(location.search).get('centerpiece') || ds.centerpiece || 'none',
@@ -134,7 +287,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
             else if (cfg.centerpiece === 'axis') buildAxis();
             else if (cfg.centerpiece === 'polystar') buildPolystar();
             else if (cfg.centerpiece === 'dive') buildDive();
-            buildParticles();
+            if (cfg.mode === 'stage') buildParticles();
             applyTheme();
         });
     } catch (err) {
@@ -178,52 +331,6 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         const x = ((e.clientX - r.left) / r.width) * 2 - 1, y = -(((e.clientY - r.top) / r.height) * 2 - 1);
         if (x >= -1 && x <= 1 && y >= -1 && y <= 1) { pointer.target.set(x, y); pointer.active = true; pointer.last = performance.now(); }
     }, { passive: true });
-    const SIM_NOISE = `
-        vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;} vec4 mod289(vec4 x){return x-floor(x*(1.0/289.0))*289.0;}
-        vec4 permute(vec4 x){return mod289(((x*34.0)+1.0)*x);} vec4 taylorInvSqrt(vec4 r){return 1.79284291400159-0.85373472095314*r;}
-        float snoise(vec3 v){ const vec2 C=vec2(1.0/6.0,1.0/3.0); const vec4 D=vec4(0.0,0.5,1.0,2.0);
-          vec3 i=floor(v+dot(v,C.yyy)); vec3 x0=v-i+dot(i,C.xxx); vec3 g=step(x0.yzx,x0.xyz); vec3 l=1.0-g; vec3 i1=min(g.xyz,l.zxy); vec3 i2=max(g.xyz,l.zxy);
-          vec3 x1=x0-i1+C.xxx; vec3 x2=x0-i2+C.yyy; vec3 x3=x0-D.yyy; i=mod289(i);
-          vec4 p=permute(permute(permute(i.z+vec4(0.0,i1.z,i2.z,1.0))+i.y+vec4(0.0,i1.y,i2.y,1.0))+i.x+vec4(0.0,i1.x,i2.x,1.0));
-          float n_=0.142857142857; vec3 ns=n_*D.wyz-D.xzx; vec4 j=p-49.0*floor(p*ns.z*ns.z); vec4 x_=floor(j*ns.z); vec4 y_=floor(j-7.0*x_);
-          vec4 x=x_*ns.x+ns.yyyy; vec4 y=y_*ns.x+ns.yyyy; vec4 h=1.0-abs(x)-abs(y); vec4 b0=vec4(x.xy,y.xy); vec4 b1=vec4(x.zw,y.zw);
-          vec4 s0=floor(b0)*2.0+1.0; vec4 s1=floor(b1)*2.0+1.0; vec4 sh=-step(h,vec4(0.0)); vec4 a0=b0.xzyw+s0.xzyw*sh.xxyy; vec4 a1=b1.xzyw+s1.xzyw*sh.zzww;
-          vec3 p0=vec3(a0.xy,h.x); vec3 p1=vec3(a0.zw,h.y); vec3 p2=vec3(a1.xy,h.z); vec3 p3=vec3(a1.zw,h.w);
-          vec4 norm=taylorInvSqrt(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3))); p0*=norm.x; p1*=norm.y; p2*=norm.z; p3*=norm.w;
-          vec4 m=max(0.6-vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)),0.0); m=m*m; return 42.0*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3))); }
-        vec3 curlNoise(vec3 p){ const float e=0.08; vec3 dx=vec3(e,0,0), dy=vec3(0,e,0), dz=vec3(0,0,e); vec3 o1=vec3(31.4), o2=vec3(62.8);
-          float pz_y=snoise(p+dy+o2)-snoise(p-dy+o2), py_z=snoise(p+dz+o1)-snoise(p-dz+o1);
-          float px_z=snoise(p+dz)-snoise(p-dz), pz_x=snoise(p+dx+o2)-snoise(p-dx+o2);
-          float py_x=snoise(p+dx+o1)-snoise(p-dx+o1), px_y=snoise(p+dy)-snoise(p-dy);
-          return vec3(pz_y-py_z, px_z-pz_x, py_x-px_y)/(2.0*e); }`;
-    const SIM_VEL = SIM_NOISE + `
-        uniform sampler2D tHome; uniform float uTime, uDelta, uCurl, uReturn, uDamp, uPull, uRadius; uniform vec3 uCam, uDir;
-        void main(){ vec2 uv=gl_FragCoord.xy/resolution.xy; vec3 p=texture2D(tPos,uv).xyz; vec3 v=texture2D(tVel,uv).xyz; vec4 h=texture2D(tHome,uv);
-          vec3 f=(h.xyz-p)*uReturn;
-          f+=curlNoise(p*0.28+vec3(0.0,uTime*0.05,0.0))*uCurl*(0.4+0.6*h.w);
-          vec3 rel=p-uCam; float along=dot(rel,uDir); vec3 perp=rel-uDir*along; float d=length(perp);
-          float infl=smoothstep(uRadius,0.0,d)*step(0.5,along);
-          vec3 toRay=-perp/max(d,1e-4);
-          f+=toRay*infl*uPull+cross(uDir,toRay)*infl*uPull*0.8;
-          v=v*uDamp+f*uDelta; gl_FragColor=vec4(v,1.0); }`;
-    const SIM_POS = `
-        uniform sampler2D tHome; uniform float uDelta;
-        void main(){ vec2 uv=gl_FragCoord.xy/resolution.xy; vec4 p=texture2D(tPos,uv); vec3 v=texture2D(tVel,uv).xyz; float w=texture2D(tHome,uv).w;
-          p.xyz+=v*uDelta; gl_FragColor=vec4(p.xyz,w); }`;
-    const PTS_VS = `
-        uniform sampler2D tPos, tVel; uniform float uSize, uDPR, uP, uRadius, uIntro; uniform vec3 uCam, uDir; attribute vec2 ref; attribute float aSize;
-        varying float vLit, vRand, vSpeed;
-        void main(){ vec4 p=texture2D(tPos,ref); vec3 v=texture2D(tVel,ref).xyz;
-          vec3 rel=p.xyz-uCam; float along=dot(rel,uDir); vec3 perp=rel-uDir*along; float d=length(perp);
-          vLit=smoothstep(uRadius,0.0,d)*step(0.5,along); vRand=p.w; vSpeed=length(v);
-          vec4 mv=modelViewMatrix*vec4(p.xyz,1.0);
-          gl_PointSize=uSize*uDPR*aSize*(1.0+1.4*vLit)*uP/max(-mv.z,1.0)*uIntro;
-          gl_Position=projectionMatrix*mv; }`;
-    const PTS_FS = `
-        uniform vec3 uColorA, uColorB, uColorLit; uniform float uGlow; varying float vLit, vRand, vSpeed;
-        void main(){ vec2 c=gl_PointCoord-0.5; float d=length(c); if(d>0.5) discard; float disc=smoothstep(0.5,0.08,d);
-          vec3 col=mix(uColorA,uColorB,smoothstep(0.25,0.85,vRand)); col=mix(col,uColorLit,clamp(vLit*0.9+smoothstep(0.8,3.0,vSpeed)*0.15,0.0,1.0));
-          float a=disc*(0.11+0.8*vLit)*uGlow; gl_FragColor=vec4(col*(0.75+0.7*vLit),a); }`;
     function buildParticles() {
         if (GPUC && gl.capabilities.isWebGL2) { try { buildGPUParticles(); return; } catch (e) { console.warn('work-spine: GPU particles failed, using the simple cloud', e); } }
         const P = 500, pos = new Float32Array(P * 3);
@@ -252,7 +359,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         const velVar = gpu.addVariable('tVel', SIM_VEL, vel0), posVar = gpu.addVariable('tPos', SIM_POS, pos0);
         gpu.setVariableDependencies(velVar, [posVar, velVar]); gpu.setVariableDependencies(posVar, [posVar, velVar]);
         const velU = velVar.material.uniforms, posU = posVar.material.uniforms;
-        Object.assign(velU, { tHome: { value: home }, uTime: { value: 0 }, uDelta: { value: 0 }, uCurl: { value: cfg.pCurl }, uReturn: { value: cfg.pReturn }, uDamp: { value: cfg.pDamp }, uPull: { value: cfg.pPull }, uRadius: { value: cfg.pRadius }, uCam: { value: new THREE.Vector3() }, uDir: { value: new THREE.Vector3(0, 0, -1) } });
+        Object.assign(velU, { tHome: { value: home }, uTime: { value: 0 }, uDelta: { value: 0 }, uCurl: { value: cfg.pCurl }, uReturn: { value: cfg.pReturn }, uDamp: { value: cfg.pDamp }, uPull: { value: cfg.pPull }, uRadius: { value: cfg.pRadius }, uScroll: { value: 0 }, uH: { value: 1e5 }, uCam: { value: new THREE.Vector3() }, uDir: { value: new THREE.Vector3(0, 0, -1) } });
         Object.assign(posU, { tHome: { value: home }, uDelta: { value: 0 } });
         const err = gpu.init(); if (err) throw new Error(err);
         const geo = new THREE.BufferGeometry();
@@ -261,7 +368,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(COUNT * 3), 3));
         geo.setAttribute('ref', new THREE.BufferAttribute(ref, 2)); geo.setAttribute('aSize', new THREE.BufferAttribute(sz, 1));
         const mat = new THREE.ShaderMaterial({
-            uniforms: { tPos: { value: null }, tVel: { value: null }, uSize: { value: cfg.pSize }, uDPR: { value: Math.min(devicePixelRatio || 1, 2) }, uP: { value: 1000 }, uRadius: { value: cfg.pRadius }, uIntro: { value: 0 },
+            uniforms: { tPos: { value: null }, tVel: { value: null }, uSize: { value: cfg.pSize }, uDPR: { value: Math.min(devicePixelRatio || 1, 2) }, uP: { value: 1000 }, uRadius: { value: cfg.pRadius }, uIntro: { value: 0 }, uScroll: { value: 0 }, uH: { value: 1e5 },
                 uCam: { value: new THREE.Vector3() }, uDir: { value: new THREE.Vector3(0, 0, -1) }, uColorA: { value: new THREE.Color(0x4faad1) }, uColorB: { value: new THREE.Color(0xbfe6ff) }, uColorLit: { value: new THREE.Color(0xe6f4ff) }, uGlow: { value: cfg.pGlow } },
             vertexShader: PTS_VS, fragmentShader: PTS_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
         });
@@ -627,10 +734,10 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         }
         if (keyLight) keyLight.color.copy(accent).lerp(new THREE.Color(0xffffff), 0.5);
         if (particles && particles.userData.isGPU) {
-            const u = particles.userData.ptsU;
-            u.uColorA.value.copy(accent).lerp(new THREE.Color(light ? 0x000000 : 0xffffff), light ? 0.25 : 0.05);
-            u.uColorB.value.copy(accent).lerp(new THREE.Color(light ? 0x000000 : 0xffffff), light ? 0.05 : 0.4);
-            u.uColorLit.value.copy(accent).lerp(new THREE.Color(light ? 0x000000 : 0xffffff), light ? 0.35 : 0.72);
+            const u = particles.userData.ptsU, v = vividAccent(THREE, light);
+            u.uColorA.value.copy(v);
+            u.uColorB.value.copy(v).lerp(new THREE.Color(light ? 0x000000 : 0xffffff), light ? 0.15 : 0.2);
+            u.uColorLit.value.copy(v).lerp(new THREE.Color(0xffffff), light ? 0.3 : 0.55);
             particles.material.blending = light ? THREE.NormalBlending : THREE.AdditiveBlending; particles.material.needsUpdate = true;
         } else if (particles) { particles.material.color.copy(accent); particles.material.opacity = light ? 0.55 : 0.75; }
         if (axis) {
@@ -832,7 +939,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
             ['polyScale', 'polystar size', 0.4, 3, 0.05], ['polyOpacity', 'polystar opacity', 0, 1, 0.02],
             ['diveSurface', 'dive: surface height', 0.5, 3, 0.05], ['diveLight', 'dive: light shafts', 0, 1.5, 0.05], ['divePitch', 'dive: look-up (deg)', 0, 30, 1],
             ['pCurl', 'particles: curl', 0, 5, 0.05], ['pReturn', 'particles: home spring', 0, 5, 0.05], ['pPull', 'particles: cursor pull', 0, 30, 0.5], ['pDamp', 'particles: damping', 0.7, 0.99, 0.005],
-            ['pSize', 'particles: size (px)', 0.5, 8, 0.1], ['pGlow', 'particles: glow', 0, 3, 0.05], ['pRadius', 'particles: light radius', 0.3, 6, 0.05],
+            ['pSize', 'particles: size (px)', 0.3, 6, 0.05], ['pGlow', 'particles: glow', 0, 3, 0.05], ['pRadius', 'particles: light radius', 0.3, 6, 0.05], ['pParallax', 'particles: scroll parallax', 0, 0.005, 0.0001],
             ['spineScale', 'spine scale', 0.4, 1.8, 0.02], ['spineSpacing', 'vertebra gap', 0.3, 1.2, 0.01], ['spineTwist', 'vertebra twist', 0, 1, 0.01],
         ];
         const el = document.createElement('div');
@@ -849,6 +956,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
             const k = e.target.dataset.k; if (!k) return;
             cfg[k] = +e.target.value; e.target.nextElementSibling.value = cfg[k];
             if (k === 'scrollPerCard') section.style.setProperty('--ws-vh', cfg.scrollPerCard + 'vh');
+            if (k in pcfg) { pcfg[k] = cfg[k]; layer?.sync(); }
             layout(); layoutSpine(); applyTheme(); syncParticles(); ta.value = attrs(); wake();
         });
         el.querySelector('[data-copy]').addEventListener('click', () => { ta.value = attrs(); ta.select(); navigator.clipboard?.writeText(ta.value).catch(() => {}); });
