@@ -34,7 +34,7 @@ async function boot() {
         io.observe(section);
     });
 
-    let THREE, CSS3D, ENV;
+    let THREE, CSS3D, ENV, GPUC = null;
     try {
         [THREE, CSS3D, ENV] = await Promise.all([
             import('three'),
@@ -45,10 +45,11 @@ async function boot() {
         console.warn('work-spine: three.js did not load, keeping the flat list.', err);
         return;
     }
-    init(THREE, CSS3D, ENV, cards);
+    try { GPUC = await import('three/addons/misc/GPUComputationRenderer.js'); } catch (e) { console.warn('work-spine: no GPU particles', e); }
+    init(THREE, CSS3D, ENV, GPUC, cards);
 }
 
-function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards) {
+function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, cards) {
     const stage = section.querySelector('.work-spine__stage');
     const glCanvas = stage.querySelector('.work-spine__gl');
     const cssHost = stage.querySelector('.work-spine__css');
@@ -82,6 +83,11 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
         diveLight: num(ds.diveLight, 1.0),          // 'dive': light shaft intensity
         divePitch: num(ds.divePitch, 14),           // 'dive': degrees the camera looks up at the hull on entry and exit
         axisOrbs: num(ds.axisOrbs, 0),              // 'axis': 1 adds a chrome node per card with rings, satellites, flare and a hanger
+        // GPU particles (the lab's "antimatter" system): count per side of the simulation texture, forces in units
+        pCount: num(ds.pCount, matchMedia('(pointer: coarse)').matches ? 128 : 256),
+        pCurl: num(ds.pCurl, 1.4), pReturn: num(ds.pReturn, 1.2), pPull: num(ds.pPull, 5), pDamp: num(ds.pDamp, 0.92),
+        pSize: num(ds.pSize, 1.7),                  // px at the card plane
+        pGlow: num(ds.pGlow, 0.8), pRadius: num(ds.pRadius, 1.6),   // how far from the cursor's ray particles light up, in units
         // what sits on the helix axis: 'none' | 'axis' (a line with a node per card) | 'spine' (their vertebrae)
         // | 'polystar' (the hero Lottie's language: 22 rounded pentagons with a fat gradient stroke)
         centerpiece: new URLSearchParams(location.search).get('centerpiece') || ds.centerpiece || 'none',
@@ -162,8 +168,64 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
 
     }
 
-    // Their "flower" particle layer, reduced to a drifting cloud that turns with the scroll.
+    // Particles. With GPUComputationRenderer: the lab's "antimatter" system — positions and velocities in
+    // ping-pong float textures, curl noise, a spring to a home position, and the cursor's ray pulling and
+    // swirling particles toward it while lighting up everything along its depth. Fallback: a drifting cloud.
+    const raycaster = new THREE.Raycaster();
+    const pointer = { ndc: new THREE.Vector2(), target: new THREE.Vector2(), active: false, last: 0 };
+    addEventListener('pointermove', e => {
+        const r = stage.getBoundingClientRect();
+        const x = ((e.clientX - r.left) / r.width) * 2 - 1, y = -(((e.clientY - r.top) / r.height) * 2 - 1);
+        if (x >= -1 && x <= 1 && y >= -1 && y <= 1) { pointer.target.set(x, y); pointer.active = true; pointer.last = performance.now(); }
+    }, { passive: true });
+    const SIM_NOISE = `
+        vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;} vec4 mod289(vec4 x){return x-floor(x*(1.0/289.0))*289.0;}
+        vec4 permute(vec4 x){return mod289(((x*34.0)+1.0)*x);} vec4 taylorInvSqrt(vec4 r){return 1.79284291400159-0.85373472095314*r;}
+        float snoise(vec3 v){ const vec2 C=vec2(1.0/6.0,1.0/3.0); const vec4 D=vec4(0.0,0.5,1.0,2.0);
+          vec3 i=floor(v+dot(v,C.yyy)); vec3 x0=v-i+dot(i,C.xxx); vec3 g=step(x0.yzx,x0.xyz); vec3 l=1.0-g; vec3 i1=min(g.xyz,l.zxy); vec3 i2=max(g.xyz,l.zxy);
+          vec3 x1=x0-i1+C.xxx; vec3 x2=x0-i2+C.yyy; vec3 x3=x0-D.yyy; i=mod289(i);
+          vec4 p=permute(permute(permute(i.z+vec4(0.0,i1.z,i2.z,1.0))+i.y+vec4(0.0,i1.y,i2.y,1.0))+i.x+vec4(0.0,i1.x,i2.x,1.0));
+          float n_=0.142857142857; vec3 ns=n_*D.wyz-D.xzx; vec4 j=p-49.0*floor(p*ns.z*ns.z); vec4 x_=floor(j*ns.z); vec4 y_=floor(j-7.0*x_);
+          vec4 x=x_*ns.x+ns.yyyy; vec4 y=y_*ns.x+ns.yyyy; vec4 h=1.0-abs(x)-abs(y); vec4 b0=vec4(x.xy,y.xy); vec4 b1=vec4(x.zw,y.zw);
+          vec4 s0=floor(b0)*2.0+1.0; vec4 s1=floor(b1)*2.0+1.0; vec4 sh=-step(h,vec4(0.0)); vec4 a0=b0.xzyw+s0.xzyw*sh.xxyy; vec4 a1=b1.xzyw+s1.xzyw*sh.zzww;
+          vec3 p0=vec3(a0.xy,h.x); vec3 p1=vec3(a0.zw,h.y); vec3 p2=vec3(a1.xy,h.z); vec3 p3=vec3(a1.zw,h.w);
+          vec4 norm=taylorInvSqrt(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3))); p0*=norm.x; p1*=norm.y; p2*=norm.z; p3*=norm.w;
+          vec4 m=max(0.6-vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)),0.0); m=m*m; return 42.0*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3))); }
+        vec3 curlNoise(vec3 p){ const float e=0.08; vec3 dx=vec3(e,0,0), dy=vec3(0,e,0), dz=vec3(0,0,e); vec3 o1=vec3(31.4), o2=vec3(62.8);
+          float pz_y=snoise(p+dy+o2)-snoise(p-dy+o2), py_z=snoise(p+dz+o1)-snoise(p-dz+o1);
+          float px_z=snoise(p+dz)-snoise(p-dz), pz_x=snoise(p+dx+o2)-snoise(p-dx+o2);
+          float py_x=snoise(p+dx+o1)-snoise(p-dx+o1), px_y=snoise(p+dy)-snoise(p-dy);
+          return vec3(pz_y-py_z, px_z-pz_x, py_x-px_y)/(2.0*e); }`;
+    const SIM_VEL = SIM_NOISE + `
+        uniform sampler2D tHome; uniform float uTime, uDelta, uCurl, uReturn, uDamp, uPull, uRadius; uniform vec3 uCam, uDir;
+        void main(){ vec2 uv=gl_FragCoord.xy/resolution.xy; vec3 p=texture2D(tPos,uv).xyz; vec3 v=texture2D(tVel,uv).xyz; vec4 h=texture2D(tHome,uv);
+          vec3 f=(h.xyz-p)*uReturn;
+          f+=curlNoise(p*0.28+vec3(0.0,uTime*0.05,0.0))*uCurl*(0.4+0.6*h.w);
+          vec3 rel=p-uCam; float along=dot(rel,uDir); vec3 perp=rel-uDir*along; float d=length(perp);
+          float infl=smoothstep(uRadius,0.0,d)*step(0.5,along);
+          vec3 toRay=-perp/max(d,1e-4);
+          f+=toRay*infl*uPull+cross(uDir,toRay)*infl*uPull*0.8;
+          v=v*uDamp+f*uDelta; gl_FragColor=vec4(v,1.0); }`;
+    const SIM_POS = `
+        uniform sampler2D tHome; uniform float uDelta;
+        void main(){ vec2 uv=gl_FragCoord.xy/resolution.xy; vec4 p=texture2D(tPos,uv); vec3 v=texture2D(tVel,uv).xyz; float w=texture2D(tHome,uv).w;
+          p.xyz+=v*uDelta; gl_FragColor=vec4(p.xyz,w); }`;
+    const PTS_VS = `
+        uniform sampler2D tPos, tVel; uniform float uSize, uDPR, uP, uRadius, uIntro; uniform vec3 uCam, uDir; attribute vec2 ref; attribute float aSize;
+        varying float vLit, vRand, vSpeed;
+        void main(){ vec4 p=texture2D(tPos,ref); vec3 v=texture2D(tVel,ref).xyz;
+          vec3 rel=p.xyz-uCam; float along=dot(rel,uDir); vec3 perp=rel-uDir*along; float d=length(perp);
+          vLit=smoothstep(uRadius,0.0,d)*step(0.5,along); vRand=p.w; vSpeed=length(v);
+          vec4 mv=modelViewMatrix*vec4(p.xyz,1.0);
+          gl_PointSize=uSize*uDPR*aSize*(1.0+1.4*vLit)*uP/max(-mv.z,1.0)*uIntro;
+          gl_Position=projectionMatrix*mv; }`;
+    const PTS_FS = `
+        uniform vec3 uColorA, uColorB, uColorLit; uniform float uGlow; varying float vLit, vRand, vSpeed;
+        void main(){ vec2 c=gl_PointCoord-0.5; float d=length(c); if(d>0.5) discard; float disc=smoothstep(0.5,0.08,d);
+          vec3 col=mix(uColorA,uColorB,smoothstep(0.25,0.85,vRand)); col=mix(col,uColorLit,clamp(vLit*0.9+smoothstep(0.8,3.0,vSpeed)*0.15,0.0,1.0));
+          float a=disc*(0.11+0.8*vLit)*uGlow; gl_FragColor=vec4(col*(0.75+0.7*vLit),a); }`;
     function buildParticles() {
+        if (GPUC && gl.capabilities.isWebGL2) { try { buildGPUParticles(); return; } catch (e) { console.warn('work-spine: GPU particles failed, using the simple cloud', e); } }
         const P = 500, pos = new Float32Array(P * 3);
         for (let i = 0; i < P; i++) {
             const a = Math.random() * Math.PI * 2, r = 1.2 + Math.random() * 2.6, h = 9 - Math.random() * 28;
@@ -171,7 +233,66 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
         }
         const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
         particles = new THREE.Points(pg, new THREE.PointsMaterial({ color: 0x4faad1, size: 0.045 * S, transparent: true, opacity: 0.75, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true }));
+        particles.userData.legacy = true;
         world.add(particles);
+    }
+    function buildGPUParticles() {
+        const N = Math.max(32, Math.round(cfg.pCount)), COUNT = N * N;
+        const gpu = new GPUC.GPUComputationRenderer(N, N, gl);
+        if (matchMedia('(pointer: coarse)').matches) gpu.setDataType(THREE.HalfFloatType);
+        const pos0 = gpu.createTexture(), vel0 = gpu.createTexture(), home = gpu.createTexture();
+        const span = yStep * (n - 1);
+        for (let i = 0; i < COUNT; i++) {
+            const a = Math.random() * Math.PI * 2, r = 1.2 + 6.6 * Math.sqrt(Math.random()), y = 4 - Math.random() * (span + 8), w = Math.random();
+            const x = Math.cos(a) * r, z = Math.sin(a) * r;
+            home.image.data.set([x, y, z, w], i * 4);
+            pos0.image.data.set([x + (Math.random() - 0.5), y + (Math.random() - 0.5), z + (Math.random() - 0.5), w], i * 4);
+        }
+        home.needsUpdate = true;
+        const velVar = gpu.addVariable('tVel', SIM_VEL, vel0), posVar = gpu.addVariable('tPos', SIM_POS, pos0);
+        gpu.setVariableDependencies(velVar, [posVar, velVar]); gpu.setVariableDependencies(posVar, [posVar, velVar]);
+        const velU = velVar.material.uniforms, posU = posVar.material.uniforms;
+        Object.assign(velU, { tHome: { value: home }, uTime: { value: 0 }, uDelta: { value: 0 }, uCurl: { value: cfg.pCurl }, uReturn: { value: cfg.pReturn }, uDamp: { value: cfg.pDamp }, uPull: { value: cfg.pPull }, uRadius: { value: cfg.pRadius }, uCam: { value: new THREE.Vector3() }, uDir: { value: new THREE.Vector3(0, 0, -1) } });
+        Object.assign(posU, { tHome: { value: home }, uDelta: { value: 0 } });
+        const err = gpu.init(); if (err) throw new Error(err);
+        const geo = new THREE.BufferGeometry();
+        const ref = new Float32Array(COUNT * 2), sz = new Float32Array(COUNT);
+        for (let i = 0; i < COUNT; i++) { ref[i * 2] = ((i % N) + 0.5) / N; ref[i * 2 + 1] = (Math.floor(i / N) + 0.5) / N; sz[i] = Math.random() < 0.015 ? 1.8 + Math.random() * 1.0 : 0.5 + Math.random() * 0.6; }
+        geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(COUNT * 3), 3));
+        geo.setAttribute('ref', new THREE.BufferAttribute(ref, 2)); geo.setAttribute('aSize', new THREE.BufferAttribute(sz, 1));
+        const mat = new THREE.ShaderMaterial({
+            uniforms: { tPos: { value: null }, tVel: { value: null }, uSize: { value: cfg.pSize }, uDPR: { value: Math.min(devicePixelRatio || 1, 2) }, uP: { value: 1000 }, uRadius: { value: cfg.pRadius }, uIntro: { value: 0 },
+                uCam: { value: new THREE.Vector3() }, uDir: { value: new THREE.Vector3(0, 0, -1) }, uColorA: { value: new THREE.Color(0x4faad1) }, uColorB: { value: new THREE.Color(0xbfe6ff) }, uColorLit: { value: new THREE.Color(0xe6f4ff) }, uGlow: { value: cfg.pGlow } },
+            vertexShader: PTS_VS, fragmentShader: PTS_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+        });
+        particles = new THREE.Points(geo, mat); particles.frustumCulled = false;
+        particles.userData = { gpu, velVar, posVar, velU, posU, ptsU: mat.uniforms, isGPU: true };
+        world.add(particles);
+        layoutParticles();
+    }
+    function layoutParticles() {
+        if (!particles || !particles.userData.isGPU) return;
+        particles.userData.ptsU.uP.value = stage.clientHeight / (2 * Math.tan(M.degToRad(camera.fov) / 2));
+    }
+    function syncParticles() {
+        if (!particles || !particles.userData.isGPU) return;
+        const { velU, ptsU } = particles.userData;
+        velU.uCurl.value = cfg.pCurl; velU.uReturn.value = cfg.pReturn; velU.uDamp.value = cfg.pDamp; velU.uPull.value = cfg.pPull; velU.uRadius.value = cfg.pRadius;
+        ptsU.uSize.value = cfg.pSize; ptsU.uGlow.value = cfg.pGlow; ptsU.uRadius.value = cfg.pRadius;
+    }
+    function updateParticles(now, dt) {
+        const u = particles.userData, t = now * 0.001;
+        const stale = !pointer.active || now - pointer.last > 2500;
+        if (stale) pointer.target.set(0.55 * Math.sin(t * 0.23), 0.35 * Math.sin(t * 0.31 + 1.0));   // idle: the light wanders
+        pointer.ndc.lerp(pointer.target, stale ? 0.03 : 0.12);
+        raycaster.setFromCamera(pointer.ndc, camera);
+        u.velU.uCam.value.copy(raycaster.ray.origin).divideScalar(S); u.velU.uDir.value.copy(raycaster.ray.direction);
+        u.ptsU.uCam.value.copy(u.velU.uCam.value); u.ptsU.uDir.value.copy(raycaster.ray.direction);
+        u.velU.uTime.value = t; u.velU.uDelta.value = dt; u.posU.uDelta.value = dt;
+        u.gpu.compute();
+        u.ptsU.tPos.value = u.gpu.getCurrentRenderTarget(u.posVar).texture;
+        u.ptsU.tVel.value = u.gpu.getCurrentRenderTarget(u.velVar).texture;
+        u.ptsU.uIntro.value = Math.min(1, u.ptsU.uIntro.value + dt * 0.6);
     }
 
     /* Centerpiece 'polystar': the hero's Lottie, rebuilt in 3D. The Lottie is one 5-point polygon
@@ -505,7 +626,13 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
             mat.envMapIntensity = light ? 0.75 : 1;
         }
         if (keyLight) keyLight.color.copy(accent).lerp(new THREE.Color(0xffffff), 0.5);
-        if (particles) { particles.material.color.copy(accent); particles.material.opacity = light ? 0.55 : 0.75; }
+        if (particles && particles.userData.isGPU) {
+            const u = particles.userData.ptsU;
+            u.uColorA.value.copy(accent).lerp(new THREE.Color(light ? 0x000000 : 0xffffff), light ? 0.25 : 0.05);
+            u.uColorB.value.copy(accent).lerp(new THREE.Color(light ? 0x000000 : 0xffffff), light ? 0.05 : 0.4);
+            u.uColorLit.value.copy(accent).lerp(new THREE.Color(light ? 0x000000 : 0xffffff), light ? 0.35 : 0.72);
+            particles.material.blending = light ? THREE.NormalBlending : THREE.AdditiveBlending; particles.material.needsUpdate = true;
+        } else if (particles) { particles.material.color.copy(accent); particles.material.opacity = light ? 0.55 : 0.75; }
         if (axis) {
             const soft = accent.clone().lerp(new THREE.Color(0xffffff), light ? 0.0 : 0.25);
             for (const mat of [axis.coreMat, axis.ribbonMat]) mat.uniforms.uColor.value.copy(soft);
@@ -583,7 +710,8 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
             targets.push(t);
         });
         world.scale.setScalar(S);
-        if (particles) particles.material.size = 0.045 * S;
+        if (particles && particles.userData.legacy) particles.material.size = 0.045 * S;
+        layoutParticles();
         layoutAxis(); layoutPolystar(); layoutDive();
 
         cssRenderer.setSize(w, h);
@@ -642,7 +770,9 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
             if (count) count.textContent = String(front + 1).padStart(2, '0') + ' / ' + String(n).padStart(2, '0');
         }
 
-        if (particles) particles.rotation.y = p * Math.PI * 1.2 + now * 0.00004;
+        const dt = Math.min(0.05, Math.max(0.001, (now - lastNow) / 1000));
+        if (particles && particles.userData.legacy) particles.rotation.y = p * Math.PI * 1.2 + now * 0.00004;
+        if (particles && particles.userData.isGPU) updateParticles(now, dt);
         if (polystar) {
             // billboard to the camera, sit on the axis at the camera's height, offset up-right in view space
             const g = polystar.group;
@@ -652,7 +782,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
             g.position.set(_s.x, camGroup.position.y / S + _s.y, _s.z);
         }
         if (dive) updateDive(p, now);
-        if (axis) updateAxis(now, Math.min(0.05, (now - lastNow) / 1000));
+        if (axis) updateAxis(now, dt);
         lastNow = now;
         cssRenderer.render(cssScene, camera);
         if (gl) gl.render(glScene, camera);
@@ -701,6 +831,8 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
             ['edge', 'scroll edge', 0, 0.2, 0.005], ['scrollPerCard', 'scroll per card (vh)', 25, 120, 5],
             ['polyScale', 'polystar size', 0.4, 3, 0.05], ['polyOpacity', 'polystar opacity', 0, 1, 0.02],
             ['diveSurface', 'dive: surface height', 0.5, 3, 0.05], ['diveLight', 'dive: light shafts', 0, 1.5, 0.05], ['divePitch', 'dive: look-up (deg)', 0, 30, 1],
+            ['pCurl', 'particles: curl', 0, 5, 0.05], ['pReturn', 'particles: home spring', 0, 5, 0.05], ['pPull', 'particles: cursor pull', 0, 30, 0.5], ['pDamp', 'particles: damping', 0.7, 0.99, 0.005],
+            ['pSize', 'particles: size (px)', 0.5, 8, 0.1], ['pGlow', 'particles: glow', 0, 3, 0.05], ['pRadius', 'particles: light radius', 0.3, 6, 0.05],
             ['spineScale', 'spine scale', 0.4, 1.8, 0.02], ['spineSpacing', 'vertebra gap', 0.3, 1.2, 0.01], ['spineTwist', 'vertebra twist', 0, 1, 0.01],
         ];
         const el = document.createElement('div');
@@ -717,7 +849,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, cards)
             const k = e.target.dataset.k; if (!k) return;
             cfg[k] = +e.target.value; e.target.nextElementSibling.value = cfg[k];
             if (k === 'scrollPerCard') section.style.setProperty('--ws-vh', cfg.scrollPerCard + 'vh');
-            layout(); layoutSpine(); applyTheme(); ta.value = attrs(); wake();
+            layout(); layoutSpine(); applyTheme(); syncParticles(); ta.value = attrs(); wake();
         });
         el.querySelector('[data-copy]').addEventListener('click', () => { ta.value = attrs(); ta.select(); navigator.clipboard?.writeText(ta.value).catch(() => {}); });
         el.querySelectorAll('[data-cp]').forEach(a => a.addEventListener('click', e => {
