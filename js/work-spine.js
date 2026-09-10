@@ -31,7 +31,7 @@ const pcfg = section ? {
     pParallax: numAttr(section.dataset.pParallax, 0.004),    // units of field per scrolled pixel at mid depth; near particles move faster, far ones slower
     pAmbient: numAttr(section.dataset.pAmbient, 0.07),       // soft accent glow behind the field
     boat: section.dataset.boat || 'scroll',                  // sailboat of particles in the hero: 'scroll' (formed at the top, dissolves as you scroll) | 'always' | 'hover' | 'off'
-    boatX: numAttr(section.dataset.boatX, 0.22), boatY: numAttr(section.dataset.boatY, -0.68), boatSize: numAttr(section.dataset.boatSize, 0.21),   // centre in NDC, hull width as a fraction of the visible width
+    boatX: numAttr(section.dataset.boatX, 0.1), boatY: numAttr(section.dataset.boatY, -0.56), boatSize: numAttr(section.dataset.boatSize, 0.21),   // centre in NDC, hull width as a fraction of the visible width
 } : null;
 let layer = null;
 
