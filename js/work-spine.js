@@ -29,7 +29,6 @@ const pcfg = section ? {
     pCurl: numAttr(section.dataset.pCurl, 1.4), pReturn: numAttr(section.dataset.pReturn, 1.2), pPull: numAttr(section.dataset.pPull, 3), pDamp: numAttr(section.dataset.pDamp, 0.92),
     pSize: numAttr(section.dataset.pSize, 1.7), pGlow: numAttr(section.dataset.pGlow, 1.0), pRadius: numAttr(section.dataset.pRadius, 1.6),
     pParallax: numAttr(section.dataset.pParallax, 0.004),    // units of field per scrolled pixel at mid depth; near particles move faster, far ones slower
-    pAmbient: numAttr(section.dataset.pAmbient, 0.07),       // soft accent glow behind the field
     boat: section.dataset.boat || 'scroll',                  // sailboat of particles in the hero: 'scroll' (formed at the top, dissolves as you scroll) | 'always' | 'hover' | 'off'
     boatX: numAttr(section.dataset.boatX, 0.1), boatY: numAttr(section.dataset.boatY, -0.56), boatSize: numAttr(section.dataset.boatSize, 0.21),   // centre in NDC, hull width as a fraction of the visible width
 } : null;
@@ -54,15 +53,20 @@ const SIM_NOISE = `
       float py_x=snoise(p+dx+o1)-snoise(p-dx+o1), px_y=snoise(p+dy)-snoise(p-dy);
       return vec3(pz_y-py_z, px_z-pz_x, py_x-px_y)/(2.0*e); }`;
 const SIM_SHARED = `
-    uniform sampler2D tBoat; uniform float uForm, uScroll, uScrollFull, uH, uBob, uBoatScale; uniform vec3 uBoat;
+    uniform sampler2D tBoat; uniform float uForm, uScroll, uScrollFull, uH, uBob, uBoatScale, uYaw, uRoll; uniform vec3 uBoat;
     // where a particle is drawn: the field wraps vertically and scrolls with depth-dependent parallax; a formed boat particle scrolls with the page instead
     vec3 drawPos(vec3 p, float bf){ float depthF = mix(0.3, 1.6, clamp((p.z + 4.0) / 8.0, 0.0, 1.0)); float off = uScroll * depthF * (1.0 - bf);
       vec3 pw = p; float wy = mod(p.y + off + uH * 0.5, uH) - uH * 0.5; pw.y = mix(wy, p.y, bf); return pw; }
-    vec3 boatTarget(vec4 b){ return vec3(uBoat.x + b.x * uBoatScale, uBoat.y + b.y * uBoatScale - uScrollFull + uBob, uBoat.z + b.z); }`;
+    vec3 boatTarget(vec4 b){ vec3 q = b.xyz - vec3(0.0, -0.37, 0.0);
+      float cy = cos(uYaw), sy = sin(uYaw); q = vec3(q.x * cy + q.z * sy, q.y, -q.x * sy + q.z * cy);      // yaw: turn the boat toward the viewer
+      float cr = cos(uRoll), sr = sin(uRoll); q = vec3(q.x, q.y * cr - q.z * sr, q.y * sr + q.z * cr);    // heel, pivoting on the waterline
+      q += vec3(0.0, -0.37, 0.0);
+      return vec3(uBoat.x + q.x * uBoatScale, uBoat.y + q.y * uBoatScale - uScrollFull + uBob, uBoat.z + q.z * uBoatScale); }
+    float boatFlag(vec4 b){ return step(0.01, b.w); }`;
 const SIM_VEL = SIM_NOISE + SIM_SHARED + `
     uniform sampler2D tHome; uniform float uTime, uDelta, uCurl, uReturn, uDamp, uPull, uRadius; uniform vec3 uCam, uDir;
     void main(){ vec2 uv=gl_FragCoord.xy/resolution.xy; vec3 p=texture2D(tPos,uv).xyz; vec3 v=texture2D(tVel,uv).xyz; vec4 h=texture2D(tHome,uv); vec4 b=texture2D(tBoat,uv);
-      float bf=b.w*uForm;
+      float bf=boatFlag(b)*uForm;
       vec3 tgt=mix(h.xyz, boatTarget(b), bf);
       vec3 f=(tgt-p)*uReturn*(1.0+1.5*bf);
       f+=curlNoise(p*0.28+vec3(0.0,uTime*0.05,0.0))*uCurl*(0.4+0.6*h.w)*(1.0-0.8*bf);
@@ -78,8 +82,8 @@ const SIM_POS = `
       p.xyz+=v*uDelta; gl_FragColor=vec4(p.xyz,w); }`;
 const PTS_VS = SIM_SHARED + `
     uniform sampler2D tPos, tVel; uniform float uSize, uDPR, uP, uRadius, uIntro; uniform vec3 uCam, uDir; attribute vec2 ref; attribute float aSize;
-    varying float vLit, vRand, vSpeed, vBoat;
-    void main(){ vec4 p=texture2D(tPos,ref); vec3 v=texture2D(tVel,ref).xyz; vec4 b=texture2D(tBoat,ref); float bf=b.w*uForm; vBoat=bf;
+    varying float vLit, vRand, vSpeed, vBoat, vShade;
+    void main(){ vec4 p=texture2D(tPos,ref); vec3 v=texture2D(tVel,ref).xyz; vec4 b=texture2D(tBoat,ref); float bf=boatFlag(b)*uForm; vBoat=bf; vShade=clamp(b.w,0.0,1.0);
       vec3 pw=drawPos(p.xyz,bf);
       vec3 rel=pw-uCam; float along=dot(rel,uDir); vec3 perp=rel-uDir*along; float d=length(perp);
       vLit=smoothstep(uRadius,0.0,d)*step(0.5,along); vRand=p.w; vSpeed=length(v);
@@ -87,10 +91,10 @@ const PTS_VS = SIM_SHARED + `
       gl_PointSize=uSize*uDPR*aSize*(1.0+0.9*vLit+0.25*bf)*uP/max(-mv.z,1.0)*uIntro;
       gl_Position=projectionMatrix*mv; }`;
 const PTS_FS = `
-    uniform vec3 uColorA, uColorB, uColorLit; uniform float uGlow; varying float vLit, vRand, vSpeed, vBoat;
+    uniform vec3 uColorA, uColorB, uColorLit; uniform float uGlow; varying float vLit, vRand, vSpeed, vBoat, vShade;
     void main(){ vec2 c=gl_PointCoord-0.5; float d=length(c); if(d>0.5) discard; float disc=smoothstep(0.5,0.08,d);
-      vec3 col=mix(uColorA,uColorB,smoothstep(0.25,0.85,vRand)); col=mix(col,uColorLit,clamp(vLit*0.9+smoothstep(0.8,3.0,vSpeed)*0.15+0.3*vBoat,0.0,1.0));
-      float a=disc*(0.24+0.5*vLit)*(1.0+1.1*vBoat)*uGlow; gl_FragColor=vec4(col*(0.85+0.35*vLit+0.2*vBoat),a); }`;
+      vec3 col=mix(uColorA,uColorB,smoothstep(0.25,0.85,vRand)); col=mix(col,uColorLit,clamp(vLit*0.9+smoothstep(0.8,3.0,vSpeed)*0.15+0.7*vBoat*vShade,0.0,1.0));
+      float a=disc*(0.24+0.5*vLit)*(1.0+vBoat*(0.1+1.4*vShade))*uGlow; gl_FragColor=vec4(col*(0.85+0.35*vLit+0.3*vBoat*vShade),a); }`;
 
 /* The picked colour, pushed to a vivid tint: the page's --button-color is derived from the picker with
    lightness tweaks that can leave it muted, and additive blending over a grey ground washes it out further. */
@@ -101,24 +105,62 @@ function vividAccent(THREE, light) {
     return c.setHSL(hsl.h, Math.max(hsl.s, 0.8), light ? 0.38 : 0.6);
 }
 
-/* A sailboat drawn in particles: main sail and jib as filled triangles with denser edges, a lens-shaped
-   hull, the mast, and a few rows of water. Returns [x, y, zJitter] in boat space (hull width = 1). */
+/* A sailboat sampled as 3D surfaces, in boat space (hull length 1, y up, z toward the viewer):
+   hull with elliptical cross-sections and a pointed bow, deck and gunwale, mast and boom, main and jib
+   with a belly, ripples on the water, and a dim mirrored reflection below the waterline.
+   Returns [x, y, z, shade]; shade is a baked Lambert term from the surface normal (light upper-left-front). */
+const WATERLINE = -0.37;
 function sampleBoat() {
-    const pick = (a, b, c) => { let u = Math.random(), v = Math.random(); if (u + v > 1) { u = 1 - u; v = 1 - v; } return [a[0] + (b[0] - a[0]) * u + (c[0] - a[0]) * v, a[1] + (b[1] - a[1]) * u + (c[1] - a[1]) * v]; };
-    const edge = (a, b) => { const t = Math.random(); return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]; };
-    const outline = (tri) => { const k = Math.floor(Math.random() * 3); return edge(tri[k], tri[(k + 1) % 3]); };
-    const main = [[-0.05, 0.62], [-0.05, -0.26], [0.46, -0.26]], jib = [[-0.08, 0.44], [-0.5, -0.27], [-0.1, -0.25]];
-    const r = Math.random(); let x, y;
-    if (r < 0.40) [x, y] = Math.random() < 0.3 ? outline(main) : pick(...main);
-    else if (r < 0.58) [x, y] = Math.random() < 0.3 ? outline(jib) : pick(...jib);
-    else if (r < 0.80) {
-        x = -0.52 + 1.04 * Math.random();
-        const keel = -0.30 - 0.13 * Math.sqrt(Math.max(0, 1 - Math.pow((x - 0.02) / 0.54, 2)));
-        y = Math.random() < 0.3 ? (Math.random() < 0.5 ? -0.30 : keel) : keel + (-0.30 - keel) * Math.random();
+    const L = [-0.45, 0.72, 0.53];                                      // normalised-ish light direction
+    const shade = n => { const l = Math.hypot(n[0], n[1], n[2]) || 1; const d = (n[0] * L[0] + n[1] * L[1] + n[2] * L[2]) / l; return Math.min(1, 0.3 + 0.7 * Math.max(0, d)); };
+    const beam = x => 0.14 * Math.sqrt(Math.max(0, 1 - Math.pow((x - 0.02) / 0.54, 2)));
+    const depth = x => 0.11 * Math.sqrt(Math.max(0, 1 - Math.pow((x - 0.02) / 0.54, 2))) + 0.02;
+    const tri = (A, B, C) => { let u = Math.random(), v = Math.random(); if (u + v > 1) { u = 1 - u; v = 1 - v; } return [A[0] + (B[0] - A[0]) * u + (C[0] - A[0]) * v, A[1] + (B[1] - A[1]) * u + (C[1] - A[1]) * v]; };
+    const onEdge = (A, B) => { const t = Math.random(); return [A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t]; };
+    // sails: a belly toward +z, strongest mid-chord near the foot; the normal tilts with the belly
+    const sail = (head, tack, clew, edges) => {
+        let [x, y] = Math.random() < 0.22 ? onEdge(...edges[Math.floor(Math.random() * edges.length)]) : tri(head, tack, clew);
+        const hFrac = Math.min(1, Math.max(0, (y - tack[1]) / (head[1] - tack[1])));
+        const luffX = head[0] + (tack[0] - head[0]) * (1 - hFrac), leechX = head[0] + (clew[0] - head[0]) * (1 - hFrac);
+        const across = leechX === luffX ? 0 : Math.min(1, Math.max(0, (x - luffX) / (leechX - luffX)));
+        const belly = 0.11 * (0.35 + 0.65 * (1 - hFrac));
+        const z = belly * Math.sin(Math.PI * across);
+        const n = [-Math.cos(Math.PI * across) * belly * 4, 0.15, 1];
+        return [x, y, z, shade(n)];
+    };
+    const main = { head: [-0.05, 0.64], tack: [-0.05, -0.23], clew: [0.47, -0.23] };
+    const jib = { head: [-0.08, 0.46], tack: [-0.5, -0.27], clew: [-0.1, -0.24] };
+    const r = Math.random();
+    if (r < 0.26) return sail(main.head, main.tack, main.clew, [[main.head, main.tack], [main.head, main.clew], [main.tack, main.clew]]);
+    if (r < 0.39) return sail(jib.head, jib.tack, jib.clew, [[jib.head, jib.tack], [jib.head, jib.clew], [jib.tack, jib.clew]]);
+    if (r < 0.57) {                                                       // hull above the waterline, plus gunwale
+        for (let k = 0; k < 8; k++) {
+            const x = -0.52 + 1.04 * Math.random(), th = (Math.random() * 2 - 1) * Math.PI / 2, b = beam(x), d = depth(x);
+            const gun = Math.random() < 0.25;
+            const y = gun ? -0.30 : -0.30 - d * Math.cos(th), z = gun ? (Math.random() < 0.5 ? b : -b) : b * Math.sin(th);
+            if (y < WATERLINE - 0.005) continue;
+            const bow = x > 0.25 ? -(x - 0.25) * 1.5 : 0;
+            return [x, y, z, shade(gun ? [0, 1, 0] : [bow, -Math.cos(th) * 0.6, Math.sin(th)])];
+        }
+        return [0, -0.30, 0, 0.6];
     }
-    else if (r < 0.85) { x = -0.06 + (Math.random() - 0.5) * 0.012; y = -0.30 + Math.random() * 0.94; }
-    else { x = -0.8 + 1.6 * Math.random(); y = -0.46 + 0.02 * Math.sin(x * 18) - Math.random() * 0.035; }
-    return [x, y, (Math.random() - 0.5) * 0.35];
+    if (r < 0.62) {                                                       // deck
+        const x = -0.52 + 1.04 * Math.random(), z = beam(x) * (Math.random() * 2 - 1) * 0.92;
+        return [x, -0.30, z, shade([0, 1, 0]) * 0.9];
+    }
+    if (r < 0.66) {                                                       // mast and boom
+        if (Math.random() < 0.7) return [-0.06 + (Math.random() - 0.5) * 0.01, -0.30 + Math.random() * 0.96, 0, 0.75];
+        const t = Math.random(); return [-0.06 + 0.53 * t, -0.235, 0.01, 0.7];
+    }
+    if (r < 0.84) {                                                       // water: ripples denser near the hull
+        const a = Math.random() * Math.PI * 2, rr = Math.pow(Math.random(), 0.6);
+        const x = Math.cos(a) * rr * 1.25, z = Math.sin(a) * rr * 0.75;
+        const rip = 0.5 + 0.5 * Math.sin(rr * 26 - a * 2);
+        return [x, WATERLINE - 0.004 + 0.008 * rip, z, 0.35 + 0.35 * rip];
+    }
+    // reflection: mirror a sail or hull sample under the waterline, rippled and dim
+    const src = Math.random() < 0.65 ? sail(main.head, main.tack, main.clew, [[main.head, main.tack], [main.head, main.clew], [main.tack, main.clew]]) : sail(jib.head, jib.tack, jib.clew, [[jib.head, jib.tack], [jib.head, jib.clew], [jib.tack, jib.clew]]);
+    return [src[0] + 0.02 * Math.sin(src[1] * 32), 2 * WATERLINE - src[1], src[2], Math.max(0.05, src[3] * 0.3)];
 }
 
 /* Page-wide particle layer: a fixed canvas behind everything (z-index -1, no pointer events), the same
@@ -139,15 +181,15 @@ function startParticleLayer(THREE, GPUC) {
     const gpu = new GPUC.GPUComputationRenderer(N, N, gl);
     if (coarse) gpu.setDataType(THREE.HalfFloatType);
     const pos0 = gpu.createTexture(), vel0 = gpu.createTexture(), home = gpu.createTexture(), boat = gpu.createTexture();
-    const boatCount = pcfg.boat === 'off' ? 0 : Math.floor(COUNT * 0.42);
+    const boatCount = pcfg.boat === 'off' ? 0 : Math.floor(COUNT * 0.18);
     for (let i = 0; i < COUNT; i++) {
         const x = (Math.random() * 2 - 1) * 10, y = (Math.random() - 0.5) * H, z = (Math.random() * 2 - 1) * 4, w = Math.random();
         home.image.data.set([x, y, z, w], i * 4);
         pos0.image.data.set([x + (Math.random() - 0.5) * 0.6, y + (Math.random() - 0.5) * 0.6, z, w], i * 4);
-        if (i < boatCount) { const [bx, by, bz] = sampleBoat(); boat.image.data.set([bx, by, bz, 1], i * 4); }
+        if (i < boatCount) { const [bx, by, bz, sh] = sampleBoat(); boat.image.data.set([bx, by, bz, Math.max(0.02, sh)], i * 4); }
     }
     home.needsUpdate = true; boat.needsUpdate = true;
-    const boatU = () => ({ tBoat: { value: boat }, uForm: { value: 0 }, uScrollFull: { value: 0 }, uBob: { value: 0 }, uBoatScale: { value: 1 }, uBoat: { value: new THREE.Vector3() } });
+    const boatU = () => ({ tBoat: { value: boat }, uForm: { value: 0 }, uScrollFull: { value: 0 }, uBob: { value: 0 }, uBoatScale: { value: 1 }, uBoat: { value: new THREE.Vector3() }, uYaw: { value: 0 }, uRoll: { value: 0 } });
     const velVar = gpu.addVariable('tVel', SIM_VEL, vel0), posVar = gpu.addVariable('tPos', SIM_POS, pos0);
     gpu.setVariableDependencies(velVar, [posVar, velVar]); gpu.setVariableDependencies(posVar, [posVar, velVar]);
     const velU = velVar.material.uniforms, posU = posVar.material.uniforms;
@@ -165,13 +207,6 @@ function startParticleLayer(THREE, GPUC) {
     });
     const U = mat.uniforms;
     const points = new THREE.Points(geo, mat); points.frustumCulled = false; scene.add(points);
-    // a little ambient light: one big soft accent glow far behind the field, drifting slowly
-    const gc = document.createElement('canvas'); gc.width = gc.height = 256; const gg = gc.getContext('2d');
-    const grad = gg.createRadialGradient(128, 128, 0, 128, 128, 128); grad.addColorStop(0, 'rgba(255,255,255,1)'); grad.addColorStop(0.4, 'rgba(255,255,255,0.35)'); grad.addColorStop(1, 'rgba(255,255,255,0)');
-    gg.fillStyle = grad; gg.fillRect(0, 0, 256, 256);
-    const glowTex = new THREE.CanvasTexture(gc); glowTex.colorSpace = THREE.SRGBColorSpace;
-    const ambient = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0x4faad1, transparent: true, opacity: pcfg.pAmbient, depthWrite: false, blending: THREE.AdditiveBlending }));
-    ambient.position.set(0, 0, -3); scene.add(ambient);
     let visW = 1, visH = 1;
     const raycaster = new THREE.Raycaster();
     const pointer = { ndc: new THREE.Vector2(), target: new THREE.Vector2(), active: false, last: 0 };
@@ -182,7 +217,6 @@ function startParticleLayer(THREE, GPUC) {
         visH = 2 * camera.position.z * Math.tan(M.degToRad(camera.fov) / 2); visW = visH * camera.aspect;
         const portrait = h > w, bx = portrait ? 0 : pcfg.boatX, by = portrait ? -0.5 : pcfg.boatY, size = (portrait ? 0.6 : pcfg.boatSize) * visW;
         for (const u of [velU, U]) { u.uBoat.value.set(bx * visW / 2, by * visH / 2, 0); u.uBoatScale.value = size; }
-        ambient.scale.set(visW * 1.6, visH * 1.6, 1);
     }
     addEventListener('resize', resize); resize();
     function applyTheme() {
@@ -192,7 +226,6 @@ function startParticleLayer(THREE, GPUC) {
         U.uColorB.value.copy(v).lerp(new THREE.Color(light ? 0x000000 : 0xffffff), light ? 0.15 : 0.2);
         U.uColorLit.value.copy(v).lerp(new THREE.Color(0xffffff), light ? 0.2 : 0.55);
         U.uGlow.value = pcfg.pGlow * (light ? 1.6 : 1);
-        ambient.material.color.copy(v); ambient.material.opacity = pcfg.pAmbient * (light ? 0.6 : 1); ambient.material.blending = light ? THREE.NormalBlending : THREE.AdditiveBlending; ambient.material.needsUpdate = true;
         mat.blending = light ? THREE.NormalBlending : THREE.AdditiveBlending; mat.needsUpdate = true;
     }
     applyTheme();
@@ -212,8 +245,7 @@ function startParticleLayer(THREE, GPUC) {
         const formTarget = pcfg.boat === 'always' ? 1 : pcfg.boat === 'hover' ? (stale ? 0 : settled) : pcfg.boat === 'scroll' ? settled : 0;
         form += (formTarget - form) * 0.04;
         const fullSpeed = pcfg.boat === 'always' ? 0 : scrollY * visH / innerHeight;   // page speed in units at the boat's depth
-        for (const u of [velU, U]) { u.uForm.value = form; u.uScrollFull.value = fullSpeed; u.uBob.value = 0.05 * Math.sin(t * 0.8) * form; }
-        ambient.position.set(Math.sin(t * 0.05) * 1.5 + pcfg.boatX * visW * 0.25, Math.cos(t * 0.04) * 1.0 - 0.5, -3);
+        for (const u of [velU, U]) { u.uForm.value = form; u.uScrollFull.value = fullSpeed; u.uBob.value = 0.04 * Math.sin(t * 0.8) * form; u.uYaw.value = -0.62 + 0.09 * Math.sin(t * 0.21); u.uRoll.value = 0.16 + 0.06 * Math.sin(t * 0.6); }
         velU.uTime.value = t; velU.uDelta.value = dt; posU.uDelta.value = dt;
         gpu.compute();
         U.tPos.value = gpu.getCurrentRenderTarget(posVar).texture; U.tVel.value = gpu.getCurrentRenderTarget(velVar).texture;
@@ -415,7 +447,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         const velVar = gpu.addVariable('tVel', SIM_VEL, vel0), posVar = gpu.addVariable('tPos', SIM_POS, pos0);
         gpu.setVariableDependencies(velVar, [posVar, velVar]); gpu.setVariableDependencies(posVar, [posVar, velVar]);
         const velU = velVar.material.uniforms, posU = posVar.material.uniforms;
-        const noBoat = () => ({ tBoat: { value: home }, uForm: { value: 0 }, uScrollFull: { value: 0 }, uBob: { value: 0 }, uBoatScale: { value: 1 }, uBoat: { value: new THREE.Vector3() } });
+        const noBoat = () => ({ tBoat: { value: home }, uForm: { value: 0 }, uScrollFull: { value: 0 }, uBob: { value: 0 }, uBoatScale: { value: 1 }, uBoat: { value: new THREE.Vector3() }, uYaw: { value: 0 }, uRoll: { value: 0 } });
         Object.assign(velU, { tHome: { value: home }, uTime: { value: 0 }, uDelta: { value: 0 }, uCurl: { value: cfg.pCurl }, uReturn: { value: cfg.pReturn }, uDamp: { value: cfg.pDamp }, uPull: { value: cfg.pPull }, uRadius: { value: cfg.pRadius }, uScroll: { value: 0 }, uH: { value: 1e5 }, uCam: { value: new THREE.Vector3() }, uDir: { value: new THREE.Vector3(0, 0, -1) } }, noBoat());
         Object.assign(posU, { tHome: { value: home }, uDelta: { value: 0 } });
         const err = gpu.init(); if (err) throw new Error(err);
@@ -996,7 +1028,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
             ['polyScale', 'polystar size', 0.4, 3, 0.05], ['polyOpacity', 'polystar opacity', 0, 1, 0.02],
             ['diveSurface', 'dive: surface height', 0.5, 3, 0.05], ['diveLight', 'dive: light shafts', 0, 1.5, 0.05], ['divePitch', 'dive: look-up (deg)', 0, 30, 1],
             ['pCurl', 'particles: curl', 0, 5, 0.05], ['pReturn', 'particles: home spring', 0, 5, 0.05], ['pPull', 'particles: cursor pull', 0, 30, 0.5], ['pDamp', 'particles: damping', 0.7, 0.99, 0.005],
-            ['pSize', 'particles: size (px)', 0.3, 6, 0.05], ['pGlow', 'particles: glow', 0, 3, 0.05], ['pRadius', 'particles: light radius', 0.3, 6, 0.05], ['pParallax', 'particles: scroll parallax', 0, 0.012, 0.0002], ['pAmbient', 'particles: ambient glow', 0, 0.3, 0.005],
+            ['pSize', 'particles: size (px)', 0.3, 6, 0.05], ['pGlow', 'particles: glow', 0, 3, 0.05], ['pRadius', 'particles: light radius', 0.3, 6, 0.05], ['pParallax', 'particles: scroll parallax', 0, 0.012, 0.0002],
             ['boatX', 'boat: x (ndc)', -1, 1, 0.01], ['boatY', 'boat: y (ndc)', -1, 1, 0.01], ['boatSize', 'boat: size', 0.05, 0.6, 0.005],
             ['spineScale', 'spine scale', 0.4, 1.8, 0.02], ['spineSpacing', 'vertebra gap', 0.3, 1.2, 0.01], ['spineTwist', 'vertebra twist', 0, 1, 0.01],
         ];
