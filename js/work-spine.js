@@ -311,9 +311,9 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         fov: num(ds.fov, 35),
         fovPortrait: num(ds.fovPortrait, 55),
         camOffset: num(ds.camOffset, 2),        // camera's local z offset inside its group
-        edge: num(ds.edge, 0.03), edgePortrait: 0.06,  // scroll dead zone at both ends
+        edge: num(ds.edge, 0), edgePortrait: 0,        // scroll dead zone at both ends; 0 keeps the motion continuous with the page scroll
         lerp: num(ds.lerp, 0.2),
-        drift: num(ds.drift, -0.7),            // entry/exit camera offset in units; theirs is +1 (card low on entry), negative keeps the first card up under the heading and the last card near the bottom edge
+        drift: num(ds.drift, 0),               // entry/exit camera offset in units (theirs is +1: card drops in from above); 0 = the card holds centred from the moment the stage pins until it releases
         cardFrac: num(ds.cardFrac, 0.6),        // card width as a fraction of the visible width (upper bound; see layout())
         gap: num(ds.gap, 0.45),                 // minimum clearance between neighbouring cards, in units
         cardFracPortrait: 0.86,
