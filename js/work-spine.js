@@ -325,6 +325,8 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         polyScale: num(ds.polyScale, 1),            // polystar size multiplier
         polyOpacity: num(ds.polyOpacity, 0.9),      // polystar opacity (dark theme; light theme uses 0.8 of it)
         axisOrbs: num(ds.axisOrbs, 0),              // 'axis': 1 adds a chrome node per card with rings, satellites, flare and a hanger
+        glass: num(ds.glass, 1),                    // translucent glass cards (experiment)
+        constellations: num(ds.constellations, 1),  // star figures drawn behind each card as it comes to front (experiment)
         // GPU particles: shared settings (see pcfg at the top; data-p-* attributes)
         ...pcfg,
         // what sits on the helix axis: 'none' | 'axis' (a line with a node per card) | 'spine' (their vertebrae)
@@ -714,6 +716,10 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
             axis.flare.material.color.copy(accent).lerp(new THREE.Color(0xffffff), 0.4);
             axis.sats.forEach(g => { g.children[0].material.color.copy(accent).lerp(new THREE.Color(0xffffff), 0.5); g.children[1].material.color.copy(accent); });
             axis.callout.material.color.copy(accent);
+        }
+        if (constellations.length) {
+            const v = vividAccent(THREE, light);
+            constellations.forEach(c => { c.stars.material.uniforms.uColor.value.copy(v).lerp(new THREE.Color(0xffffff), light ? 0.1 : 0.6); c.edges.material.uniforms.uColor.value.copy(v).lerp(new THREE.Color(0xffffff), light ? 0 : 0.2); });
             axis.nodeMat.color.set(light ? 0xb9c6d6 : 0xdfe8f2); axis.ringMat.color.set(light ? 0xa9b7c8 : 0xcfd9e6);
             if (light) { [axis.ribbonMat].forEach(m => m.blending = THREE.NormalBlending); axis.halos.forEach(h => h.material.blending = THREE.NormalBlending); }
         }
@@ -729,6 +735,66 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
     /* ---------- layout: helix + camera targets ---------- */
     const targets = [];
     let portrait = false, S = 240, yStep = 0, lastCardW = 0, lastCardH = 0, lastCap = '';
+    /* Constellations: one small figure per card on a plane just behind it (toward the axis), stars as soft
+       points and lines that draw themselves in edge by edge as the card comes to front, fading as it leaves.
+       Figures are unit-square coordinates (y up) matched to the case studies: a traceability chain, a small
+       neural net, a hub with five spokes, a token tree. They cycle if there are more cards than figures. */
+    const FIGURES = [
+        { pts: [[-0.45, -0.1], [-0.45, 0.25], [-0.2, 0.05], [0.05, 0.15], [0.05, -0.2], [0.32, 0.0], [0.48, 0.28]], edges: [[0, 2], [1, 2], [2, 3], [2, 4], [3, 5], [4, 5], [5, 6]] },
+        (() => { const pts = [], edges = []; const layers = [[-0.4, [-0.25, 0, 0.25]], [0, [-0.36, -0.12, 0.12, 0.36]], [0.4, [-0.15, 0.15]]];
+            layers.forEach(([x, ys]) => ys.forEach(y => pts.push([x, y])));
+            let a = 0; for (let l = 0; l < 2; l++) { const na = layers[l][1].length, nb = layers[l + 1][1].length; for (let i = 0; i < na; i++) for (let j = 0; j < nb; j++) edges.push([a + i, a + na + j]); a += na; }
+            return { pts, edges }; })(),
+        (() => { const pts = [[0, 0]], edges = []; for (let k = 0; k < 5; k++) { const a = Math.PI / 2 + k * 2 * Math.PI / 5; pts.push([Math.cos(a) * 0.38, Math.sin(a) * 0.38]); edges.push([0, k + 1]); edges.push([k + 1, (k + 1) % 5 + 1]); } return { pts, edges }; })(),
+        (() => { const pts = [[0, 0.38], [-0.3, 0.05], [0, 0.05], [0.3, 0.05]], edges = [[0, 1], [0, 2], [0, 3]]; [-0.42, -0.25, -0.08, 0.08, 0.25, 0.42].forEach((x, k) => { pts.push([x, -0.32]); edges.push([1 + Math.floor(k / 2), 4 + k]); }); return { pts, edges }; })(),
+    ];
+    const constellations = [];
+    const STAR_VS = 'attribute float aPhase; uniform float uSize, uDPR, uP, uVis, uTime; varying float vA; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); float tw = 0.8 + 0.2 * sin(uTime * 2.4 + aPhase); vA = uVis * tw; gl_PointSize = uSize * uDPR * tw * uVis * uP / max(-mv.z, 1.0); gl_Position = projectionMatrix * mv; }';
+    const STAR_FS = 'uniform sampler2D tMap; uniform vec3 uColor; varying float vA; void main(){ vec4 t = texture2D(tMap, gl_PointCoord); gl_FragColor = vec4(uColor, t.a * vA); }';
+    const EDGE_VS = 'attribute float aT; attribute float aE; varying float vT, vE; void main(){ vT = aT; vE = aE; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
+    const EDGE_FS = 'uniform float uDraw, uEdges, uVis; uniform vec3 uColor; varying float vT, vE; void main(){ float lim = clamp(uDraw * (uEdges + 1.0) - vE, 0.0, 1.0); if (vT > lim) discard; gl_FragColor = vec4(uColor, 0.55 * uVis); }';
+    function buildConstellations() {
+        if (!gl || cfg.constellations < 0.5) return;
+        const tex = glowTexture('halo');
+        items.forEach((item, i) => {
+            const fig = FIGURES[i % FIGURES.length];
+            const pos = new Float32Array(fig.pts.length * 3), phase = new Float32Array(fig.pts.length);
+            fig.pts.forEach((p, k) => { pos.set([p[0], p[1], 0], k * 3); phase[k] = Math.random() * 6.28; });
+            const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(pos, 3)); sg.setAttribute('aPhase', new THREE.BufferAttribute(phase, 1));
+            const stars = new THREE.Points(sg, new THREE.ShaderMaterial({ uniforms: { tMap: { value: tex }, uColor: { value: new THREE.Color(0xffffff) }, uSize: { value: 22 }, uDPR: { value: Math.min(devicePixelRatio || 1, 2) }, uP: { value: 1000 }, uVis: { value: 0 }, uTime: { value: 0 } }, vertexShader: STAR_VS, fragmentShader: STAR_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+            stars.frustumCulled = false;
+            const ep = new Float32Array(fig.edges.length * 6), et = new Float32Array(fig.edges.length * 2), ee = new Float32Array(fig.edges.length * 2);
+            fig.edges.forEach(([a, b], k) => { ep.set([fig.pts[a][0], fig.pts[a][1], 0, fig.pts[b][0], fig.pts[b][1], 0], k * 6); et.set([0, 1], k * 2); ee.set([k, k], k * 2); });
+            const eg = new THREE.BufferGeometry(); eg.setAttribute('position', new THREE.BufferAttribute(ep, 3)); eg.setAttribute('aT', new THREE.BufferAttribute(et, 1)); eg.setAttribute('aE', new THREE.BufferAttribute(ee, 1));
+            const edges = new THREE.LineSegments(eg, new THREE.ShaderMaterial({ uniforms: { uDraw: { value: 0 }, uEdges: { value: fig.edges.length }, uVis: { value: 0 }, uColor: { value: new THREE.Color(0x4faad1) } }, vertexShader: EDGE_VS, fragmentShader: EDGE_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+            edges.frustumCulled = false;
+            const group = new THREE.Group(); group.add(stars, edges); world.add(group);
+            constellations.push({ group, stars, edges, draw: 0 });
+        });
+        layoutConstellations();
+    }
+    const _n = new THREE.Vector3();
+    function layoutConstellations() {
+        if (!constellations.length) return;
+        const uP = stage.clientHeight / (2 * Math.tan(M.degToRad(camera.fov) / 2));
+        constellations.forEach((c, i) => {
+            const obj = items[i].obj;
+            _n.set(0, 0, 1).applyQuaternion(obj.quaternion);                       // the card's outward normal
+            c.group.position.copy(obj.position).divideScalar(S).addScaledVector(_n, -1.3);   // 1.3 units behind the card, toward the axis
+            c.group.quaternion.copy(obj.quaternion);
+            c.group.scale.set(lastCardW * 1.3, lastCardH * 1.3, 1);
+            c.stars.material.uniforms.uP.value = uP;
+        });
+    }
+    function updateConstellations(seg, t, dt) {
+        constellations.forEach((c, i) => {
+            const near = Math.abs(seg - i), vis = 1 - M.smoothstep(near, 0.3, 0.85);
+            c.draw += ((near < 0.5 ? 1 : 0) - c.draw) * Math.min(1, dt * 1.6);
+            c.stars.material.uniforms.uVis.value = vis; c.stars.material.uniforms.uTime.value = t;
+            c.edges.material.uniforms.uVis.value = vis; c.edges.material.uniforms.uDraw.value = c.draw;
+        });
+    }
+
     function layout() {
         const w = stage.clientWidth, h = stage.clientHeight;
         portrait = h > w;
@@ -775,7 +841,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         world.scale.setScalar(S);
         if (particles && particles.userData.legacy) particles.material.size = 0.045 * S;
         layoutParticles();
-        layoutAxis(); layoutPolystar();
+        layoutAxis(); layoutPolystar(); layoutConstellations();
 
         cssRenderer.setSize(w, h);
         if (gl) gl.setSize(w, h, false);
@@ -852,6 +918,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
             g.position.set(_s.x, camGroup.position.y / S + _s.y, _s.z);
         }
         if (axis) updateAxis(now, dt);
+        if (constellations.length) updateConstellations(seg, now * 0.001, dt);
         lastNow = now;
         cssRenderer.render(cssScene, camera);
         if (gl) gl.render(glScene, camera);
@@ -888,6 +955,8 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
     });
 
     layout();
+    queueMicrotask(() => { buildConstellations(); applyTheme(); });
+    section.classList.toggle('is-glass', cfg.glass > 0.5);
 
     /* ---------- ?tune=1: sliders for every number, copy them out as data-attributes ---------- */
     const params = new URLSearchParams(location.search);

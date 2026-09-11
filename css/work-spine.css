@@ -162,3 +162,15 @@
     .ws-card .teaser-metrics .metric strong { display: block; font-size: 1.5em; }
     .work-spine__rail { right: 14px; }
 }
+
+/* Glass cards (experiment, data-glass="1"): a tinted translucent body over the WebGL behind it.
+   The backdrop blur applies where the browser allows it inside the 3D layer; the tint always does. */
+.work-spine.is-glass .ws-card .case-study-teaser {
+    background: color-mix(in srgb, var(--bgMedium, #1a1a1e) 42%, transparent);
+    -webkit-backdrop-filter: blur(10px) saturate(1.2);
+    backdrop-filter: blur(10px) saturate(1.2);
+    border-color: color-mix(in srgb, var(--button-color, #4faad1) 35%, transparent);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 calc(var(--s) * 0.12) calc(var(--s) * 0.3) rgba(0, 0, 0, 0.35);
+}
+.work-spine.is-glass .ws-card .teaser-body { background: transparent; }
+.work-spine.is-glass .ws-card .teaser-visual { opacity: 0.92; }
