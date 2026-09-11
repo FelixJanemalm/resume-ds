@@ -313,7 +313,8 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         camOffset: num(ds.camOffset, 2),        // camera's local z offset inside its group
         edge: num(ds.edge, 0), edgePortrait: 0,        // scroll dead zone at both ends; 0 keeps the motion continuous with the page scroll
         lerp: num(ds.lerp, 0.2),
-        drift: num(ds.drift, 0),               // entry/exit camera offset in units (theirs is +1: card drops in from above); 0 = the card holds centred from the moment the stage pins until it releases
+        blend: num(ds.blend, 0.45),            // end blend, as a fraction of the viewport height: over this much scroll after the pin the card keeps
+                                                // moving up at page speed and decelerates to centre (velocity-matched), and the reverse before release; 0 = hard stop
         cardFrac: num(ds.cardFrac, 0.6),        // card width as a fraction of the visible width (upper bound; see layout())
         gap: num(ds.gap, 0.45),                 // minimum clearance between neighbouring cards, in units
         cardFracPortrait: 0.86,
@@ -831,8 +832,13 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         const seg = sv * (n - 1), i0 = Math.floor(seg), i1 = Math.min(i0 + 1, n - 1), f = seg - i0;
         target.position.copy(targets[i0].position).lerp(targets[i1].position, f);
         target.quaternion.copy(targets[i0].quaternion).slerp(targets[i1].quaternion, f);
-        target.position.y += -cfg.drift * S * smooth(p, 0, 0.15);    // drop in from above
-        target.position.y += cfg.drift * S * (1 - smooth(p, 0.85, 1)); // and leave below
+        // end blend: camera offset (scene px move the card 1:1 on screen) of (D/2)(1 - s/D)^2, whose slope at s = 0 is exactly -1,
+        // i.e. the card continues at page speed the instant the stage pins and eases to rest; mirrored at the release
+        const total = section.offsetHeight - stage.clientHeight, sPx = p * total, D = cfg.blend * stage.clientHeight;
+        if (D > 0 && total > 0) {
+            const a = Math.max(0, 1 - sPx / D), b = Math.max(0, 1 - (total - sPx) / D);
+            target.position.y += (D / 2) * (a * a) - (D / 2) * (b * b);
+        }
         if (tuneLive && (frames++ % 10 === 0)) tuneLive.textContent = 'progress ' + p.toFixed(3) + ' · front ' + (Math.round(seg) + 1) + ' · S ' + S.toFixed(0) + 'px · card ' + lastCardW.toFixed(2) + 'u (' + lastCap + ') · ' + (portrait ? 'portrait' : 'landscape');
         if (first) { camGroup.position.copy(target.position); camGroup.quaternion.copy(target.quaternion); first = false; }
         else { camGroup.position.lerp(target.position, cfg.lerp); camGroup.quaternion.slerp(target.quaternion, cfg.lerp); }
@@ -916,7 +922,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         const rows = [
             ['radius', 'helix radius', 2, 8, 0.05], ['step', 'step (deg)', 15, 90, 1], ['stepPortrait', 'step portrait', 15, 90, 1],
             ['fov', 'fov', 20, 70, 1], ['fovPortrait', 'fov portrait', 30, 90, 1], ['camOffset', 'camera offset', 0, 5, 0.05],
-            ['cardFrac', 'card width', 0.3, 0.95, 0.01], ['gap', 'card gap', 0, 1.5, 0.05], ['drift', 'entry drift', -1.5, 1.5, 0.05], ['lerp', 'camera lerp', 0.02, 0.5, 0.01],
+            ['cardFrac', 'card width', 0.3, 0.95, 0.01], ['gap', 'card gap', 0, 1.5, 0.05], ['blend', 'end blend (vh)', 0, 1, 0.05], ['lerp', 'camera lerp', 0.02, 0.5, 0.01],
             ['edge', 'scroll edge', 0, 0.2, 0.005], ['scrollPerCard', 'scroll per card (vh)', 25, 120, 5],
             ['polyScale', 'polystar size', 0.4, 3, 0.05], ['polyOpacity', 'polystar opacity', 0, 1, 0.02],
             ['pCurl', 'particles: curl', 0, 5, 0.05], ['pReturn', 'particles: home spring', 0, 5, 0.05], ['pPull', 'particles: cursor pull', 0, 30, 0.5], ['pDamp', 'particles: damping', 0.7, 0.99, 0.005],
