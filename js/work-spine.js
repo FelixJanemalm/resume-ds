@@ -548,10 +548,9 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         polystar.group.scale.setScalar(polystar.scale);
     }
 
-    /* Centerpiece 'axis': one line down the helix, one node per card. Cheap tricks only:
-       sprites with canvas-drawn glows, additive ribbons, a shader with travelling pulses, chrome
-       iridescent nodes off the environment map, rings and satellites on the lit node, a spark that
-       jumps node to node when the front card changes, a callout to the card, a faint dot grid behind. */
+    /* Centerpiece 'axis': one quiet beam down the helix, lit above the camera and dim below.
+       Optional (data-axis-orbs="1"): chrome iridescent nodes off the environment map with additive
+       halos, rings and satellites on the lit node, and a hanger to its card. */
     let axis = null;
     function glowTexture(kind) {
         const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
@@ -574,14 +573,10 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
             float y = vY / uS;
             float edge = smoothstep(uBottom, uBottom + 2.5, y) * smoothstep(uTop, uTop - 2.5, y);
             float lit = mix(0.22, 1.0, smoothstep(uCamY - 0.45, uCamY + 0.25, y));          // above you: visited and bright
-            float pulse = 0.0;
-            for (int k = 0; k < 3; k++) { float pk = fract(uTime * 0.09 + float(k) * 0.37); float py = uTop - pk * (uTop - uBottom); pulse += exp(-pow((y - py) * 4.5, 2.0)); }
-            pulse = min(pulse, 1.0);
-            vec3 c = mix(uColor, vec3(1.0), pulse * 0.85);
             float a = edge * uIntro;
-            if (uRibbon > 0.5) { float w = pow(sin(vUv.x * 3.14159), 2.4); a *= w * (0.16 * lit + 0.45 * pulse); }
-            else { a *= 0.55 + 0.45 * lit + pulse; }
-            gl_FragColor = vec4(c, a);
+            if (uRibbon > 0.5) { float w = pow(sin(vUv.x * 3.14159), 2.4); a *= w * 0.16 * lit; }
+            else { a *= 0.55 + 0.45 * lit; }
+            gl_FragColor = vec4(uColor, a);
         }`;
     function buildAxis() {
         const accent = new THREE.Color(0x4faad1);
@@ -614,17 +609,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         });
         const callout = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 1, 6), new THREE.MeshBasicMaterial({ color: accent.clone(), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
         if (orbs) world.add(callout);
-        const spark = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTex, color: new THREE.Color(0xffffff), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
-        spark.scale.set(orbs ? 0.4 : 0.14, orbs ? 0.4 : 0.9, 1); world.add(spark);   // without orbs the spark is a dash of light on the line
-        // dot grid backdrop, like the hero's grid canvas: a billboard behind the axis, fading out radially
-        const gridMat = new THREE.ShaderMaterial({
-            uniforms: { uColor: { value: accent.clone() }, uAlpha: { value: 0.16 }, uTime: { value: 0 } },
-            vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-            fragmentShader: 'uniform vec3 uColor; uniform float uAlpha, uTime; varying vec2 vUv; void main(){ vec2 q = (vUv - 0.5) * 24.0; vec2 f = fract(q + vec2(0.0, uTime * 0.02)) - 0.5; float d = length(f); float dot = smoothstep(0.09, 0.03, d); float fade = 1.0 - smoothstep(0.15, 0.5, length(vUv - 0.5)); gl_FragColor = vec4(uColor, dot * fade * uAlpha); }',
-            transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
-        });
-        const grid = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), gridMat); world.add(grid);
-        axis = { orbs, core, ribbon, coreMat, ribbonMat, nodes, halos, nodeMat, ringMat, flare, rings, sats, callout, spark, grid, gridMat, nodeY: [], sparkT: 1, sparkFrom: 0, sparkTo: 0, intro: 0 };
+        axis = { orbs, core, ribbon, coreMat, ribbonMat, nodes, halos, nodeMat, ringMat, flare, rings, sats, callout, nodeY: [], intro: 0 };
         layoutAxis();
     }
     function layoutAxis() {
@@ -638,17 +623,12 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         axis.nodeY = items.map((_, i) => -yStep * i + (axis.orbs ? crown : 0));
         axis.nodes.forEach((nd, i) => { nd.position.y = axis.nodeY[i]; axis.halos[i].position.y = nd.position.y; });
     }
-    function axisSpark(from, to) {
-        if (!axis || from < 0 || from === to) return;
-        axis.sparkFrom = from; axis.sparkTo = to; axis.sparkT = 0;
-    }
     const _q = new THREE.Quaternion(), _up = new THREE.Vector3(0, 1, 0), _dir = new THREE.Vector3();
     function updateAxis(now, dt) {
         const t = now * 0.001, camY = camGroup.position.y / S, cx = camera.position.x / S, cz = camera.position.z / S;
         axis.intro = Math.min(1, axis.intro + dt * 0.8);
         for (const mat of [axis.coreMat, axis.ribbonMat]) { mat.uniforms.uTime.value = t; mat.uniforms.uCamY.value = camY; mat.uniforms.uIntro.value = axis.intro; }
         axis.ribbon.lookAt(cx, axis.ribbon.position.y, cz);
-        axis.grid.lookAt(cx, axis.grid.position.y, cz); axis.grid.position.y = camY; axis.gridMat.uniforms.uTime.value = t;
         const fi = frontIndex < 0 ? 0 : frontIndex, fn = axis.nodes[fi];
         if (axis.orbs) axis.nodes.forEach((nd, i) => {
             const k = i === fi ? 1 : 0, visited = nd.position.y > camY - 0.2 ? 1 : 0;
@@ -679,15 +659,6 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         axis.callout.scale.set(1, len, 1);
         axis.callout.material.opacity += (0.35 * axis.intro - axis.callout.material.opacity) * 0.08;
         }
-        // spark: shoots along the line when the front card changes
-        if (axis.sparkT < 1) {
-            axis.sparkT = Math.min(1, axis.sparkT + dt * 1.8);
-            const e = axis.sparkT < 0.5 ? 2 * axis.sparkT * axis.sparkT : 1 - Math.pow(-2 * axis.sparkT + 2, 2) / 2;
-            axis.spark.position.set(0, M.lerp(axis.nodeY[axis.sparkFrom], axis.nodeY[axis.sparkTo], e), 0);
-            axis.spark.material.opacity = Math.sin(axis.sparkT * Math.PI);
-            const sz = 0.35 + 0.25 * Math.sin(axis.sparkT * Math.PI);
-            if (axis.orbs) axis.spark.scale.setScalar(sz); else axis.spark.scale.set(0.14, 0.9 * sz / 0.6, 1);
-        } else axis.spark.material.opacity = 0;
     }
 
     let spine = null;
@@ -742,8 +713,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
             axis.halos.forEach(h => h.material.color.copy(accent));
             axis.flare.material.color.copy(accent).lerp(new THREE.Color(0xffffff), 0.4);
             axis.sats.forEach(g => { g.children[0].material.color.copy(accent).lerp(new THREE.Color(0xffffff), 0.5); g.children[1].material.color.copy(accent); });
-            axis.callout.material.color.copy(accent); axis.spark.material.color.set(0xffffff);
-            axis.gridMat.uniforms.uColor.value.copy(accent); axis.gridMat.uniforms.uAlpha.value = light ? 0.28 : 0.16;
+            axis.callout.material.color.copy(accent);
             axis.nodeMat.color.set(light ? 0xb9c6d6 : 0xdfe8f2); axis.ringMat.color.set(light ? 0xa9b7c8 : 0xcfd9e6);
             if (light) { [axis.ribbonMat].forEach(m => m.blending = THREE.NormalBlending); axis.halos.forEach(h => h.material.blending = THREE.NormalBlending); }
         }
@@ -856,8 +826,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
 
         const front = Math.round(seg);
         if (front !== frontIndex) {
-            const prevFront = frontIndex; frontIndex = front;
-            if (axis) axisSpark(prevFront, front);
+            frontIndex = front;
             items.forEach((item, i) => {
                 item.wrap.classList.toggle('is-front', i === front);
                 if (item.video) { if (i === front) item.video.play?.().catch?.(() => {}); else item.video.pause?.(); }
