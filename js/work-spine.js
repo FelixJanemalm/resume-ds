@@ -786,6 +786,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
     const camGroup = new THREE.Object3D();
     const _s = new THREE.Vector3();
     const target = new THREE.Object3D();
+    const _look = new THREE.Vector3();
     const offset = new THREE.Vector3();
     let first = true, dirty = true, running = false, active = false, tStart = performance.now(), frontIndex = -1, tuneLive = null, frames = 0, lastNow = performance.now();
 
@@ -799,9 +800,13 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         const p = progress();
         const edge = portrait ? cfg.edgePortrait : cfg.edge;
         const sv = smooth(p, edge, 1 - edge);
-        const seg = sv * (n - 1), i0 = Math.floor(seg), i1 = Math.min(i0 + 1, n - 1), f = seg - i0;
-        target.position.copy(targets[i0].position).lerp(targets[i1].position, f);
-        target.quaternion.copy(targets[i0].quaternion).slerp(targets[i1].quaternion, f);
+        const seg = sv * (n - 1);
+        // the camera rides the outer helix itself: constant radius, azimuth and height continuous in seg.
+        // (interpolating between per-card targets cut chords, pulling the camera in and out once per card)
+        const stepRad = M.degToRad(portrait ? cfg.stepPortrait : cfg.step), az = -stepRad * seg, Rcam = cfg.radius * 2 * S;
+        target.position.set(Rcam * Math.cos(az), -yStep * seg * S + (portrait && cfg.centerpiece === 'axis' && cfg.axisOrbs > 0.5 ? 0.45 : portrait ? -0.7 : 0) * S, Rcam * Math.sin(az));
+        _look.set(target.position.x * 2, target.position.y, target.position.z * 2);   // face outward, like the cards
+        target.lookAt(_look);
         // end blend: camera offset (scene px move the card 1:1 on screen) of (D/2)(1 - s/D)^2, whose slope at s = 0 is exactly -1,
         // i.e. the card continues at page speed the instant the stage pins and eases to rest; mirrored at the release
         const total = section.offsetHeight - stage.clientHeight, sPx = p * total, D = cfg.blend * stage.clientHeight;
