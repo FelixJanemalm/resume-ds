@@ -717,9 +717,10 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
             axis.sats.forEach(g => { g.children[0].material.color.copy(accent).lerp(new THREE.Color(0xffffff), 0.5); g.children[1].material.color.copy(accent); });
             axis.callout.material.color.copy(accent);
         }
-        if (constellations.length) {
+        if (cs) {
             const v = vividAccent(THREE, light);
-            constellations.forEach(c => { c.stars.material.uniforms.uColor.value.copy(v).lerp(new THREE.Color(0xffffff), light ? 0.1 : 0.6); c.edges.material.uniforms.uColor.value.copy(v).lerp(new THREE.Color(0xffffff), light ? 0 : 0.2); });
+            cs.stars.material.uniforms.uColor.value.copy(v).lerp(new THREE.Color(0xffffff), light ? 0.1 : 0.6);
+            cs.edges.material.uniforms.uColor.value.copy(v).lerp(new THREE.Color(0xffffff), light ? 0 : 0.2);
             axis.nodeMat.color.set(light ? 0xb9c6d6 : 0xdfe8f2); axis.ringMat.color.set(light ? 0xa9b7c8 : 0xcfd9e6);
             if (light) { [axis.ribbonMat].forEach(m => m.blending = THREE.NormalBlending); axis.halos.forEach(h => h.material.blending = THREE.NormalBlending); }
         }
@@ -748,51 +749,80 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         (() => { const pts = [[0, 0]], edges = []; for (let k = 0; k < 5; k++) { const a = Math.PI / 2 + k * 2 * Math.PI / 5; pts.push([Math.cos(a) * 0.38, Math.sin(a) * 0.38]); edges.push([0, k + 1]); edges.push([k + 1, (k + 1) % 5 + 1]); } return { pts, edges }; })(),
         (() => { const pts = [[0, 0.38], [-0.3, 0.05], [0, 0.05], [0.3, 0.05]], edges = [[0, 1], [0, 2], [0, 3]]; [-0.42, -0.25, -0.08, 0.08, 0.25, 0.42].forEach((x, k) => { pts.push([x, -0.32]); edges.push([1 + Math.floor(k / 2), 4 + k]); }); return { pts, edges }; })(),
     ];
-    const constellations = [];
-    const STAR_VS = 'attribute float aPhase; uniform float uSize, uDPR, uP, uVis, uTime; varying float vA; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); float tw = 0.8 + 0.2 * sin(uTime * 2.4 + aPhase); vA = uVis * tw; gl_PointSize = uSize * uDPR * tw * uVis * uP / max(-mv.z, 1.0); gl_Position = projectionMatrix * mv; }';
+    const CS_N = 12, CS_E = 20;          // living stars, and the largest figure's edge count
+    let cs = null;
+    const STAR_VS = 'attribute float aPhase, aAlpha; uniform float uSize, uDPR, uP, uVis, uTime; varying float vA; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); float tw = 0.8 + 0.2 * sin(uTime * 2.4 + aPhase); vA = uVis * tw * aAlpha; gl_PointSize = uSize * uDPR * (0.7 + 0.3 * aAlpha) * tw * uVis * uP / max(-mv.z, 1.0); gl_Position = projectionMatrix * mv; }';
     const STAR_FS = 'uniform sampler2D tMap; uniform vec3 uColor; varying float vA; void main(){ vec4 t = texture2D(tMap, gl_PointCoord); gl_FragColor = vec4(uColor, t.a * vA); }';
-    const EDGE_VS = 'attribute float aT; attribute float aE; varying float vT, vE; void main(){ vT = aT; vE = aE; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
-    const EDGE_FS = 'uniform float uDraw, uEdges, uVis; uniform vec3 uColor; varying float vT, vE; void main(){ float lim = clamp(uDraw * (uEdges + 1.0) - vE, 0.0, 1.0); if (vT > lim) discard; gl_FragColor = vec4(uColor, 0.55 * uVis); }';
+    const EDGE_VS = 'attribute float aT, aD, aA; varying float vT, vD, vA; void main(){ vT = aT; vD = aD; vA = aA; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
+    const EDGE_FS = 'uniform float uVis; uniform vec3 uColor; varying float vT, vD, vA; void main(){ if (vT > vD) discard; gl_FragColor = vec4(uColor, 0.55 * vA * uVis); }';
     function buildConstellations() {
         if (!gl || cfg.constellations < 0.5) return;
-        const tex = glowTexture('halo');
-        items.forEach((item, i) => {
-            const fig = FIGURES[i % FIGURES.length];
-            const pos = new Float32Array(fig.pts.length * 3), phase = new Float32Array(fig.pts.length);
-            fig.pts.forEach((p, k) => { pos.set([p[0], p[1], 0], k * 3); phase[k] = Math.random() * 6.28; });
-            const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(pos, 3)); sg.setAttribute('aPhase', new THREE.BufferAttribute(phase, 1));
-            const stars = new THREE.Points(sg, new THREE.ShaderMaterial({ uniforms: { tMap: { value: tex }, uColor: { value: new THREE.Color(0xffffff) }, uSize: { value: 22 }, uDPR: { value: Math.min(devicePixelRatio || 1, 2) }, uP: { value: 1000 }, uVis: { value: 0 }, uTime: { value: 0 } }, vertexShader: STAR_VS, fragmentShader: STAR_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-            stars.frustumCulled = false;
-            const ep = new Float32Array(fig.edges.length * 6), et = new Float32Array(fig.edges.length * 2), ee = new Float32Array(fig.edges.length * 2);
-            fig.edges.forEach(([a, b], k) => { ep.set([fig.pts[a][0], fig.pts[a][1], 0, fig.pts[b][0], fig.pts[b][1], 0], k * 6); et.set([0, 1], k * 2); ee.set([k, k], k * 2); });
-            const eg = new THREE.BufferGeometry(); eg.setAttribute('position', new THREE.BufferAttribute(ep, 3)); eg.setAttribute('aT', new THREE.BufferAttribute(et, 1)); eg.setAttribute('aE', new THREE.BufferAttribute(ee, 1));
-            const edges = new THREE.LineSegments(eg, new THREE.ShaderMaterial({ uniforms: { uDraw: { value: 0 }, uEdges: { value: fig.edges.length }, uVis: { value: 0 }, uColor: { value: new THREE.Color(0x4faad1) } }, vertexShader: EDGE_VS, fragmentShader: EDGE_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-            edges.frustumCulled = false;
-            const group = new THREE.Group(); group.add(stars, edges); world.add(group);
-            constellations.push({ group, stars, edges, draw: 0 });
-        });
-        layoutConstellations();
+        const sg = new THREE.BufferGeometry();
+        const pos = new Float32Array(CS_N * 3), alpha = new Float32Array(CS_N).fill(0.35), phase = new Float32Array(CS_N);
+        for (let i = 0; i < CS_N; i++) phase[i] = Math.random() * 6.28;
+        sg.setAttribute('position', new THREE.BufferAttribute(pos, 3)); sg.setAttribute('aAlpha', new THREE.BufferAttribute(alpha, 1)); sg.setAttribute('aPhase', new THREE.BufferAttribute(phase, 1));
+        const stars = new THREE.Points(sg, new THREE.ShaderMaterial({ uniforms: { tMap: { value: glowTexture('halo') }, uColor: { value: new THREE.Color(0xffffff) }, uSize: { value: 26 }, uDPR: { value: Math.min(devicePixelRatio || 1, 2) }, uP: { value: 1000 }, uVis: { value: 0 }, uTime: { value: 0 } }, vertexShader: STAR_VS, fragmentShader: STAR_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+        stars.frustumCulled = false;
+        const eg = new THREE.BufferGeometry(), segs = CS_E * 2;   // current figure's edges, then the previous figure's fading edges
+        const ep = new Float32Array(segs * 6), et = new Float32Array(segs * 2), ed = new Float32Array(segs * 2), ea = new Float32Array(segs * 2);
+        for (let k = 0; k < segs; k++) et.set([0, 1], k * 2);
+        eg.setAttribute('position', new THREE.BufferAttribute(ep, 3)); eg.setAttribute('aT', new THREE.BufferAttribute(et, 1)); eg.setAttribute('aD', new THREE.BufferAttribute(ed, 1)); eg.setAttribute('aA', new THREE.BufferAttribute(ea, 1));
+        const edges = new THREE.LineSegments(eg, new THREE.ShaderMaterial({ uniforms: { uVis: { value: 0 }, uColor: { value: new THREE.Color(0x4faad1) } }, vertexShader: EDGE_VS, fragmentShader: EDGE_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+        edges.frustumCulled = false;
+        const group = new THREE.Group(); group.add(stars, edges); world.add(group);
+        const p2 = new Float32Array(CS_N * 2), v2 = new Float32Array(CS_N * 2), t2 = new Float32Array(CS_N * 2), seed = new Float32Array(CS_N);
+        for (let i = 0; i < CS_N; i++) { p2[i * 2] = (Math.random() - 0.5) * 1.2; p2[i * 2 + 1] = (Math.random() - 0.5) * 0.9; seed[i] = Math.random(); }
+        cs = { group, stars, edges, pos: p2, vel: v2, tgt: t2, seed, fig: -1, cur: null, prev: null, curT: 0, prevA: 0, intro: 0 };
     }
-    const _n = new THREE.Vector3();
-    function layoutConstellations() {
-        if (!constellations.length) return;
-        const uP = stage.clientHeight / (2 * Math.tan(M.degToRad(camera.fov) / 2));
-        constellations.forEach((c, i) => {
-            const obj = items[i].obj;
-            _n.set(0, 0, 1).applyQuaternion(obj.quaternion);                       // the card's outward normal
-            c.group.position.copy(obj.position).divideScalar(S).addScaledVector(_n, -1.3);   // 1.3 units behind the card, toward the axis
-            c.group.quaternion.copy(obj.quaternion);
-            c.group.scale.set(lastCardW * 1.3, lastCardH * 1.3, 1);
-            c.stars.material.uniforms.uP.value = uP;
+    // a new figure: hand each node to the nearest free star, so stars travel short paths into the new pattern
+    function csSetFigure(k) {
+        const fig = FIGURES[k % FIGURES.length], used = new Set(), map = new Array(fig.pts.length);
+        fig.pts.forEach((pt, j) => {
+            let best = -1, bd = Infinity;
+            for (let i = 0; i < CS_N; i++) { if (used.has(i)) continue; const dx = cs.pos[i * 2] - pt[0], dy = cs.pos[i * 2 + 1] - pt[1], d = dx * dx + dy * dy; if (d < bd) { bd = d; best = i; } }
+            used.add(best); map[j] = best;
         });
+        cs.prev = cs.cur; cs.prevA = cs.cur ? 1 : 0;
+        cs.cur = { fig, map }; cs.curT = 0; cs.fig = k;
     }
     function updateConstellations(seg, t, dt) {
-        constellations.forEach((c, i) => {
-            const near = Math.abs(seg - i), vis = 1 - M.smoothstep(near, 0.3, 0.85);
-            c.draw += ((near < 0.5 ? 1 : 0) - c.draw) * Math.min(1, dt * 1.6);
-            c.stars.material.uniforms.uVis.value = vis; c.stars.material.uniforms.uTime.value = t;
-            c.edges.material.uniforms.uVis.value = vis; c.edges.material.uniforms.uDraw.value = c.draw;
-        });
+        const k = Math.round(seg); if (k !== cs.fig) csSetFigure(k);
+        cs.intro = Math.min(1, cs.intro + dt * 0.7);
+        // the group rides the helix just inside the cards, always centred behind the current view
+        const stepRad = M.degToRad(portrait ? cfg.stepPortrait : cfg.step), az = -stepRad * seg, r = cfg.radius - 1.3;
+        cs.group.position.set(r * Math.cos(az), -yStep * seg, r * Math.sin(az));
+        _look.set(cs.group.position.x * 2, cs.group.position.y, cs.group.position.z * 2); cs.group.lookAt(_look);
+        cs.group.scale.set(lastCardW * 1.3, lastCardH * 1.3, 1);
+        // targets: figure nodes for assigned stars, a slow wander for the rest; everyone keeps a little life
+        const inv = new Int8Array(CS_N).fill(-1); cs.cur.map.forEach((si, j) => inv[si] = j);
+        const alpha = cs.stars.geometry.attributes.aAlpha.array, sp = cs.stars.geometry.attributes.position.array;
+        for (let i = 0; i < CS_N; i++) {
+            const sd = cs.seed[i] * 6.28;
+            if (inv[i] >= 0) { const pt = cs.cur.fig.pts[inv[i]]; cs.tgt[i * 2] = pt[0] + 0.012 * Math.sin(t * 0.7 + sd); cs.tgt[i * 2 + 1] = pt[1] + 0.012 * Math.cos(t * 0.9 + sd * 1.3); }
+            else { const a = t * 0.12 + sd; cs.tgt[i * 2] = Math.cos(a) * 0.62; cs.tgt[i * 2 + 1] = Math.sin(a * 1.31 + sd) * 0.42; }
+            for (let c = 0; c < 2; c++) { const idx = i * 2 + c; cs.vel[idx] += (cs.tgt[idx] - cs.pos[idx]) * 6 * dt; cs.vel[idx] *= Math.exp(-4.5 * dt); cs.pos[idx] += cs.vel[idx] * dt; }
+            sp[i * 3] = cs.pos[i * 2]; sp[i * 3 + 1] = cs.pos[i * 2 + 1]; sp[i * 3 + 2] = 0;
+            alpha[i] += ((inv[i] >= 0 ? 1 : 0.3) - alpha[i]) * Math.min(1, dt * 3);
+        }
+        cs.stars.geometry.attributes.position.needsUpdate = true; cs.stars.geometry.attributes.aAlpha.needsUpdate = true;
+        cs.stars.material.uniforms.uTime.value = t; cs.stars.material.uniforms.uVis.value = cs.intro;
+        cs.stars.material.uniforms.uP.value = stage.clientHeight / (2 * Math.tan(M.degToRad(camera.fov) / 2));
+        // edges: the current figure draws in edge by edge along the moving stars; the previous figure's lines follow the stars out and fade
+        cs.curT = Math.min(1, cs.curT + dt / 1.4); cs.prevA = Math.max(0, cs.prevA - dt / 0.7);
+        const ep = cs.edges.geometry.attributes.position.array, ed = cs.edges.geometry.attributes.aD.array, ea = cs.edges.geometry.attributes.aA.array;
+        const write = (set, offset, alphaOf, limitOf) => {
+            for (let j = 0; j < CS_E; j++) {
+                const k2 = offset + j, e = set && set.fig.edges[j];
+                if (!e) { ea[k2 * 2] = ea[k2 * 2 + 1] = 0; continue; }
+                const a = set.map[e[0]], b = set.map[e[1]];
+                ep.set([cs.pos[a * 2], cs.pos[a * 2 + 1], 0, cs.pos[b * 2], cs.pos[b * 2 + 1], 0], k2 * 6);
+                ed[k2 * 2] = ed[k2 * 2 + 1] = limitOf(j); ea[k2 * 2] = ea[k2 * 2 + 1] = alphaOf(j);
+            }
+        };
+        write(cs.cur, 0, () => 1, j => Math.min(1, Math.max(0, cs.curT * (cs.cur.fig.edges.length + 1) - j)));
+        write(cs.prevA > 0 ? cs.prev : null, CS_E, () => cs.prevA, () => 1);
+        for (const name of ['position', 'aD', 'aA']) cs.edges.geometry.attributes[name].needsUpdate = true;
+        cs.edges.material.uniforms.uVis.value = cs.intro;
     }
 
     function layout() {
@@ -841,7 +871,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         world.scale.setScalar(S);
         if (particles && particles.userData.legacy) particles.material.size = 0.045 * S;
         layoutParticles();
-        layoutAxis(); layoutPolystar(); layoutConstellations();
+        layoutAxis(); layoutPolystar();
 
         cssRenderer.setSize(w, h);
         if (gl) gl.setSize(w, h, false);
@@ -918,7 +948,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
             g.position.set(_s.x, camGroup.position.y / S + _s.y, _s.z);
         }
         if (axis) updateAxis(now, dt);
-        if (constellations.length) updateConstellations(seg, now * 0.001, dt);
+        if (cs) updateConstellations(seg, now * 0.001, dt);
         lastNow = now;
         cssRenderer.render(cssScene, camera);
         if (gl) gl.render(glScene, camera);
