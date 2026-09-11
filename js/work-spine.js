@@ -323,9 +323,6 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         scrollPerCard: num(ds.scrollPerCard, 60),   // vh of scrolling per card
         polyScale: num(ds.polyScale, 1),            // polystar size multiplier
         polyOpacity: num(ds.polyOpacity, 0.9),      // polystar opacity (dark theme; light theme uses 0.8 of it)
-        diveSurface: num(ds.diveSurface, 1.5),      // 'dive': water surface height above the first card, in units
-        diveLight: num(ds.diveLight, 1.0),          // 'dive': light shaft intensity
-        divePitch: num(ds.divePitch, 14),           // 'dive': degrees the camera looks up at the hull on entry and exit
         axisOrbs: num(ds.axisOrbs, 0),              // 'axis': 1 adds a chrome node per card with rings, satellites, flare and a hanger
         // GPU particles: shared settings (see pcfg at the top; data-p-* attributes)
         ...pcfg,
@@ -374,7 +371,6 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
             if (cfg.centerpiece === 'spine') buildSpine();
             else if (cfg.centerpiece === 'axis') buildAxis();
             else if (cfg.centerpiece === 'polystar') buildPolystar();
-            else if (cfg.centerpiece === 'dive') buildDive();
             if (cfg.mode === 'stage') buildParticles();
             applyTheme();
         });
@@ -549,96 +545,6 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         // roughly two cards tall, parked up and to the right so only the fan's lower-left arcs sweep behind the cards (the hero crops it the same way)
         polystar.scale = (portrait ? 1.6 : 2.0) * cfg.polyScale * lastCardW * 0.65 / 2;
         polystar.group.scale.setScalar(polystar.scale);
-    }
-
-    /* Centerpiece 'dive' (prototype): the ship stays on the surface, the work is below it.
-       - a rippling water surface seen from underneath, wearing the hero Lottie's sliding stripe gradient
-       - the hull as a dark silhouette on that surface (the headline's "ship")
-       - light shafts hanging from the surface, swaying, sweeping past the cards as the camera orbits
-       - a depth sphere around the camera that darkens as the section progresses
-       - the camera looks up at the hull on entry, levels out, and rises back to the surface at the end */
-    let dive = null;
-    function buildDive() {
-        const accent = new THREE.Color(0x4faad1);
-        // depth sphere: the water itself, vertical gradient, darkens with progress
-        const sky = new THREE.Mesh(new THREE.SphereGeometry(40, 32, 24), new THREE.ShaderMaterial({
-            uniforms: { uShallow: { value: accent.clone() }, uDeep: { value: new THREE.Color(0x06080c) }, uDepth: { value: 0 } },
-            vertexShader: 'varying vec3 vD; void main(){ vD = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-            fragmentShader: 'uniform vec3 uShallow, uDeep; uniform float uDepth; varying vec3 vD; void main(){ float t = smoothstep(0.02, 0.9, vD.y); vec3 c = mix(uDeep, uShallow, t * (1.0 - 0.55 * uDepth)); gl_FragColor = vec4(c, 1.0); }',
-            side: THREE.BackSide, depthWrite: false,
-        }));
-        sky.renderOrder = -10;
-        world.add(sky);
-        // the surface, from below: displaced plane with sliding diagonal bands (the Lottie's fat stroke slivers) fading into the depth colour
-        const surfMat = new THREE.ShaderMaterial({
-            uniforms: { uA: { value: accent.clone() }, uB: { value: new THREE.Color(0x0d1a22) }, uGround: { value: new THREE.Color(0x06080c) }, uTime: { value: 0 }, uCam: { value: new THREE.Vector3() }, uS: { value: 1 } },
-            // the group is scaled by S (px per unit); divide world positions back to units so bands and fog are in the same space as uCam
-            vertexShader: 'uniform float uTime, uS; varying vec3 vW; varying float vH; void main(){ vec3 p = position; float h = 0.05 * sin(p.x * 2.1 + uTime * 0.8) + 0.04 * sin(p.y * 1.7 - uTime * 0.6) + 0.03 * sin((p.x + p.y) * 3.3 + uTime * 1.1); p.z += h; vH = h; vec4 w = modelMatrix * vec4(p, 1.0); vW = w.xyz / uS; gl_Position = projectionMatrix * viewMatrix * w; }',
-            fragmentShader: 'uniform vec3 uA, uB, uGround, uCam; uniform float uTime; varying vec3 vW; varying float vH; void main(){ vec2 q = vW.xz / ' + '1.0' + '; float band = fract(dot(q, normalize(vec2(1.0, 0.6))) * 1.6 + uTime * 0.04); float stripe = pow(band, 4.0); float d = length(vW.xz - uCam.xz); float over = 1.0 - smoothstep(1.5, 16.0, d); float lit = (0.42 + 0.58 * stripe + vH * 2.5) * (0.7 + 0.6 * over); vec3 c = mix(uB, uA, clamp(lit, 0.0, 1.0)); c = mix(c, uGround, smoothstep(8.0, 70.0, d)); gl_FragColor = vec4(c, 1.0); }',
-            side: THREE.DoubleSide,
-        });
-        const surface = new THREE.Mesh(new THREE.PlaneGeometry(90, 90, 120, 120), surfMat);
-        surface.rotation.x = -Math.PI / 2;
-        world.add(surface);
-        // the hull: a plan-view boat outline extruded downward with a deep bevel, dark and matte
-        const sh = new THREE.Shape();
-        sh.moveTo(1.9, 0); sh.quadraticCurveTo(0.9, 0.62, -1.3, 0.55); sh.quadraticCurveTo(-1.85, 0.5, -1.85, 0);
-        sh.quadraticCurveTo(-1.85, -0.5, -1.3, -0.55); sh.quadraticCurveTo(0.9, -0.62, 1.9, 0);
-        const hull = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 0.16, bevelEnabled: true, bevelThickness: 0.26, bevelSize: 0.2, bevelSegments: 8, curveSegments: 24 }),
-            new THREE.MeshStandardMaterial({ color: 0x07090d, roughness: 0.95, metalness: 0.05, envMapIntensity: 0.4 }));
-        hull.rotation.x = Math.PI / 2;            // extrusion now points down through the surface
-        hull.scale.set(0.5, 0.42, 0.42);
-        world.add(hull);
-        const rimShape = new THREE.Shape();      // the same outline, 15% larger, with the hull as a hole: the waterline seen from below
-        rimShape.moveTo(2.2, 0); rimShape.quadraticCurveTo(1.05, 0.72, -1.5, 0.64); rimShape.quadraticCurveTo(-2.13, 0.58, -2.13, 0);
-        rimShape.quadraticCurveTo(-2.13, -0.58, -1.5, -0.64); rimShape.quadraticCurveTo(1.05, -0.72, 2.2, 0);
-        rimShape.holes.push(new THREE.Path(sh.getPoints(40).reverse()));
-        const rim = new THREE.Mesh(new THREE.ShapeGeometry(rimShape, 24), new THREE.MeshBasicMaterial({ color: 0xbfe6ff, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
-        rim.rotation.x = Math.PI / 2; rim.scale.set(0.5, 0.42, 0.42);
-        world.add(rim);
-        // light shafts: additive quads hanging from the surface, always turned toward the camera
-        const shaftMat = new THREE.ShaderMaterial({
-            uniforms: { uColor: { value: accent.clone() }, uTime: { value: 0 }, uI: { value: cfg.diveLight } },
-            vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-            fragmentShader: 'uniform vec3 uColor; uniform float uTime, uI; varying vec2 vUv; void main(){ float a = pow(vUv.y, 3.0) * sin(vUv.x * 3.14159) * (0.78 + 0.22 * sin(uTime * 0.5 + vUv.y * 2.5 + vUv.x * 4.0)); gl_FragColor = vec4(uColor, a * uI * 0.32); }',
-            transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
-        });
-        const shafts = [];
-        for (let k = 0; k < 14; k++) {
-            const w = 0.25 + Math.random() * 0.9, a = (k / 14) * Math.PI * 2 + Math.random() * 0.4, r = 1.4 + Math.random() * 4.5;
-            const m = new THREE.Mesh(new THREE.PlaneGeometry(w, 7), shaftMat);
-            m.userData = { a, r, phase: Math.random() * 6.28 };
-            world.add(m); shafts.push(m);
-        }
-        dive = { sky, surface, surfMat, hull, rim, shafts, shaftMat };
-        layoutDive();
-    }
-    function layoutDive() {
-        if (!dive) return;
-        dive.surface.position.y = cfg.diveSurface;
-        dive.hull.position.y = cfg.diveSurface + 0.02;
-        dive.rim.position.y = cfg.diveSurface - 0.012;
-        dive.shafts.forEach(m => { m.position.set(Math.cos(m.userData.a) * m.userData.r, cfg.diveSurface - 3.5, Math.sin(m.userData.a) * m.userData.r); });
-        dive.shaftMat.uniforms.uI.value = cfg.diveLight;
-    }
-    function updateDive(p, now) {
-        const t = now * 0.001;
-        dive.surfMat.uniforms.uTime.value = t;
-        dive.surfMat.uniforms.uCam.value.copy(camera.position).divideScalar(S);
-        dive.surfMat.uniforms.uS.value = S;
-        dive.shaftMat.uniforms.uTime.value = t;
-        dive.sky.material.uniforms.uDepth.value = smooth(p, 0.1, 0.9);
-        dive.sky.position.copy(camera.position).divideScalar(S);
-        // the boat stays above you: on the surface, at the camera's azimuth, two units ahead of it, broadside
-        const az = Math.atan2(camGroup.position.z, camGroup.position.x), hr = cfg.radius * 1.45;
-        dive.hull.position.set(Math.cos(az) * hr, cfg.diveSurface + 0.02 + 0.03 * Math.sin(t * 0.9), Math.sin(az) * hr);
-        dive.rim.position.set(dive.hull.position.x, cfg.diveSurface - 0.012, dive.hull.position.z);
-        // Euler order XYZ: z is applied first, i.e. in the plan view, so the boat's heading goes on rotation.z; x then tips the plan flat
-        const heading = az + Math.PI / 2 + 0.2 + 0.04 * Math.sin(t * 0.5);
-        dive.hull.rotation.set(Math.PI / 2 + 0.03 * Math.sin(t * 0.7), 0, heading);
-        dive.rim.rotation.set(Math.PI / 2, 0, heading);
-        const cx = camera.position.x / S, cz = camera.position.z / S;
-        dive.shafts.forEach(m => { m.lookAt(cx, m.position.y, cz); m.position.x = Math.cos(m.userData.a + 0.05 * Math.sin(t * 0.3 + m.userData.phase)) * m.userData.r; m.position.z = Math.sin(m.userData.a + 0.05 * Math.sin(t * 0.3 + m.userData.phase)) * m.userData.r; });
     }
 
     /* Centerpiece 'axis': one line down the helix, one node per card. Cheap tricks only:
@@ -846,16 +752,6 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
             polystar.mat.uniforms.uB.value.copy(accent).lerp(bg, light ? 0.55 : 0.8);   // accent fading toward the page ground, like the Lottie's fade to black
             polystar.mat.uniforms.uOpacity.value = cfg.polyOpacity * (light ? 0.8 : 1);
         }
-        if (dive) {
-            const bg = new THREE.Color(); try { bg.setStyle(cssVar('--bg', light ? '#ffffff' : '#101012')); } catch (e) { bg.set(light ? 0xffffff : 0x101012); }
-            const deep = accent.clone().lerp(bg, light ? 0.35 : 0.9).multiplyScalar(light ? 1 : 0.9);
-            dive.sky.material.uniforms.uShallow.value.copy(accent).lerp(bg, light ? 0.3 : 0.45);
-            dive.sky.material.uniforms.uDeep.value.copy(deep);
-            dive.surfMat.uniforms.uA.value.copy(accent).lerp(new THREE.Color(0xffffff), light ? 0.3 : 0.15);
-            dive.surfMat.uniforms.uB.value.copy(accent).lerp(bg, light ? 0.3 : 0.5);
-            dive.surfMat.uniforms.uGround.value.copy(deep);
-            dive.shaftMat.uniforms.uColor.value.copy(accent).lerp(new THREE.Color(0xffffff), 0.35);
-        }
     }
     new MutationObserver(applyTheme).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
@@ -908,7 +804,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         world.scale.setScalar(S);
         if (particles && particles.userData.legacy) particles.material.size = 0.045 * S;
         layoutParticles();
-        layoutAxis(); layoutPolystar(); layoutDive();
+        layoutAxis(); layoutPolystar();
 
         cssRenderer.setSize(w, h);
         if (gl) gl.setSize(w, h, false);
@@ -937,14 +833,12 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         target.quaternion.copy(targets[i0].quaternion).slerp(targets[i1].quaternion, f);
         target.position.y += -cfg.drift * S * smooth(p, 0, 0.15);    // drop in from above
         target.position.y += cfg.drift * S * (1 - smooth(p, 0.85, 1)); // and leave below
-        if (dive) target.position.y += 2 * cfg.drift * S * smooth(p, 0.85, 1);   // dive: rise back to the surface instead
         if (tuneLive && (frames++ % 10 === 0)) tuneLive.textContent = 'progress ' + p.toFixed(3) + ' · front ' + (Math.round(seg) + 1) + ' · S ' + S.toFixed(0) + 'px · card ' + lastCardW.toFixed(2) + 'u (' + lastCap + ') · ' + (portrait ? 'portrait' : 'landscape');
         if (first) { camGroup.position.copy(target.position); camGroup.quaternion.copy(target.quaternion); first = false; }
         else { camGroup.position.lerp(target.position, cfg.lerp); camGroup.quaternion.slerp(target.quaternion, cfg.lerp); }
         offset.set(0, 0, cfg.camOffset * S).applyQuaternion(camGroup.quaternion);
         camera.position.copy(camGroup.position).add(offset);
         camera.quaternion.copy(camGroup.quaternion);
-        if (dive) camera.rotateX(M.degToRad(cfg.divePitch) * ((1 - smooth(p, 0, 0.2)) + smooth(p, 0.8, 1)));   // look up at the hull on the way in and out
 
         // staggered scale-in (their tween: 1200 ms easeOutQuint, 200 ms apart)
         const elapsed = now - tStart;
@@ -977,7 +871,6 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
             _s.set((portrait ? 0.7 : 1.0) * polystar.scale, (portrait ? 1.0 : 0.75) * polystar.scale, -0.6 * polystar.scale).applyQuaternion(camera.quaternion);
             g.position.set(_s.x, camGroup.position.y / S + _s.y, _s.z);
         }
-        if (dive) updateDive(p, now);
         if (axis) updateAxis(now, dt);
         lastNow = now;
         cssRenderer.render(cssScene, camera);
@@ -1026,7 +919,6 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
             ['cardFrac', 'card width', 0.3, 0.95, 0.01], ['gap', 'card gap', 0, 1.5, 0.05], ['drift', 'entry drift', -1.5, 1.5, 0.05], ['lerp', 'camera lerp', 0.02, 0.5, 0.01],
             ['edge', 'scroll edge', 0, 0.2, 0.005], ['scrollPerCard', 'scroll per card (vh)', 25, 120, 5],
             ['polyScale', 'polystar size', 0.4, 3, 0.05], ['polyOpacity', 'polystar opacity', 0, 1, 0.02],
-            ['diveSurface', 'dive: surface height', 0.5, 3, 0.05], ['diveLight', 'dive: light shafts', 0, 1.5, 0.05], ['divePitch', 'dive: look-up (deg)', 0, 30, 1],
             ['pCurl', 'particles: curl', 0, 5, 0.05], ['pReturn', 'particles: home spring', 0, 5, 0.05], ['pPull', 'particles: cursor pull', 0, 30, 0.5], ['pDamp', 'particles: damping', 0.7, 0.99, 0.005],
             ['pSize', 'particles: size (px)', 0.3, 6, 0.05], ['pGlow', 'particles: glow', 0, 3, 0.05], ['pRadius', 'particles: light radius', 0.3, 6, 0.05], ['pParallax', 'particles: scroll parallax', 0, 0.012, 0.0002],
             ['boatX', 'boat: x (ndc)', -1, 1, 0.01], ['boatY', 'boat: y (ndc)', -1, 1, 0.01], ['boatSize', 'boat: size', 0.05, 0.6, 0.005],
@@ -1038,7 +930,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
             + rows.map(([k, l, min, max, st]) => `<label style="display:grid;grid-template-columns:1fr 96px 46px;gap:8px;align-items:center;margin:3px 0"><span>${l}</span><input type="range" data-k="${k}" min="${min}" max="${max}" step="${st}" value="${cfg[k]}" style="width:96px"><output style="text-align:right">${cfg[k]}</output></label>`).join('')
             + '<div style="display:flex;gap:8px;margin:10px 0 6px"><button type="button" data-copy style="position:static;display:inline-block;margin:0;height:auto;width:auto;line-height:1.3;font:inherit;text-transform:none;letter-spacing:0;box-shadow:none;transform:none;flex:1;padding:6px;border:1px solid rgba(255,255,255,.25);background:none;color:inherit;border-radius:6px;cursor:pointer">Copy as data-attributes</button><button type="button" data-reset style="position:static;display:inline-block;margin:0;height:auto;width:auto;line-height:1.3;font:inherit;text-transform:none;letter-spacing:0;box-shadow:none;transform:none;padding:6px 10px;border:1px solid rgba(255,255,255,.25);background:none;color:inherit;border-radius:6px;cursor:pointer">Reset</button></div>'
             + '<textarea readonly rows="4" style="width:100%;box-sizing:border-box;font:11px/1.35 ui-monospace,Menlo,monospace;background:rgba(0,0,0,.35);color:#cfd6df;border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:6px" placeholder="paste these onto <section class=&quot;work-spine&quot; …>"></textarea>'
-            + '<div style="margin-top:8px;display:flex;gap:6px;align-items:center"><span>centerpiece</span>' + ['none', 'polystar', 'dive', 'axis', 'spine'].map(c => `<a href="#" data-cp="${c}" style="color:${c === cfg.centerpiece ? '#fff' : '#9aa4b2'};text-decoration:${c === cfg.centerpiece ? 'underline' : 'none'}">${c}</a>`).join('') + '</div>'
+            + '<div style="margin-top:8px;display:flex;gap:6px;align-items:center"><span>centerpiece</span>' + ['none', 'polystar', 'axis', 'spine'].map(c => `<a href="#" data-cp="${c}" style="color:${c === cfg.centerpiece ? '#fff' : '#9aa4b2'};text-decoration:${c === cfg.centerpiece ? 'underline' : 'none'}">${c}</a>`).join('') + '</div>'
             + '<small data-live style="display:block;margin-top:6px;color:#9aa4b2"></small>';
         const attrs = () => rows.map(([k]) => `data-${k.replace(/[A-Z]/g, m => '-' + m.toLowerCase())}="${cfg[k]}"`).join(' ') + ` data-scroll-per-card="${cfg.scrollPerCard}" data-centerpiece="${cfg.centerpiece}"`;
         const ta = el.querySelector('textarea');
