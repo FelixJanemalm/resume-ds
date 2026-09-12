@@ -87,37 +87,39 @@ const SIM_SHARED = `
     // stern wave at the quarter, the Kelvin wedge from the stem (divergent crests along 19.5 degrees, transverse crests inside, both
     // dying aft), churn just abaft the transom, and a strip of foam (its own particles) running out behind. All of it scales with
     // uWay; at rest the water is still specks with faint slow rings spreading from the hull.
-    float hullBeam(float x){ return 0.16 * sqrt(max(0.0, 1.0 - pow((x - 0.02) / 0.56, 2.0))); }
+    float hullBeam(float x){ return 0.15 * sqrt(max(0.0, 1.0 - pow((x + 0.02) / 0.48, 2.0))); }   // the waterline: stem at 0.46, transom at -0.5
     float hash1(float n){ return fract(sin(n) * 43758.5453); }
     vec3 flowLocal(vec3 q, vec4 md, float role, out float fade){
       fade = 1.0; float wake = step(6.5, role) * step(role, 7.5), water = step(5.5, role) * step(role, 6.5);
       if (wake > 0.5) {
-        float d1 = fract(md.w + uFlow / 1.8), h = hash1(md.z * 91.7);
-        q.x = -0.5 - d1 * 1.8; q.z = (h - 0.5) * (0.28 + 0.3 * d1); q.y = ${WATERLINE} + 0.004 * sin(uTime * 3.0 + h * 40.0);
-        fade = pow(1.0 - d1, 1.6) * (0.35 + 0.65 * hash1(md.z * 17.3 + floor(uTime * 2.0 + h * 5.0))); }
+        float d1 = fract(md.w + uFlow / 1.4), h = hash1(md.z * 91.7);
+        q.x = -0.5 - d1 * 1.4; q.z = (h - 0.5) * (0.28 + 0.24 * d1); q.y = ${WATERLINE} + 0.004 * sin(uTime * 3.0 + h * 40.0);
+        fade = pow(1.0 - d1, 2.2) * (0.35 + 0.65 * hash1(md.z * 17.3 + floor(uTime * 2.0 + h * 5.0))); }
       else if (water > 0.5) {
         float x0 = q.x, z0 = q.z, sgn = z0 < 0.0 ? -1.0 : 1.0;
         float x = -1.25 + mod(x0 + 1.25 - uFlow, 2.5); q.x = x; q.y = ${WATERLINE};
-        float az = abs(z0), hb = hullBeam(x), s = 0.5 - x;
-        float inHull = step(az, hb) * step(-0.5, x) * step(x, 0.55);
+        float az = abs(z0), hb = hullBeam(x), s = 0.46 - x;                                          // s: distance aft of the stem
+        float inHull = step(az, hb) * step(-0.5, x) * step(x, 0.46);
         float side = hb + 0.012 + 0.04 * uWay * hash1(md.z * 31.0) * smoothstep(0.4, 0.0, s);
         q.z = mix(z0, sgn * side, inHull); az = abs(q.z);
         float spray = inHull * smoothstep(0.45, 0.0, s) * uWay;
         q.y += spray * (0.02 + 0.03 * hash1(md.w * 53.0 + floor(uTime * 3.0)));
-        float near = exp(-pow((az - hb) / 0.07, 2.0)) * step(-0.55, x) * step(x, 0.5);
+        float near = exp(-pow((az - hb) / 0.07, 2.0)) * step(-0.55, x) * step(x, 0.46);
         float along = 0.02 * cos(6.2832 * s) * exp(-s * 0.6);
         q.y += uWay * near * along;
         float crestNear = near * max(0.0, along) * 50.0;
-        float wedge = 0.354 * s, edge = az - wedge, aft = step(0.0, s);
-        float div = aft * exp(-pow(edge / (0.03 + 0.03 * s), 2.0)) / sqrt(0.3 + s);
+        float wedge = 0.354 * s, edge = az - wedge, aft = step(0.0, s), dying = exp(-s / 1.1);       // the whole pattern dies aft, well inside the window
+        float div = aft * exp(-pow(edge / (0.03 + 0.03 * s), 2.0)) * dying;
         float divPhase = cos(6.2832 * s / 0.9 + 1.0);
-        float inside = aft * (1.0 - smoothstep(wedge - 0.1, wedge, az));
-        float trans = inside * cos(6.2832 * s / 0.9) * exp(-s / 2.0);
+        float inside = aft * (1.0 - smoothstep(wedge - 0.1, wedge, az)) * step(1.0, s);               // transverse crests only astern of the hull
+        float trans = inside * cos(6.2832 * s / 0.9) * dying;
         q.y += uWay * (0.014 * div * divPhase + 0.008 * trans);
         float churn = step(x, -0.5) * (1.0 - smoothstep(0.0, 0.16, az)) * smoothstep(-1.4, -0.5, x);
         q.y += uWay * churn * 0.006 * sin(uTime * 4.0 + z0 * 30.0 + x * 10.0);
-        float lit = uWay * (3.0 * spray + 1.6 * crestNear + 1.2 * div * max(0.0, divPhase) + 0.5 * max(0.0, trans) + 0.6 * churn * hash1(md.z * 7.7 + floor(uTime * 3.0)));
-        fade = (1.0 - smoothstep(0.85, 1.25, abs(x))) * (0.55 + lit);
+        float lit = uWay * (3.0 * spray + 1.6 * crestNear + 1.2 * div * max(0.0, divPhase) + 0.3 * max(0.0, trans) + 0.6 * churn * hash1(md.z * 7.7 + floor(uTime * 3.0)));
+        // the patch of water has no edges: a soft window in both directions, dithered per particle, applied to base and crests alike
+        float win = exp(-pow(x / 0.95, 4.0)) * exp(-pow(q.z / 0.6, 4.0)) * (0.55 + 0.45 * hash1(md.w * 77.0));
+        fade = win * (0.55 + lit);
         float r = length(vec2(x, q.z * 1.6));
         fade *= 1.0 - (1.0 - uWay) * 0.18 * (0.5 - 0.5 * sin(r * 9.0 - uRipple * 0.6)); }
       return q; }
