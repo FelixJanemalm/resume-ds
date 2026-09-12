@@ -53,7 +53,9 @@ const SIM_NOISE = `
       float py_x=snoise(p+dx+o1)-snoise(p-dx+o1), px_y=snoise(p+dy)-snoise(p-dy);
       return vec3(pz_y-py_z, px_z-pz_x, py_x-px_y)/(2.0*e); }`;
 const SIM_SHARED = `
-    uniform sampler2D tBoat; uniform float uForm, uScroll, uScrollFull, uH, uBob, uBoatScale, uYaw, uRoll; uniform vec3 uBoat;
+    uniform sampler2D tBoat; uniform float uForm, uScroll, uScrollFull, uH, uBob, uBoatScale, uYaw, uRoll, uN, uStarForm, uSnap; uniform vec3 uBoat; uniform vec4 uStarT[12];
+    // the first 12 particles can be recruited as constellation stars: uStarT holds their targets (xyz) and an on flag (w)
+    vec4 starOf(vec2 uv){ int idx = int(floor(uv.x * uN) + floor(uv.y * uN) * uN + 0.5); vec4 st = vec4(0.0); for (int k = 0; k < 12; k++) { if (k == idx) st = uStarT[k]; } return st; }
     // where a particle is drawn: the field wraps vertically and scrolls with depth-dependent parallax; a formed boat particle scrolls with the page instead
     vec3 drawPos(vec3 p, float bf){ float depthF = mix(0.3, 1.6, clamp((p.z + 4.0) / 8.0, 0.0, 1.0)); float off = uScroll * depthF * (1.0 - bf);
       vec3 pw = p; float wy = mod(p.y + off + uH * 0.5, uH) - uH * 0.5; pw.y = mix(wy, p.y, bf); return pw; }
@@ -66,35 +68,39 @@ const SIM_SHARED = `
 const SIM_VEL = SIM_NOISE + SIM_SHARED + `
     uniform sampler2D tHome; uniform float uTime, uDelta, uCurl, uReturn, uDamp, uPull, uRadius; uniform vec3 uCam, uDir;
     void main(){ vec2 uv=gl_FragCoord.xy/resolution.xy; vec3 p=texture2D(tPos,uv).xyz; vec3 v=texture2D(tVel,uv).xyz; vec4 h=texture2D(tHome,uv); vec4 b=texture2D(tBoat,uv);
-      float bf=boatFlag(b)*uForm;
-      vec3 tgt=mix(h.xyz, boatTarget(b), bf);
-      vec3 f=(tgt-p)*uReturn*(1.0+1.5*bf);
-      f+=curlNoise(p*0.28+vec3(0.0,uTime*0.05,0.0))*uCurl*(0.4+0.6*h.w)*(1.0-0.8*bf);
-      vec3 pw=drawPos(p,bf);
+      float bf=boatFlag(b)*uForm; vec4 st=starOf(uv); float sf=st.w*uStarForm;
+      vec3 tgt=mix(mix(h.xyz, boatTarget(b), bf), st.xyz, sf);
+      vec3 f=(tgt-p)*uReturn*(1.0+1.5*bf+2.5*sf);
+      f+=curlNoise(p*0.28+vec3(0.0,uTime*0.05,0.0))*uCurl*(0.4+0.6*h.w)*(1.0-0.8*bf)*(1.0-0.7*sf);
+      vec3 pw=drawPos(p,max(bf,sf));
       vec3 rel=pw-uCam; float along=dot(rel,uDir); vec3 perp=rel-uDir*along; float d=length(perp);
       float infl=smoothstep(uRadius,0.0,d)*step(0.5,along);
       vec3 toRay=-perp/max(d,1e-4);
       f+=toRay*infl*uPull+cross(uDir,toRay)*infl*uPull*0.6;
       v=v*uDamp+f*uDelta; gl_FragColor=vec4(v,1.0); }`;
-const SIM_POS = `
+const SIM_POS = SIM_SHARED + `
     uniform sampler2D tHome; uniform float uDelta;
     void main(){ vec2 uv=gl_FragCoord.xy/resolution.xy; vec4 p=texture2D(tPos,uv); vec3 v=texture2D(tVel,uv).xyz; float w=texture2D(tHome,uv).w;
-      p.xyz+=v*uDelta; gl_FragColor=vec4(p.xyz,w); }`;
+      p.xyz+=v*uDelta;
+      vec4 st=starOf(uv); float sf=st.w*uStarForm;
+      if (sf > 0.5 && distance(p.xyz, st.xyz) > uSnap) p.xyz = st.xyz + (p.xyz - st.xyz) * 0.12;   // a far recruit snaps most of the way instead of flying across the screen
+      gl_FragColor=vec4(p.xyz,w); }`;
 const PTS_VS = SIM_SHARED + `
     uniform sampler2D tPos, tVel; uniform float uSize, uDPR, uP, uRadius, uIntro; uniform vec3 uCam, uDir; attribute vec2 ref; attribute float aSize;
-    varying float vLit, vRand, vSpeed, vBoat, vShade;
+    varying float vLit, vRand, vSpeed, vBoat, vShade, vStar;
     void main(){ vec4 p=texture2D(tPos,ref); vec3 v=texture2D(tVel,ref).xyz; vec4 b=texture2D(tBoat,ref); float bf=boatFlag(b)*uForm; vBoat=bf; vShade=clamp(b.w,0.0,1.0);
-      vec3 pw=drawPos(p.xyz,bf);
+      vec4 st=starOf(ref); float sf=st.w*uStarForm; vStar=sf;
+      vec3 pw=drawPos(p.xyz,max(bf,sf));
       vec3 rel=pw-uCam; float along=dot(rel,uDir); vec3 perp=rel-uDir*along; float d=length(perp);
       vLit=smoothstep(uRadius,0.0,d)*step(0.5,along); vRand=p.w; vSpeed=length(v);
       vec4 mv=modelViewMatrix*vec4(pw,1.0);
-      gl_PointSize=uSize*uDPR*aSize*(1.0+0.9*vLit+0.25*bf)*uP/max(-mv.z,1.0)*uIntro;
+      gl_PointSize=uSize*uDPR*aSize*(1.0+0.9*vLit+0.25*bf+2.4*sf)*uP/max(-mv.z,1.0)*uIntro;
       gl_Position=projectionMatrix*mv; }`;
 const PTS_FS = `
-    uniform vec3 uColorA, uColorB, uColorLit; uniform float uGlow; varying float vLit, vRand, vSpeed, vBoat, vShade;
+    uniform vec3 uColorA, uColorB, uColorLit; uniform float uGlow; varying float vLit, vRand, vSpeed, vBoat, vShade, vStar;
     void main(){ vec2 c=gl_PointCoord-0.5; float d=length(c); if(d>0.5) discard; float disc=smoothstep(0.5,0.08,d);
-      vec3 col=mix(uColorA,uColorB,smoothstep(0.25,0.85,vRand)); col=mix(col,uColorLit,clamp(vLit*0.9+smoothstep(0.8,3.0,vSpeed)*0.15+0.7*vBoat*vShade,0.0,1.0));
-      float a=disc*(0.24+0.5*vLit)*(1.0+vBoat*(0.1+1.4*vShade))*uGlow; gl_FragColor=vec4(col*(0.85+0.35*vLit+0.3*vBoat*vShade),a); }`;
+      vec3 col=mix(uColorA,uColorB,smoothstep(0.25,0.85,vRand)); col=mix(col,uColorLit,clamp(vLit*0.9+smoothstep(0.8,3.0,vSpeed)*0.15+0.7*vBoat*vShade+0.6*vStar,0.0,1.0));
+      float a=disc*(0.24+0.5*vLit)*(1.0+vBoat*(0.1+1.4*vShade)+1.6*vStar)*uGlow; gl_FragColor=vec4(col*(0.85+0.35*vLit+0.3*vBoat*vShade+0.3*vStar),a); }`;
 
 /* The picked colour, pushed to a vivid tint: the page's --button-color is derived from the picker with
    lightness tweaks that can leave it muted, and additive blending over a grey ground washes it out further. */
@@ -104,6 +110,16 @@ function vividAccent(THREE, light) {
     const hsl = { h: 0, s: 0, l: 0 }; c.getHSL(hsl);
     return c.setHSL(hsl.h, Math.max(hsl.s, 0.8), light ? 0.38 : 0.6);
 }
+
+const FIGURES = [
+    { pts: [[-0.45, -0.1], [-0.45, 0.25], [-0.2, 0.05], [0.05, 0.15], [0.05, -0.2], [0.32, 0.0], [0.48, 0.28]], edges: [[0, 2], [1, 2], [2, 3], [2, 4], [3, 5], [4, 5], [5, 6]] },
+    (() => { const pts = [], edges = []; const layers = [[-0.4, [-0.25, 0, 0.25]], [0, [-0.36, -0.12, 0.12, 0.36]], [0.4, [-0.15, 0.15]]];
+        layers.forEach(([x, ys]) => ys.forEach(y => pts.push([x, y])));
+        let a = 0; for (let l = 0; l < 2; l++) { const na = layers[l][1].length, nb = layers[l + 1][1].length; for (let i = 0; i < na; i++) for (let j = 0; j < nb; j++) edges.push([a + i, a + na + j]); a += na; }
+        return { pts, edges }; })(),
+    (() => { const pts = [[0, 0]], edges = []; for (let k = 0; k < 5; k++) { const a = Math.PI / 2 + k * 2 * Math.PI / 5; pts.push([Math.cos(a) * 0.38, Math.sin(a) * 0.38]); edges.push([0, k + 1]); edges.push([k + 1, (k + 1) % 5 + 1]); } return { pts, edges }; })(),
+    (() => { const pts = [[0, 0.38], [-0.3, 0.05], [0, 0.05], [0.3, 0.05]], edges = [[0, 1], [0, 2], [0, 3]]; [-0.42, -0.25, -0.08, 0.08, 0.25, 0.42].forEach((x, k) => { pts.push([x, -0.32]); edges.push([1 + Math.floor(k / 2), 4 + k]); }); return { pts, edges }; })(),
+];
 
 /* A sailboat sampled as 3D surfaces, in boat space (hull length 1, y up, z toward the viewer):
    hull with elliptical cross-sections and a pointed bow, deck and gunwale, mast and boom, main and jib
@@ -165,6 +181,7 @@ function sampleBoat() {
 
 /* Page-wide particle layer: a fixed canvas behind everything (z-index -1, no pointer events), the same
    simulation as the lab, with the field wrapping vertically so it follows the page scroll with a little parallax. */
+const STAR_N = 12;
 function startParticleLayer(THREE, GPUC) {
     if (!GPUC) return;
     const canvas = document.createElement('canvas');
@@ -186,10 +203,11 @@ function startParticleLayer(THREE, GPUC) {
         const x = (Math.random() * 2 - 1) * 10, y = (Math.random() - 0.5) * H, z = (Math.random() * 2 - 1) * 4, w = Math.random();
         home.image.data.set([x, y, z, w], i * 4);
         pos0.image.data.set([x + (Math.random() - 0.5) * 0.6, y + (Math.random() - 0.5) * 0.6, z, w], i * 4);
-        if (i < boatCount) { const [bx, by, bz, sh] = sampleBoat(); boat.image.data.set([bx, by, bz, Math.max(0.02, sh)], i * 4); }
+        if (i >= STAR_N && i < boatCount) { const [bx, by, bz, sh] = sampleBoat(); boat.image.data.set([bx, by, bz, Math.max(0.02, sh)], i * 4); }   // the first STAR_N are constellation recruits
     }
     home.needsUpdate = true; boat.needsUpdate = true;
-    const boatU = () => ({ tBoat: { value: boat }, uForm: { value: 0 }, uScrollFull: { value: 0 }, uBob: { value: 0 }, uBoatScale: { value: 1 }, uBoat: { value: new THREE.Vector3() }, uYaw: { value: 0 }, uRoll: { value: 0 } });
+    const starT = Array.from({ length: STAR_N }, () => new THREE.Vector4());   // shared by every material that needs the star targets
+    const boatU = () => ({ tBoat: { value: boat }, uForm: { value: 0 }, uScrollFull: { value: 0 }, uBob: { value: 0 }, uBoatScale: { value: 1 }, uBoat: { value: new THREE.Vector3() }, uYaw: { value: 0 }, uRoll: { value: 0 }, uStarT: { value: starT }, uN: { value: N }, uStarForm: { value: 0 }, uSnap: { value: 1.2 } });
     const velVar = gpu.addVariable('tVel', SIM_VEL, vel0), posVar = gpu.addVariable('tPos', SIM_POS, pos0);
     gpu.setVariableDependencies(velVar, [posVar, velVar]); gpu.setVariableDependencies(posVar, [posVar, velVar]);
     const velU = velVar.material.uniforms, posU = posVar.material.uniforms;
@@ -208,6 +226,65 @@ function startParticleLayer(THREE, GPUC) {
     const U = mat.uniforms;
     const points = new THREE.Points(geo, mat); points.frustumCulled = false; scene.add(points);
     let visW = 1, visH = 1;
+    // constellation lines between recruited stars: vertices sample the live position texture, so the lines follow the particles
+    // each line vertex knows both endpoints (position texture refs and star indices) so the segment only shows once both stars are near their targets
+    const LINE_VS = 'uniform sampler2D tPos; uniform vec4 uStarT[12]; attribute vec2 aRef, aRef2; attribute float aIdx, aIdx2, aT, aD, aA; varying float vT, vD, vA; '
+        + 'vec4 tgt(float i){ int idx = int(i + 0.5); vec4 r = vec4(0.0); for (int k = 0; k < 12; k++) { if (k == idx) r = uStarT[k]; } return r; } '
+        + 'void main(){ vec3 p = texture2D(tPos, aRef).xyz, q = texture2D(tPos, aRef2).xyz; float near = smoothstep(0.45, 0.12, distance(p, tgt(aIdx).xyz)) * smoothstep(0.45, 0.12, distance(q, tgt(aIdx2).xyz)); vT = aT; vD = aD; vA = aA * near; gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }';
+    const LINE_FS = 'uniform float uVis; uniform vec3 uColor; varying float vT, vD, vA; void main(){ if (vT > vD) discard; gl_FragColor = vec4(uColor, 0.55 * vA * uVis); }';
+    const SEGS = 40, lg = new THREE.BufferGeometry();
+    const lref = new Float32Array(SEGS * 4), lref2 = new Float32Array(SEGS * 4), lidx = new Float32Array(SEGS * 2), lidx2 = new Float32Array(SEGS * 2), lt = new Float32Array(SEGS * 2), ld = new Float32Array(SEGS * 2), la = new Float32Array(SEGS * 2);
+    for (let k = 0; k < SEGS; k++) lt.set([0, 1], k * 2);
+    lg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(SEGS * 6), 3));
+    lg.setAttribute('aRef', new THREE.BufferAttribute(lref, 2)); lg.setAttribute('aRef2', new THREE.BufferAttribute(lref2, 2)); lg.setAttribute('aIdx', new THREE.BufferAttribute(lidx, 1)); lg.setAttribute('aIdx2', new THREE.BufferAttribute(lidx2, 1));
+    lg.setAttribute('aT', new THREE.BufferAttribute(lt, 1)); lg.setAttribute('aD', new THREE.BufferAttribute(ld, 1)); lg.setAttribute('aA', new THREE.BufferAttribute(la, 1));
+    const lines = new THREE.LineSegments(lg, new THREE.ShaderMaterial({ uniforms: { tPos: { value: null }, uVis: { value: 0 }, uColor: { value: new THREE.Color(0x4faad1) }, uStarT: { value: starT } }, vertexShader: LINE_VS, fragmentShader: LINE_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    lines.frustumCulled = false; scene.add(lines);
+    const starRef = i => [((i % N) + 0.5) / N, (Math.floor(i / N) + 0.5) / N];
+    const stars = { fig: -1, cur: null, prev: null, curT: 0, prevA: 0, form: 0, last: -1e9, cx: 0, cy: 0, w: 1, h: 1, est: new Float32Array(STAR_N * 2), seed: new Float32Array(STAR_N) };
+    for (let i = 0; i < STAR_N; i++) { stars.seed[i] = Math.random(); stars.est[i * 2] = (Math.random() - 0.5) * 1.2; stars.est[i * 2 + 1] = (Math.random() - 0.5) * 0.9; }
+    function starsSetFigure(k) {
+        const fig = FIGURES[k % FIGURES.length], used = new Set(), map = new Array(fig.pts.length);
+        fig.pts.forEach((pt, j) => {   // nearest free star to each node, by the stars' last known targets
+            let best = -1, bd = Infinity;
+            for (let i = 0; i < STAR_N; i++) { if (used.has(i)) continue; const dx = stars.est[i * 2] - pt[0], dy = stars.est[i * 2 + 1] - pt[1], d = dx * dx + dy * dy; if (d < bd) { bd = d; best = i; } }
+            used.add(best); map[j] = best;
+        });
+        stars.prev = stars.cur; stars.prevA = stars.cur ? 1 : 0; stars.cur = { fig, map }; stars.curT = 0; stars.fig = k;
+    }
+    function starsFrame(t, dt) {
+        const on = performance.now() - stars.last < 250 && stars.cur;
+        stars.form += ((on ? 1 : 0) - stars.form) * Math.min(1, dt * 2);
+        for (const u of [velU, U]) u.uStarForm.value = stars.form;
+        lines.material.uniforms.uVis.value = stars.form; lines.material.uniforms.tPos.value = U.tPos.value;
+        if (!stars.cur) return;
+        // targets in this camera's world at z = 1, from the stage-projected centre and size in px
+        const zs = 1, k = (camera.position.z - zs) / camera.position.z, wu = visW * k, hu = visH * k;
+        const cx = ((stars.cx / innerWidth) - 0.5) * wu, cy = (0.5 - (stars.cy / innerHeight)) * hu, sw = stars.w / innerWidth * wu, sh = stars.h / innerHeight * hu;
+        const inv = new Int8Array(STAR_N).fill(-1); stars.cur.map.forEach((si, j) => inv[si] = j);
+        for (let i = 0; i < STAR_N; i++) {
+            const sd = stars.seed[i] * 6.28; let u, v;
+            if (inv[i] >= 0) { const pt = stars.cur.fig.pts[inv[i]]; u = pt[0] + 0.012 * Math.sin(t * 0.7 + sd); v = pt[1] + 0.012 * Math.cos(t * 0.9 + sd * 1.3); }
+            else { const a = t * 0.12 + sd; u = Math.cos(a) * 0.62; v = Math.sin(a * 1.31 + sd) * 0.42; }
+            stars.est[i * 2] = u; stars.est[i * 2 + 1] = v;
+            starT[i].set(cx + u * sw, cy + v * sh, zs, inv[i] >= 0 ? 1 : 0.55);
+        }
+        // edges: the current figure draws in edge by edge; the previous figure's lines follow the stars out and fade
+        stars.curT = Math.min(1, stars.curT + dt / 1.4); stars.prevA = Math.max(0, stars.prevA - dt / 0.7);
+        const write = (set, offset, alphaOf, limitOf) => {
+            for (let j = 0; j < 20; j++) {
+                const k2 = offset + j, e = set && set.fig.edges[j];
+                if (!e) { la[k2 * 2] = la[k2 * 2 + 1] = 0; continue; }
+                const ia = set.map[e[0]], ib = set.map[e[1]], ra = starRef(ia), rb = starRef(ib);
+                lref.set([ra[0], ra[1], rb[0], rb[1]], k2 * 4); lref2.set([rb[0], rb[1], ra[0], ra[1]], k2 * 4);
+                lidx[k2 * 2] = ia; lidx[k2 * 2 + 1] = ib; lidx2[k2 * 2] = ib; lidx2[k2 * 2 + 1] = ia;
+                ld[k2 * 2] = ld[k2 * 2 + 1] = limitOf(j); la[k2 * 2] = la[k2 * 2 + 1] = alphaOf(j);
+            }
+        };
+        write(stars.cur, 0, () => 1, j => Math.min(1, Math.max(0, stars.curT * (stars.cur.fig.edges.length + 1) - j)));
+        write(stars.prevA > 0 ? stars.prev : null, 20, () => stars.prevA, () => 1);
+        for (const name of ['aRef', 'aRef2', 'aIdx', 'aIdx2', 'aD', 'aA']) lg.attributes[name].needsUpdate = true;
+    }
     const raycaster = new THREE.Raycaster();
     const pointer = { ndc: new THREE.Vector2(), target: new THREE.Vector2(), active: false, last: 0 };
     addEventListener('pointermove', e => { pointer.target.set((e.clientX / innerWidth) * 2 - 1, -((e.clientY / innerHeight) * 2 - 1)); pointer.active = true; pointer.last = performance.now(); }, { passive: true });
@@ -226,11 +303,14 @@ function startParticleLayer(THREE, GPUC) {
         U.uColorB.value.copy(v).lerp(new THREE.Color(light ? 0x000000 : 0xffffff), light ? 0.15 : 0.2);
         U.uColorLit.value.copy(v).lerp(new THREE.Color(0xffffff), light ? 0.2 : 0.55);
         U.uGlow.value = pcfg.pGlow * (light ? 1.6 : 1);
+        lines.material.uniforms.uColor.value.copy(v).lerp(new THREE.Color(0xffffff), light ? 0 : 0.2);
         mat.blending = light ? THREE.NormalBlending : THREE.AdditiveBlending; mat.needsUpdate = true;
     }
     applyTheme();
     new MutationObserver(applyTheme).observe(document.body, { attributes: true, attributeFilter: ['class'] });
     let last = performance.now(), shown = false, form = pcfg.boat === 'off' ? 0 : 1;
+    // adaptive quality: after the first 2.5 s, a slow device gets a lower pixel ratio, half the drawn particles and a half-rate simulation
+    const qual = { acc: 0, frames: 0, done: false, half: false, tick: 0, simDt: 0 };
     function frame(now) {
         const dt = Math.min(0.05, Math.max(0.001, (now - last) / 1000)); last = now; const t = now * 0.001;
         const stale = !pointer.active || now - pointer.last > 2500;
@@ -246,8 +326,10 @@ function startParticleLayer(THREE, GPUC) {
         form += (formTarget - form) * 0.04;
         const fullSpeed = pcfg.boat === 'always' ? 0 : scrollY * visH / innerHeight;   // page speed in units at the boat's depth
         for (const u of [velU, U]) { u.uForm.value = form; u.uScrollFull.value = fullSpeed; u.uBob.value = 0.04 * Math.sin(t * 0.8) * form; u.uYaw.value = -0.62 + 0.09 * Math.sin(t * 0.21); u.uRoll.value = 0.16 + 0.06 * Math.sin(t * 0.6); }
-        velU.uTime.value = t; velU.uDelta.value = dt; posU.uDelta.value = dt;
-        gpu.compute();
+        if (!qual.done) { qual.acc += dt; qual.frames++; if (qual.acc > 2.5) { qual.done = true; const ms = qual.acc / qual.frames * 1000; if (ms > 20) { qual.half = true; gl.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5)); geo.setDrawRange(0, Math.floor(COUNT / 2)); resize(); console.info('work-spine: slow device (' + ms.toFixed(1) + ' ms/frame), reduced quality'); } } }
+        starsFrame(t, dt);
+        qual.simDt += dt;
+        if (!qual.half || (qual.tick++ % 2 === 0)) { velU.uTime.value = t; velU.uDelta.value = qual.simDt; posU.uDelta.value = qual.simDt; qual.simDt = 0; gpu.compute(); }
         U.tPos.value = gpu.getCurrentRenderTarget(posVar).texture; U.tVel.value = gpu.getCurrentRenderTarget(velVar).texture;
         U.uIntro.value = Math.min(1, U.uIntro.value + dt * 0.5);
         gl.render(scene, camera);
@@ -256,6 +338,8 @@ function startParticleLayer(THREE, GPUC) {
     }
     let running = true; last = performance.now(); requestAnimationFrame(frame);   // a hidden tab simply stops getting animation frames
     layer = {
+        // called by the work section every frame while it is active: figure index and where the figure sits on screen (px)
+        setStars(k, cx, cy, w, h) { if (k !== stars.fig) starsSetFigure(k); stars.cx = cx; stars.cy = cy; stars.w = w; stars.h = h; stars.last = performance.now(); },
         sync() { velU.uCurl.value = pcfg.pCurl; velU.uReturn.value = pcfg.pReturn; velU.uDamp.value = pcfg.pDamp; velU.uPull.value = pcfg.pPull; velU.uRadius.value = pcfg.pRadius; U.uSize.value = pcfg.pSize; U.uRadius.value = pcfg.pRadius; applyTheme(); resize(); },
     };
 }
@@ -446,7 +530,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         const velVar = gpu.addVariable('tVel', SIM_VEL, vel0), posVar = gpu.addVariable('tPos', SIM_POS, pos0);
         gpu.setVariableDependencies(velVar, [posVar, velVar]); gpu.setVariableDependencies(posVar, [posVar, velVar]);
         const velU = velVar.material.uniforms, posU = posVar.material.uniforms;
-        const noBoat = () => ({ tBoat: { value: home }, uForm: { value: 0 }, uScrollFull: { value: 0 }, uBob: { value: 0 }, uBoatScale: { value: 1 }, uBoat: { value: new THREE.Vector3() }, uYaw: { value: 0 }, uRoll: { value: 0 } });
+        const noBoat = () => ({ tBoat: { value: home }, uForm: { value: 0 }, uScrollFull: { value: 0 }, uBob: { value: 0 }, uBoatScale: { value: 1 }, uBoat: { value: new THREE.Vector3() }, uYaw: { value: 0 }, uRoll: { value: 0 }, uStarT: { value: Array.from({ length: 12 }, () => new THREE.Vector4()) }, uN: { value: N }, uStarForm: { value: 0 }, uSnap: { value: 1.2 } });
         Object.assign(velU, { tHome: { value: home }, uTime: { value: 0 }, uDelta: { value: 0 }, uCurl: { value: cfg.pCurl }, uReturn: { value: cfg.pReturn }, uDamp: { value: cfg.pDamp }, uPull: { value: cfg.pPull }, uRadius: { value: cfg.pRadius }, uScroll: { value: 0 }, uH: { value: 1e5 }, uCam: { value: new THREE.Vector3() }, uDir: { value: new THREE.Vector3(0, 0, -1) } }, noBoat());
         Object.assign(posU, { tHome: { value: home }, uDelta: { value: 0 } });
         const err = gpu.init(); if (err) throw new Error(err);
@@ -717,13 +801,6 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
             axis.sats.forEach(g => { g.children[0].material.color.copy(accent).lerp(new THREE.Color(0xffffff), 0.5); g.children[1].material.color.copy(accent); });
             axis.callout.material.color.copy(accent);
         }
-        if (cs) {
-            const v = vividAccent(THREE, light);
-            cs.stars.material.uniforms.uColor.value.copy(v).lerp(new THREE.Color(0xffffff), light ? 0.1 : 0.6);
-            cs.edges.material.uniforms.uColor.value.copy(v).lerp(new THREE.Color(0xffffff), light ? 0 : 0.2);
-            axis.nodeMat.color.set(light ? 0xb9c6d6 : 0xdfe8f2); axis.ringMat.color.set(light ? 0xa9b7c8 : 0xcfd9e6);
-            if (light) { [axis.ribbonMat].forEach(m => m.blending = THREE.NormalBlending); axis.halos.forEach(h => h.material.blending = THREE.NormalBlending); }
-        }
         if (polystar) {
             const bg = new THREE.Color(); try { bg.setStyle(cssVar('--bg', light ? '#ffffff' : '#101012')); } catch (e) { bg.set(light ? 0xffffff : 0x101012); }
             polystar.mat.uniforms.uA.value.copy(accent);
@@ -740,90 +817,9 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
        points and lines that draw themselves in edge by edge as the card comes to front, fading as it leaves.
        Figures are unit-square coordinates (y up) matched to the case studies: a traceability chain, a small
        neural net, a hub with five spokes, a token tree. They cycle if there are more cards than figures. */
-    const FIGURES = [
-        { pts: [[-0.45, -0.1], [-0.45, 0.25], [-0.2, 0.05], [0.05, 0.15], [0.05, -0.2], [0.32, 0.0], [0.48, 0.28]], edges: [[0, 2], [1, 2], [2, 3], [2, 4], [3, 5], [4, 5], [5, 6]] },
-        (() => { const pts = [], edges = []; const layers = [[-0.4, [-0.25, 0, 0.25]], [0, [-0.36, -0.12, 0.12, 0.36]], [0.4, [-0.15, 0.15]]];
-            layers.forEach(([x, ys]) => ys.forEach(y => pts.push([x, y])));
-            let a = 0; for (let l = 0; l < 2; l++) { const na = layers[l][1].length, nb = layers[l + 1][1].length; for (let i = 0; i < na; i++) for (let j = 0; j < nb; j++) edges.push([a + i, a + na + j]); a += na; }
-            return { pts, edges }; })(),
-        (() => { const pts = [[0, 0]], edges = []; for (let k = 0; k < 5; k++) { const a = Math.PI / 2 + k * 2 * Math.PI / 5; pts.push([Math.cos(a) * 0.38, Math.sin(a) * 0.38]); edges.push([0, k + 1]); edges.push([k + 1, (k + 1) % 5 + 1]); } return { pts, edges }; })(),
-        (() => { const pts = [[0, 0.38], [-0.3, 0.05], [0, 0.05], [0.3, 0.05]], edges = [[0, 1], [0, 2], [0, 3]]; [-0.42, -0.25, -0.08, 0.08, 0.25, 0.42].forEach((x, k) => { pts.push([x, -0.32]); edges.push([1 + Math.floor(k / 2), 4 + k]); }); return { pts, edges }; })(),
-    ];
-    const CS_N = 12, CS_E = 20;          // living stars, and the largest figure's edge count
-    let cs = null;
-    const STAR_VS = 'attribute float aPhase, aAlpha; uniform float uSize, uDPR, uP, uVis, uTime; varying float vA; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); float tw = 0.8 + 0.2 * sin(uTime * 2.4 + aPhase); vA = uVis * tw * aAlpha; gl_PointSize = uSize * uDPR * (0.7 + 0.3 * aAlpha) * tw * uVis * uP / max(-mv.z, 1.0); gl_Position = projectionMatrix * mv; }';
-    const STAR_FS = 'uniform sampler2D tMap; uniform vec3 uColor; varying float vA; void main(){ vec4 t = texture2D(tMap, gl_PointCoord); gl_FragColor = vec4(uColor, t.a * vA); }';
-    const EDGE_VS = 'attribute float aT, aD, aA; varying float vT, vD, vA; void main(){ vT = aT; vD = aD; vA = aA; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
-    const EDGE_FS = 'uniform float uVis; uniform vec3 uColor; varying float vT, vD, vA; void main(){ if (vT > vD) discard; gl_FragColor = vec4(uColor, 0.55 * vA * uVis); }';
-    function buildConstellations() {
-        if (!gl || cfg.constellations < 0.5) return;
-        const sg = new THREE.BufferGeometry();
-        const pos = new Float32Array(CS_N * 3), alpha = new Float32Array(CS_N).fill(0.35), phase = new Float32Array(CS_N);
-        for (let i = 0; i < CS_N; i++) phase[i] = Math.random() * 6.28;
-        sg.setAttribute('position', new THREE.BufferAttribute(pos, 3)); sg.setAttribute('aAlpha', new THREE.BufferAttribute(alpha, 1)); sg.setAttribute('aPhase', new THREE.BufferAttribute(phase, 1));
-        const stars = new THREE.Points(sg, new THREE.ShaderMaterial({ uniforms: { tMap: { value: glowTexture('halo') }, uColor: { value: new THREE.Color(0xffffff) }, uSize: { value: 26 }, uDPR: { value: Math.min(devicePixelRatio || 1, 2) }, uP: { value: 1000 }, uVis: { value: 0 }, uTime: { value: 0 } }, vertexShader: STAR_VS, fragmentShader: STAR_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-        stars.frustumCulled = false;
-        const eg = new THREE.BufferGeometry(), segs = CS_E * 2;   // current figure's edges, then the previous figure's fading edges
-        const ep = new Float32Array(segs * 6), et = new Float32Array(segs * 2), ed = new Float32Array(segs * 2), ea = new Float32Array(segs * 2);
-        for (let k = 0; k < segs; k++) et.set([0, 1], k * 2);
-        eg.setAttribute('position', new THREE.BufferAttribute(ep, 3)); eg.setAttribute('aT', new THREE.BufferAttribute(et, 1)); eg.setAttribute('aD', new THREE.BufferAttribute(ed, 1)); eg.setAttribute('aA', new THREE.BufferAttribute(ea, 1));
-        const edges = new THREE.LineSegments(eg, new THREE.ShaderMaterial({ uniforms: { uVis: { value: 0 }, uColor: { value: new THREE.Color(0x4faad1) } }, vertexShader: EDGE_VS, fragmentShader: EDGE_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-        edges.frustumCulled = false;
-        const group = new THREE.Group(); group.add(stars, edges); world.add(group);
-        const p2 = new Float32Array(CS_N * 2), v2 = new Float32Array(CS_N * 2), t2 = new Float32Array(CS_N * 2), seed = new Float32Array(CS_N);
-        for (let i = 0; i < CS_N; i++) { p2[i * 2] = (Math.random() - 0.5) * 1.2; p2[i * 2 + 1] = (Math.random() - 0.5) * 0.9; seed[i] = Math.random(); }
-        cs = { group, stars, edges, pos: p2, vel: v2, tgt: t2, seed, fig: -1, cur: null, prev: null, curT: 0, prevA: 0, intro: 0 };
-    }
-    // a new figure: hand each node to the nearest free star, so stars travel short paths into the new pattern
-    function csSetFigure(k) {
-        const fig = FIGURES[k % FIGURES.length], used = new Set(), map = new Array(fig.pts.length);
-        fig.pts.forEach((pt, j) => {
-            let best = -1, bd = Infinity;
-            for (let i = 0; i < CS_N; i++) { if (used.has(i)) continue; const dx = cs.pos[i * 2] - pt[0], dy = cs.pos[i * 2 + 1] - pt[1], d = dx * dx + dy * dy; if (d < bd) { bd = d; best = i; } }
-            used.add(best); map[j] = best;
-        });
-        cs.prev = cs.cur; cs.prevA = cs.cur ? 1 : 0;
-        cs.cur = { fig, map }; cs.curT = 0; cs.fig = k;
-    }
-    function updateConstellations(seg, t, dt) {
-        const k = Math.round(seg); if (k !== cs.fig) csSetFigure(k);
-        cs.intro = Math.min(1, cs.intro + dt * 0.7);
-        // the group rides the helix just inside the cards, always centred behind the current view
-        const stepRad = M.degToRad(portrait ? cfg.stepPortrait : cfg.step), az = -stepRad * seg, r = cfg.radius - 1.3;
-        cs.group.position.set(r * Math.cos(az), -yStep * seg, r * Math.sin(az));
-        _look.set(cs.group.position.x * 2, cs.group.position.y, cs.group.position.z * 2); cs.group.lookAt(_look);
-        cs.group.scale.set(lastCardW * 1.3, lastCardH * 1.3, 1);
-        // targets: figure nodes for assigned stars, a slow wander for the rest; everyone keeps a little life
-        const inv = new Int8Array(CS_N).fill(-1); cs.cur.map.forEach((si, j) => inv[si] = j);
-        const alpha = cs.stars.geometry.attributes.aAlpha.array, sp = cs.stars.geometry.attributes.position.array;
-        for (let i = 0; i < CS_N; i++) {
-            const sd = cs.seed[i] * 6.28;
-            if (inv[i] >= 0) { const pt = cs.cur.fig.pts[inv[i]]; cs.tgt[i * 2] = pt[0] + 0.012 * Math.sin(t * 0.7 + sd); cs.tgt[i * 2 + 1] = pt[1] + 0.012 * Math.cos(t * 0.9 + sd * 1.3); }
-            else { const a = t * 0.12 + sd; cs.tgt[i * 2] = Math.cos(a) * 0.62; cs.tgt[i * 2 + 1] = Math.sin(a * 1.31 + sd) * 0.42; }
-            for (let c = 0; c < 2; c++) { const idx = i * 2 + c; cs.vel[idx] += (cs.tgt[idx] - cs.pos[idx]) * 6 * dt; cs.vel[idx] *= Math.exp(-4.5 * dt); cs.pos[idx] += cs.vel[idx] * dt; }
-            sp[i * 3] = cs.pos[i * 2]; sp[i * 3 + 1] = cs.pos[i * 2 + 1]; sp[i * 3 + 2] = 0;
-            alpha[i] += ((inv[i] >= 0 ? 1 : 0.3) - alpha[i]) * Math.min(1, dt * 3);
-        }
-        cs.stars.geometry.attributes.position.needsUpdate = true; cs.stars.geometry.attributes.aAlpha.needsUpdate = true;
-        cs.stars.material.uniforms.uTime.value = t; cs.stars.material.uniforms.uVis.value = cs.intro;
-        cs.stars.material.uniforms.uP.value = stage.clientHeight / (2 * Math.tan(M.degToRad(camera.fov) / 2));
-        // edges: the current figure draws in edge by edge along the moving stars; the previous figure's lines follow the stars out and fade
-        cs.curT = Math.min(1, cs.curT + dt / 1.4); cs.prevA = Math.max(0, cs.prevA - dt / 0.7);
-        const ep = cs.edges.geometry.attributes.position.array, ed = cs.edges.geometry.attributes.aD.array, ea = cs.edges.geometry.attributes.aA.array;
-        const write = (set, offset, alphaOf, limitOf) => {
-            for (let j = 0; j < CS_E; j++) {
-                const k2 = offset + j, e = set && set.fig.edges[j];
-                if (!e) { ea[k2 * 2] = ea[k2 * 2 + 1] = 0; continue; }
-                const a = set.map[e[0]], b = set.map[e[1]];
-                ep.set([cs.pos[a * 2], cs.pos[a * 2 + 1], 0, cs.pos[b * 2], cs.pos[b * 2 + 1], 0], k2 * 6);
-                ed[k2 * 2] = ed[k2 * 2 + 1] = limitOf(j); ea[k2 * 2] = ea[k2 * 2 + 1] = alphaOf(j);
-            }
-        };
-        write(cs.cur, 0, () => 1, j => Math.min(1, Math.max(0, cs.curT * (cs.cur.fig.edges.length + 1) - j)));
-        write(cs.prevA > 0 ? cs.prev : null, CS_E, () => cs.prevA, () => 1);
-        for (const name of ['position', 'aD', 'aA']) cs.edges.geometry.attributes[name].needsUpdate = true;
-        cs.edges.material.uniforms.uVis.value = cs.intro;
-    }
+    /* Constellations live in the page-wide particle layer (recruited field particles); the section only reports
+       which figure is current and where it sits on screen. FIGURES is defined at module scope. */
+    const _proj = new THREE.Vector3();
 
     function layout() {
         const w = stage.clientWidth, h = stage.clientHeight;
@@ -948,7 +944,12 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
             g.position.set(_s.x, camGroup.position.y / S + _s.y, _s.z);
         }
         if (axis) updateAxis(now, dt);
-        if (cs) updateConstellations(seg, now * 0.001, dt);
+        const srect = stage.getBoundingClientRect();
+        if (layer && cfg.constellations > 0.5 && srect.bottom > 0 && srect.top < innerHeight) {
+            const stepRad2 = M.degToRad(portrait ? cfg.stepPortrait : cfg.step), az2 = -stepRad2 * seg, rr = (cfg.radius - 1.3) * S;
+            _proj.set(rr * Math.cos(az2), -yStep * seg * S, rr * Math.sin(az2)).project(camera);   // the point just behind the current view, in this camera
+            layer.setStars(Math.round(seg), srect.left + (_proj.x * 0.5 + 0.5) * srect.width, srect.top + (0.5 - _proj.y * 0.5) * srect.height, lastCardW * S * 1.3, lastCardH * S * 1.3);
+        }
         lastNow = now;
         cssRenderer.render(cssScene, camera);
         if (gl) gl.render(glScene, camera);
@@ -985,7 +986,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
     });
 
     layout();
-    queueMicrotask(() => { buildConstellations(); applyTheme(); });
+    queueMicrotask(applyTheme);
     section.classList.toggle('is-glass', cfg.glass > 0.5);
 
     /* ---------- ?tune=1: sliders for every number, copy them out as data-attributes ---------- */
