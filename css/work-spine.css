@@ -176,3 +176,14 @@
 /* The voyage: the page-wide particle layer sits behind the page (z-index -1), so a section that paints its own ground hides
    the ship. The manifesto's ground is the page colour anyway; letting it stay transparent keeps the ship sailing under the words. */
 body:has(#ws-particles) .reader { background-color: transparent; }
+
+/* data-ship-grounds="translucent" on the section: the sections after it paint their own ground, which would hide the ship;
+   thinned to 45% they keep their tint and the ship sails behind them like everywhere else. (The alternative, "overlay",
+   flips the canvas above those sections with a screen blend, which can put bright particles over text.) */
+.work-spine[data-ship-grounds="translucent"] ~ #scalability { background: color-mix(in srgb, var(--bgStrong, #222) 45%, transparent); }
+.work-spine[data-ship-grounds="translucent"] ~ .testimonials-wrapper,
+.work-spine[data-ship-grounds="translucent"] ~ .tools,
+.work-spine[data-ship-grounds="translucent"] ~ footer { background-color: color-mix(in srgb, var(--primaryBgTint) 45%, transparent); }
+.work-spine[data-ship-grounds="translucent"] ~ .testimonials-wrapper .Wallop-list::before { background: linear-gradient(to right, color-mix(in srgb, var(--primaryBgTint) 45%, transparent), transparent 60%); }
+.work-spine[data-ship-grounds="translucent"] ~ .testimonials-wrapper .Wallop-list::after { background: linear-gradient(to left, color-mix(in srgb, var(--primaryBgTint) 45%, transparent), transparent 60%); }
+.work-spine[data-ship-grounds="translucent"] ~ .tools::before { background: linear-gradient(to right, color-mix(in srgb, var(--primaryBgTint) 45%, transparent), transparent 25%, transparent 75%, color-mix(in srgb, var(--primaryBgTint) 45%, transparent)); }

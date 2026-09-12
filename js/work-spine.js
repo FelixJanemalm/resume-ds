@@ -40,9 +40,9 @@ const pcfg = section ? {
     boatX: numAttr(section.dataset.boatX, -0.35), boatY: numAttr(section.dataset.boatY, -0.29), boatSize: numAttr(section.dataset.boatSize, 0.37),   // hero pose: waterline centre in NDC, hull length as a fraction of the visible width
     shipShare: numAttr(section.dataset.shipShare, coarse ? 0.3 : 0.2),   // share of the particles that belong to the ship
     shipEntry: numAttr(section.dataset.shipEntry, 3.2),                  // seconds the ship takes to sail into the frame on load
-    shipWorkSize: numAttr(section.dataset.shipWorkSize, 0.19), shipWorkY: numAttr(section.dataset.shipWorkY, -0.35), shipWorkTilt: numAttr(section.dataset.shipWorkTilt, 50), shipWorkHeading: numAttr(section.dataset.shipWorkHeading, -85),   // pose in the work section: seen from above, sailing down the axis below the cards, wake streaming up behind them
+    shipWorkSize: numAttr(section.dataset.shipWorkSize, 0.16), shipWorkY: numAttr(section.dataset.shipWorkY, -0.68), shipWorkTilt: numAttr(section.dataset.shipWorkTilt, 68), shipWorkHeading: numAttr(section.dataset.shipWorkHeading, -90),   // pose in the work section: seen from above in the band under the cards, sailing down the axis, wake streaming up the column (size is the on-screen hull length; it does not grow with the level here)
     shipFlap: numAttr(section.dataset.shipFlap, 1), shipRipple: numAttr(section.dataset.shipRipple, 1), shipBob: numAttr(section.dataset.shipBob, 1),   // idle motion strengths
-    shipOverlay: numAttr(section.dataset.shipOverlay, 1),   // 1: over the bottom sections (which paint their own ground) the layer moves above the page with a screen blend, so the ship reaches the harbour
+    shipGrounds: section.dataset.shipGrounds || 'overlay',   // the bottom sections paint their own ground over the layer: 'translucent' (work-spine.css thins those grounds so the ship shows through, the concept's pick) | 'overlay' (the canvas flips above the page there with a screen blend) | 'none'
 } : null;
 if (pcfg) for (const [k, v] of new URLSearchParams(location.search)) if (k in pcfg && v !== '') pcfg[k] = Number.isNaN(+v) ? v : +v;   // dev aid: ?shipWorkTilt=45&boat=off
 let layer = null;
@@ -288,35 +288,55 @@ function startParticleLayer(THREE, GPUC, BOAT) {
        value eases (smoothstep), so every keyframe is a moment of rest and the motion never overshoots. */
     const POSE_KEYS = ['x', 'y', 'size', 'heading', 'turn', 'tilt', 'heel', 'level', 'wake'];
     function keyframes() {
-        const c = pcfg, work = { x: 0, y: c.shipWorkY, size: c.shipWorkSize, heading: c.shipWorkHeading, turn: 0, tilt: c.shipWorkTilt, heel: 5, wake: 0.8 };
+        const c = pcfg, LS = (BOAT && BOAT.LEVEL_SCALE) || [1, 1, 1, 1];
+        // the work stage: top view in the band under the cards; the hull keeps one on-screen length while the ship evolves
+        const work = L => ({ x: 0, y: c.shipWorkY, size: c.shipWorkSize / LS[Math.min(3, Math.round(L))], heading: c.shipWorkHeading, turn: 0, tilt: c.shipWorkTilt, heel: 14, level: L, wake: L > 1.5 ? 1 : 0.9 });
+        const translucent = c.shipGrounds === 'translucent';
         return {
             landscape: [
-                { at: 'top', x: c.boatX, y: c.boatY, size: c.boatSize, heading: 0, turn: 35, tilt: 0, heel: 9, level: 0, wake: 0 },                       // at anchor behind the headline
-                { at: 'stage-pin-560', x: c.boatX + 0.2, y: c.boatY - 0.1, size: c.boatSize * 0.8, heading: -40, turn: 25, tilt: 30, heel: 12, level: 0.5, wake: 0.7 },   // casts off as the Work heading comes up
-                { at: 'stage-pin', ...work, level: 1 },                       // sailing down the axis of the work section, seen from above
-                { at: 'stage@0.2', ...work, level: 1 },
-                { at: 'stage@0.4', ...work, level: 2 },                       // a new part per case study
-                { at: 'stage@0.55', ...work, level: 2 },
-                { at: 'stage@0.78', ...work, level: 3 },
-                { at: 'stage-release', ...work, level: 3 },
-                { at: '#read:top@0.5', x: 0.55, y: -0.1, size: 0.17, heading: -25, turn: 28, tilt: 10, heel: 8, level: 3, wake: 0.6 },              // levels out and heads for the right margin, off the manifesto
-                { at: '#read:bottom@0.6', x: 0.78, y: -0.2, size: 0.15, heading: 0, turn: 35, tilt: 0, heel: 8, level: 3, wake: 0.4 },
-                { at: '#scalability:top@0.6', x: 0.85, y: -0.28, size: 0.09, heading: 0, turn: 35, tilt: 0, heel: 6, level: 3, wake: 0.4 },       // small and far, along the right edge past the principles and the quotes
-                { at: '.testimonials-wrapper:center@0.5', x: 0.85, y: -0.28, size: 0.09, heading: 0, turn: 38, tilt: 0, heel: 5, level: 3, wake: 0.3 },
-                { at: 'end', x: 0.85, y: -0.28, size: 0.09, heading: 0, turn: 40, tilt: 3, heel: 2, level: 3, wake: 0 },                           // moored above the harbour line
+                { at: 'top', x: c.boatX, y: c.boatY, size: c.boatSize, heading: 0, turn: 35, tilt: 0, heel: 9, level: 0, wake: 0 },              // at anchor behind the headline, bow toward the swell
+                { at: 'top+250', x: c.boatX, y: c.boatY, size: c.boatSize, heading: 0, turn: 35, tilt: 0, heel: 9, level: 0, wake: 0 },          // hold: a wheel nudge does not disturb the hero
+                { at: '#work:center@0.5', x: -0.12, y: -0.36, size: 0.3, heading: -45, turn: 20, tilt: 35, heel: 12, level: 0.5, wake: 0.7 },  // casts off under the Lottie's trailing edge, jib unfurling, bow swinging down-page
+                { at: 'stage-pin', ...work(1) },
+                { at: 'stage@0.14', ...work(1) },                                                                                              // rests while card 1 fronts
+                { at: 'stage@0.3', ...work(2) },                                                                                               // schooner: morphed in transit, done before card 2 fronts
+                { at: 'stage@0.47', ...work(2) },
+                { at: 'stage@0.63', ...work(3) },                                                                                              // tall ship, done before card 3 fronts
+                { at: 'stage@0.8', ...work(3) },
+                { at: 'stage-release', x: 0.12, y: -0.55, size: 0.13, heading: -45, turn: 10, tilt: 50, heel: 12, level: 3, wake: 0.9 },       // levels out as the stage unpins
+                { at: '#read:top@0.5', x: 0.5, y: -0.18, size: 0.16, heading: -15, turn: 28, tilt: 12, heel: 12, level: 3, wake: 1 },          // open water at the right margin: hardest heel, full sail
+                { at: '#read:bottom@0.6', x: 0.7, y: -0.25, size: 0.15, heading: -5, turn: 32, tilt: 4, heel: 10, level: 3, wake: 0.9 },
+                { at: '#scalability:top@0.6', x: 0.72, y: 0.55, size: 0.08, heading: 0, turn: -40, tilt: 8, heel: 4, level: 3, wake: 0.3 },    // horizon: stern quarter, hull-down, beside the heading
+                ...(translucent ? [
+                    { at: '.testimonials-wrapper:top@0.5', x: -0.62, y: -0.45, size: 0.2, heading: -30, turn: 70, tilt: 6, heel: -8, level: 3, wake: 0.6 },    // back around from the left, bow-on, left of the quotes
+                    { at: '.tools:top@0.85', x: -0.2, y: -0.62, size: 0.16, heading: 0, turn: 40, tilt: 3, heel: 4, level: 3, wake: 0.3 },                     // along the quay (the tools band)
+                    { at: 'end', x: -0.62, y: -0.68, size: 0.13, heading: 0, turn: 35, tilt: 3, heel: 0, level: 3, wake: 0 },                                  // landfall: moored beside the Los Angeles pin, bottom-left
+                ] : [
+                    { at: '.testimonials-wrapper:center@0.5', x: 0.85, y: -0.28, size: 0.09, heading: 0, turn: 38, tilt: 0, heel: 5, level: 3, wake: 0.3 },  // small and far along the right edge, clear of the quotes
+                    { at: 'end', x: 0.85, y: -0.28, size: 0.09, heading: 0, turn: 40, tilt: 3, heel: 2, level: 3, wake: 0 },
+                ]),
             ],
             portrait: [
-                { at: 'top', x: 0.3, y: 0.42, size: 0.5, heading: 0, turn: 35, tilt: 0, heel: 9, level: 0, wake: 0 },                      // behind the headline; the flipped Lottie covers the lower half on phones
-                { at: 'stage-pin-400', x: 0.15, y: 0.1, size: 0.45, heading: -40, turn: 25, tilt: 30, heel: 12, level: 0.5, wake: 0.7 },
-                { at: 'stage-pin', ...work, size: c.shipWorkSize * 1.8, level: 1 },
-                { at: 'stage@0.2', ...work, size: c.shipWorkSize * 1.8, level: 1 },
-                { at: 'stage@0.4', ...work, size: c.shipWorkSize * 1.8, level: 2 },
-                { at: 'stage@0.55', ...work, size: c.shipWorkSize * 1.8, level: 2 },
-                { at: 'stage@0.78', ...work, size: c.shipWorkSize * 1.8, level: 3 },
-                { at: 'stage-release', ...work, size: c.shipWorkSize * 1.8, level: 3 },
-                { at: '#read:top@0.5', x: 0.2, y: -0.55, size: 0.5, heading: -20, turn: 30, tilt: 8, heel: 8, level: 3, wake: 0.5 },
-                { at: '.testimonials-wrapper:center@0.5', x: -0.1, y: -0.5, size: 0.55, heading: 0, turn: 40, tilt: 0, heel: 8, level: 3, wake: 0.3 },
-                { at: 'end', x: 0.1, y: -0.55, size: 0.55, heading: 0, turn: 40, tilt: 4, heel: 2, level: 3, wake: 0 },
+                { at: 'top', x: 0.55, y: 0.42, size: 0.36, heading: -180, turn: 35, tilt: 0, heel: 9, level: 0, wake: 0 },                     // beside the headline, bow left toward the flipped swell (sails in from the right)
+                { at: 'top+200', x: 0.55, y: 0.42, size: 0.36, heading: -180, turn: 35, tilt: 0, heel: 9, level: 0, wake: 0 },
+                { at: '#work:center@0.5', x: 0.15, y: -0.2, size: 0.32, heading: -120, turn: 20, tilt: 35, heel: 12, level: 0.5, wake: 0.7 },  // dives down-left toward the sea, behind the picker glass
+                { at: 'stage-pin', ...work(1), y: -0.66, size: 0.3 },
+                { at: 'stage@0.14', ...work(1), y: -0.66, size: 0.3 },
+                { at: 'stage@0.3', ...work(2), y: -0.66, size: 0.24 },
+                { at: 'stage@0.47', ...work(2), y: -0.66, size: 0.24 },
+                { at: 'stage@0.63', ...work(3), y: -0.66, size: 0.2 },
+                { at: 'stage@0.8', ...work(3), y: -0.66, size: 0.2 },
+                { at: 'stage-release', x: 0.05, y: -0.62, size: 0.22, heading: -45, turn: 10, tilt: 50, heel: 12, level: 3, wake: 0.9 },
+                { at: '#read:top@0.5', x: 0.3, y: -0.62, size: 0.28, heading: -20, turn: 30, tilt: 10, heel: 16, level: 3, wake: 1 },          // below the manifesto text
+                { at: '#read:bottom@0.6', x: 0.45, y: -0.6, size: 0.26, heading: -5, turn: 32, tilt: 4, heel: 12, level: 3, wake: 0.9 },
+                { at: '#scalability:top@0.6', x: 0.6, y: 0.6, size: 0.12, heading: 0, turn: -40, tilt: 8, heel: 4, level: 3, wake: 0.3 },
+                ...(translucent ? [
+                    { at: '.testimonials-wrapper:top@0.5', x: -0.3, y: -0.55, size: 0.26, heading: -30, turn: 70, tilt: 6, heel: -8, level: 3, wake: 0.6 },
+                    { at: 'end', x: -0.3, y: -0.7, size: 0.2, heading: 0, turn: 35, tilt: 3, heel: 0, level: 3, wake: 0 },
+                ] : [
+                    { at: '.testimonials-wrapper:center@0.5', x: 0.7, y: -0.6, size: 0.14, heading: 0, turn: 38, tilt: 0, heel: 5, level: 3, wake: 0.3 },
+                    { at: 'end', x: 0.7, y: -0.6, size: 0.14, heading: 0, turn: 40, tilt: 3, heel: 2, level: 3, wake: 0 },
+                ]),
             ],
         };
     }
@@ -353,7 +373,7 @@ function startParticleLayer(THREE, GPUC, BOAT) {
             ship.resolvedAt = now;
             const src = innerHeight > innerWidth ? keyframes().portrait : keyframes().landscape;
             ship.keys = src.map(k => ({ y: resolveAt(k.at), k })).filter(e => e.y !== null).sort((a, b) => a.y - b.y);
-            const oy = pcfg.shipOverlay > 0.5 ? resolveAt('#scalability:top@0.55') : null; ship.overlayY = oy === null ? Infinity : oy;   // from the principles down: their grounds are opaque
+            const oy = pcfg.shipGrounds === 'overlay' ? resolveAt('#scalability:top@0.55') : null; ship.overlayY = oy === null ? Infinity : oy;   // from the principles down: their grounds are opaque
         }
         setOverlay(scrollY > ship.overlayY);
         const keys = ship.keys; if (!keys.length) return;
@@ -362,9 +382,9 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         const a = keys[i], b = keys[Math.min(i + 1, keys.length - 1)], f = b.y > a.y ? M.smoothstep(ship.sy, a.y, b.y) : 1;
         const P = ship.pose; for (const key of POSE_KEYS) P[key] = a.k[key] + (b.k[key] - a.k[key]) * f;
         // sailing in: on load the ship is already formed off the left edge, under way, and eases into its first pose
-        if (ship.t0 < 0) ship.t0 = now;
-        const e = Math.min(1, (now - ship.t0) / 1000 / Math.max(0.1, pcfg.shipEntry)), entry = Math.pow(1 - e, 3);
-        P.x -= entry * (P.x + 1 + P.size * 0.9);
+        if (ship.t0 < 0) { ship.t0 = now; ship.entry = scrollY < 200; }   // a page that opens already scrolled shows the ship where it is
+        const e = ship.entry ? Math.min(1, (now - ship.t0) / 1000 / Math.max(0.1, pcfg.shipEntry)) : 1, entry = Math.pow(1 - e, 3);
+        if (Math.abs(P.heading) > 90) P.x += entry * (1 + P.size * 0.9 - P.x); else P.x -= entry * (P.x + 1 + P.size * 0.9);   // bow first, from whichever edge it points away from
         P.wake = Math.max(P.wake, entry); P.heel += entry * 4;
         // idle: bob, a slow heel and yaw wander; sails flutter and the water loops in the shader, and scrolling advances the loop
         const bob = pcfg.shipBob, dScroll = Math.abs(scrollY - ship.lastScroll); ship.lastScroll = scrollY;

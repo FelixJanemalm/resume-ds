@@ -34,30 +34,34 @@ function mulberry32(seed) {
 }
 
 /* ---------------------------------------------------------------- hulls
-   B: max half-beam, c/p: plan form (max beam at length fraction c, bow fullness p), D: depth below the deck,
-   tumble: tumblehome (topsides leaning in), rake: stem rake, overhang: stern leaning out, deck(x): sheer line
-   (a parabola rising toward the ends: rockered on the dinghy, a bow-heavy sheer on the schooner, stepped aft on the tall ship). */
+   B: max half-beam, c/p: plan form (max beam at length fraction c, bow fullness p), D: depth below the sheer line,
+   tumble: tumblehome (topsides leaning in), rake: stem rake, overhang: stern leaning out, sheer(x): the base sheer line
+   (a parabola rising toward the ends: rockered on the dinghy, bow-heavy on the schooner), steps(x): raised decks above
+   the sheer (the tall ship's quarterdeck and poop); the section is measured from the sheer so the hull bottom sits on
+   the waterline along the whole length and the steps are drawn as a vertical bulwark on top. */
 const HULL = [
-    { B: 0.170, c: 0.44, p: 0.50, D: 0.100, tumble: 0.00, rake: 0.00, overhang: 0.00, deck: x => -0.305 + 0.045 * 4 * x * x },
-    { B: 0.140, c: 0.47, p: 0.50, D: 0.110, tumble: 0.00, rake: 0.02, overhang: 0.00, deck: x => -0.300 + 0.035 * 4 * x * x },
-    { B: 0.115, c: 0.48, p: 0.45, D: 0.120, tumble: 0.00, rake: 0.03, overhang: 0.01, deck: x => -0.300 + 0.030 * 4 * x * x + 0.025 * Math.max(0, 2 * x) ** 2 },
-    { B: 0.150, c: 0.44, p: 0.38, D: 0.150, tumble: 0.22, rake: 0.05, overhang: 0.04, deck: x => -0.250 + 0.025 * 4 * x * x + (x < -0.12 ? 0.035 : 0) + (x < -0.38 ? 0.035 : 0) },
+    { B: 0.170, c: 0.44, p: 0.50, D: 0.100, tumble: 0.00, rake: 0.00, overhang: 0.00, sheer: x => -0.305 + 0.050 * 4 * x * x },
+    { B: 0.140, c: 0.47, p: 0.50, D: 0.110, tumble: 0.00, rake: 0.02, overhang: 0.00, sheer: x => -0.304 + 0.033 * 4 * x * x },
+    { B: 0.115, c: 0.48, p: 0.45, D: 0.120, tumble: 0.00, rake: 0.03, overhang: 0.01, sheer: x => -0.300 + 0.030 * 4 * x * x + 0.025 * Math.max(0, 2 * x) ** 2 },
+    { B: 0.150, c: 0.44, p: 0.38, D: 0.200, tumble: 0.22, rake: 0.05, overhang: 0.04, sheer: x => -0.250 + 0.030 * 4 * x * x, steps: x => (x < -0.12 ? 0.035 : 0) + (x < -0.38 ? 0.035 : 0) },
 ];
+const deckX = (H, x) => H.sheer(x) + (H.steps ? H.steps(x) : 0);   // the deck line: the sheer plus any raised deck
 const plan = (H, u) => Math.pow(Math.max(0, 1 - Math.pow((u - H.c) / (1 - H.c), 2)), H.p);   // u: 0 stern .. 1 bow
 const halfBeam = (H, u) => H.B * plan(H, u);
 const tumble = (H, v) => 1 - H.tumble * Math.pow(Math.max(0, v - 0.35), 2) / 0.4225;             // v: 0 waterline .. 1 gunwale
 const bowness = u => Math.pow(Math.max(0, (u - 0.7) / 0.3), 2), sternness = u => Math.pow(Math.max(0, (0.3 - u) / 0.3), 2);
-const deckAt = (H, u) => H.deck(-0.5 + u);
+const deckAt = (H, u) => deckX(H, -0.5 + u);
 const hullX = (H, u, v) => -0.5 + u + H.rake * v * bowness(u) - H.overhang * v * sternness(u);
 
 // a hull point: u along the length, s = +-1 side, v = 0 at the waterline .. 1 at the gunwale, gun: on the sheer line
 function hullPt(H, u, s, v, gun) {
-    const f = plan(H, u), b = H.B * f, dy = deckAt(H, u), vis = dy - WL, d = Math.max(H.D * f + 0.02, vis * 1.02);   // the section reaches the waterline even at the ends (stem, stern post)
+    const f = plan(H, u), b = H.B * f, x0 = -0.5 + u, dy0 = H.sheer(x0), dy = deckX(H, x0);
+    const vis = dy0 - WL, d = Math.max(H.D * f + 0.02, vis * 1.02);   // depth below the sheer; the section reaches the waterline even at the ends (stem, stern post)
     if (gun) { const x = hullX(H, u, 1); return [x, dy, s * b * tumble(H, 1), shadeN([0, 1, 0])]; }
-    const thw = Math.acos(vis / d);   // the section below the waterline is not drawn
-    const th = thw + (PI / 2 - thw) * v;
-    const x = hullX(H, u, v), y = dy - d * Math.cos(th), z = s * b * Math.sin(th) * tumble(H, v);
-    const bow = x > 0.25 ? -(x - 0.25) * 1.5 : 0;
+    const x = hullX(H, u, v), bow = x > 0.25 ? -(x - 0.25) * 1.5 : 0, va = vis / (dy - WL);   // va: the fraction of the visible height taken by the rounded section
+    if (v > va) return [x, dy0 + (dy - dy0) * (v - va) / (1 - va), s * b * tumble(H, v), shadeN([bow, 0, s])];   // the bulwark of a raised deck: a vertical topside above the sheer
+    const thw = Math.acos(vis / d), th = thw + (PI / 2 - thw) * v / va;   // the section below the waterline is not drawn
+    const y = dy0 - d * Math.cos(th), z = s * b * Math.sin(th) * tumble(H, v);
     return [x, y, z, shadeN([bow, -Math.cos(th) * 0.6, s * Math.sin(th)])];
 }
 
@@ -74,7 +78,7 @@ const FA = {
         { tack: [-0.28, -0.130], clew: [-0.62, -0.110], throat: [-0.28, 0.12], peak: [-0.50, 0.22] },
     ],
     jib: [null,
-        { tack: [0.50, -0.270], clew: [0.10, -0.240], throat: [0.08, 0.40], peak: [0.08, 0.40] },
+        { tack: [0.50, -0.270], clew: [0.14, -0.240], throat: [0.18, 0.40], peak: [0.18, 0.40] },
         { tack: [0.72, -0.200], clew: [0.42, -0.180], throat: [0.21, 0.53], peak: [0.21, 0.53] },
         { tack: [0.80, -0.160], clew: [0.50, -0.120], throat: [0.27, 0.56], peak: [0.27, 0.56] },
     ],
@@ -87,7 +91,7 @@ const FA = {
         null,   // becomes the fore course (square) on the tall ship
     ],
 };
-const BETA = -28 * PI / 180, SB = Math.sin(BETA), CB = Math.cos(BETA);   // yards braced so their faces show from the front-starboard 3/4 view
+const BETA = -14 * PI / 180, SB = Math.sin(BETA), CB = Math.cos(BETA);   // yards braced a little toward the front-starboard 3/4 view; nearly square so the sails keep their area from every side
 const SQ = {   // tall ship square sails: mast x, foot y, head (yard) y, half-widths at foot and head
     foreC: { mx: 0.27, yf: -0.17, yh: 0.06, hwF: 0.19, hwH: 0.22 },
     foreT: { mx: 0.27, yf: 0.09, yh: 0.34, hwF: 0.15, hwH: 0.18 },
@@ -122,11 +126,11 @@ function sqSail(S, a, up, edgeP) {
         [a, up] = k === 0 ? [t, 0] : k === 1 ? [1, t] : k === 2 ? [1 - t, 1] : [0, 1 - t];
     }
     const y = lerp(S.yf, S.yh, up), hw = lerp(S.hwF, S.hwH, up), l = (a - 0.5) * 2 * hw;
-    const soft = Math.sqrt(1 - up), bul = 0.28 * hw * Math.sin(PI * a) * soft;
+    const soft = Math.pow(1 - up, 0.6), bul = 0.50 * hw * Math.sin(PI * a) * (0.35 + 0.65 * soft);   // a soft belly, fullest at the foot, that still shows from the side
     const x = S.mx + l * SB + bul * CB, z = l * CB - bul * SB;              // yard axis (SB,0,CB), belly normal (CB,0,-SB): +x, the wind from astern
     const tilt = Math.cos(PI * a) * soft;                                    // the viewer-facing normal (CB,0,-SB) tilts along the yard with the belly
     const shade = shadeN([0.5 * CB + SB * tilt, 0.25, -SB + CB * tilt]);
-    const flap = 0.8 * Math.pow(Math.sin(PI * a), 0.8) * Math.pow(1 - up, 0.7);
+    const flap = 0.8 * Math.pow(Math.sin(PI * a), 1.3) * Math.pow(1 - up, 0.7);   // still at the leeches
     return [x, y, z, shade, flap, a];
 }
 function sailAt(L, part, a, up, edgeP) {
@@ -139,7 +143,7 @@ function sailAt(L, part, a, up, edgeP) {
 /* ---------------------------------------------------------------- spars and rigging: line segments per level */
 const yardOf = S => { const hw = S.hwH * 1.08; return [[S.mx - hw * SB, S.yh, -hw * CB], [S.mx + hw * SB, S.yh, hw * CB]]; };
 const MAST = {   // [x, foot y, top y] per level (null = absent). mast1 is the aft mast at every level
-    mast1: [[0.12, -0.31, 0.32], [0.06, -0.30, 0.66], [-0.12, -0.30, 0.62], [-0.28, -0.21, 0.60]],
+    mast1: [[0.12, -0.31, 0.32], [0.06, -0.30, 0.66], [-0.12, -0.30, 0.62], [-0.28, -0.20, 0.60]],
     mast2: [null, null, [0.22, -0.29, 0.55], [0.27, -0.25, 0.72]],
     mast3: [null, null, null, [0.00, -0.25, 0.82]],
 };
@@ -173,7 +177,7 @@ const RIG = {   // per level: an array of segments (fixed count where present) o
     mizzenStay: [null, null, null, [[[-0.28, 0.60, 0], [0.00, 0.02, 0]]]],
     backstay: [null, [[[0.06, 0.66, 0], [-0.50, -0.268, 0]]], [[[-0.12, 0.62, 0], [-0.51, -0.272, 0]]], [[[-0.28, 0.60, 0], [-0.54, -0.160, 0]]]],
 };
-const RIG_DENSITY = { foreStay: [0, 0.45, 0.8, 1] };   // fraction of a line's particles present per level (sparser forestay on the sloop so the jib reads apart from the main)
+const RIG_DENSITY = { foreStay: [0, 0.4, 0.8, 1] };   // fraction of a line's particles present per level (sparser forestay on the sloop so the jib reads apart from the main)
 
 /* ---------------------------------------------------------------- deck */
 function deckPt(L, u, w, q) {
@@ -187,13 +191,13 @@ function deckPt(L, u, w, q) {
     if (q < 0.8) return flat();
     if (L === 1) return null;
     if (L === 2) {   // a deckhouse abaft the foremast: roof, then side and end walls
-        const x0 = -0.32, x1 = -0.02, hx = lerp(x0, x1, u), hw = halfBeam(H, hx + 0.5) * 0.6, h = 0.05, dy = H.deck(hx);
+        const x0 = -0.32, x1 = -0.02, hx = lerp(x0, x1, u), hw = halfBeam(H, hx + 0.5) * 0.6, h = 0.05, dy = deckX(H, hx);
         if (q < 0.9) return [hx, dy + h, w * hw, shadeN([0, 1, 0]) * 0.9];
         if (q < 0.95) { const s = Math.sign(w) || 1; return [hx, dy + h * Math.abs(w), s * hw, shadeN([0, 0.1, s])]; }
         const ex = u < 0.5 ? x1 : x0; return [ex, dy + h * frac(u * 2), w * hw, shadeN([u < 0.5 ? 1 : -1, 0.1, 0])];
     }
     // tall ship: the breaks of the quarterdeck and the poop are vertical faces across the deck
-    const fx = q < 0.9 ? -0.12 : -0.38, yb = H.deck(fx + 0.001), hw = halfBeam(H, fx + 0.5) * tumble(H, 1) * 0.95;
+    const fx = q < 0.9 ? -0.12 : -0.38, yb = deckX(H, fx + 0.001), hw = halfBeam(H, fx + 0.5) * tumble(H, 1) * 0.95;
     return [fx + 0.002, yb + 0.04 * frac(u * 5), w * hw, shadeN([1, 0.2, 0.3])];
 }
 
@@ -202,17 +206,17 @@ function waterPt(rand) {   // a disc of ripples around the hull: concentric ring
     let x = 0, z = 0, rr = 0, ph = 0, rip = 0;
     for (let k = 0; k < 12; k++) {
         const a = rand() * PI * 2; rr = Math.pow(rand(), 0.6); x = Math.cos(a) * rr * 1.25; z = Math.sin(a) * rr * 0.75;
-        ph = rr * 26; rip = Math.pow(0.5 + 0.5 * Math.sin(ph), 1.6);
+        ph = rr * 26; rip = Math.pow(0.5 + 0.5 * Math.sin(ph), 2.0);
         if ((x / 0.5) ** 2 + (z / 0.17) ** 2 > 1 && rand() < 0.3 + 0.7 * rip) break;   // outside the hull footprint, favouring the crests
     }
-    return { p: [x, WL - 0.008 + 0.016 * rip, z, 0.22 + 0.55 * rip], flap: 0, phase: frac(ph / (2 * PI)), aux: rr };
+    return { p: [x, WL - 0.008 + 0.016 * rip, z, 0.15 + 0.68 * rip], flap: 0, phase: frac(ph / (2 * PI)), aux: rr };
 }
 const KELVIN = Math.tan(19.5 * PI / 180);
 function wakePt(rand) {
-    const d = Math.pow(rand(), 2.2) * 1.6, f = d / 1.6, half = KELVIN * d, arm = rand() < 0.55;   // density and shade fall off with distance so the V dissolves
+    const d = 0.004 + Math.pow(rand(), 2.8) * 1.596, f = d / 1.6, half = KELVIN * d, arm = rand() < 0.55 * (1 - 0.5 * f);   // starts just abaft the stern   // density, arm share and shade fall off with distance so the V dissolves
     let z, shade;
-    if (arm) { z = (rand() < 0.5 ? -1 : 1) * half + (rand() - 0.5) * 0.012 * (1 + d); shade = 0.65 * (1 - 0.85 * f); }
-    else { z = (rand() * 2 - 1) * half * 0.85; shade = 0.34 * (1 - 0.8 * f); }
+    if (arm) { z = (rand() < 0.5 ? -1 : 1) * half + (rand() - 0.5) * (0.012 * (1 + d) + 0.02 * f); shade = 0.65 * (1 - 0.9 * f) ** 1.5; }
+    else { z = (rand() * 2 - 1) * half * 0.85; shade = 0.34 * (1 - 0.85 * f) ** 1.5; }
     return { p: [-0.5 - d, WL - 0.002 + 0.004 * Math.sin(d * 25), z, Math.max(0.05, shade)], flap: 0, phase: frac(d * 3), aux: f };
 }
 
