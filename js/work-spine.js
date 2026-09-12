@@ -42,6 +42,8 @@ const pcfg = section ? {
     shipEntry: numAttr(section.dataset.shipEntry, 3.2),                  // seconds the ship takes to sail into the frame on load
     shipWorkSize: numAttr(section.dataset.shipWorkSize, 0.16), shipWorkY: numAttr(section.dataset.shipWorkY, -0.68), shipWorkTilt: numAttr(section.dataset.shipWorkTilt, 68), shipWorkHeading: numAttr(section.dataset.shipWorkHeading, -90),   // pose in the work section: seen from above in the band under the cards, sailing down the axis, wake streaming up the column (size is the on-screen hull length; it does not grow with the level here)
     shipFlap: numAttr(section.dataset.shipFlap, 1), shipRipple: numAttr(section.dataset.shipRipple, 1), shipBob: numAttr(section.dataset.shipBob, 1),   // idle motion strengths
+    shipSettle: numAttr(section.dataset.shipSettle, 7),     // how fast ship particles take their places (per second): 7 lands a recruit in about 0.4 s
+    shipWay: numAttr(section.dataset.shipWay, 1),           // how fast the water streams past the hull under way (hull lengths per second at full wake)
     shipGrounds: section.dataset.shipGrounds || 'overlay',   // the bottom sections paint their own ground over the layer: 'translucent' (work-spine.css thins those grounds so the ship shows through, the concept's pick) | 'overlay' (the canvas flips above the page there with a screen blend) | 'none'
 } : null;
 if (pcfg) for (const [k, v] of new URLSearchParams(location.search)) if (k in pcfg && v !== '') pcfg[k] = Number.isNaN(+v) ? v : +v;   // dev aid: ?shipWorkTilt=45&boat=off
@@ -67,7 +69,7 @@ const SIM_NOISE = `
       return vec3(pz_y-py_z, px_z-pz_x, py_x-px_y)/(2.0*e); }`;
 const WATERLINE = -0.37;   // boat space: hull length 1, bow at +x, y up, z toward the viewer; the ship pivots on its waterline
 const SIM_SHARED = `
-    uniform sampler2D tBoatA, tBoatB, tMetaA, tMetaB; uniform float uMix, uForm, uScroll, uH, uBob, uBoatScale, uTime, uFlap, uRipple, uN, uStarForm, uSnap, uSnapBoat; uniform vec3 uBoat; uniform mat3 uRot; uniform vec4 uStarT[12];
+    uniform sampler2D tBoatA, tBoatB, tMetaA, tMetaB; uniform float uMix, uForm, uScroll, uH, uBob, uBoatScale, uTime, uFlap, uRipple, uFlow, uSettle, uN, uStarForm, uSnap, uSnapBoat; uniform vec3 uBoat; uniform mat3 uRot; uniform vec4 uStarT[12];
     // the first 12 particles can be recruited as constellation stars: uStarT holds their targets (xyz) and an on flag (w)
     vec4 starOf(vec2 uv){ int idx = int(floor(uv.x * uN) + floor(uv.y * uN) * uN + 0.5); vec4 st = vec4(0.0); for (int k = 0; k < 12; k++) { if (k == idx) st = uStarT[k]; } return st; }
     // where a particle is drawn: the field wraps vertically and scrolls with depth-dependent parallax; a ship particle is drawn where it is
@@ -79,10 +81,18 @@ const SIM_SHARED = `
     // a particle present at both levels morphs; one absent at A and present at B is recruited the moment uMix passes its own random
     // threshold r, so the ship grows out of the stars a few particles at a time and nothing ever hangs halfway between home and ship
     float boatFlag(vec4 a, vec4 b, float r){ float fa = step(0.01, a.w), fb = step(0.01, b.w); return fa * fb > 0.5 ? 1.0 : fb > 0.5 ? step(r, uMix) : fa > 0.5 ? step(uMix, r) : 0.0; }
+    // way on: the water is not glued to the hull. Wake points run aft from the stern and wrap back (their spread and fade follow
+    // the streamed distance), and the water lane streams under the hull, fading at its ends; uFlow is the way made in hull lengths
+    vec3 flowLocal(vec3 q, vec4 md, float role, out float fade){
+      fade = 1.0; float wake = step(6.5, role) * step(role, 7.5), water = step(5.5, role) * step(role, 6.5);
+      if (wake > 0.5) { float d0 = max(md.w, 0.03), d1 = fract(md.w + uFlow / 1.6); q.x = -0.5 - d1 * 1.6; q.z *= d1 / d0; fade = pow(1.0 - 0.9 * d1, 1.5); }
+      else if (water > 0.5) { q.x = -1.25 + mod(q.x + 1.25 - uFlow, 2.5); fade = 1.0 - smoothstep(0.85, 1.25, abs(q.x)); }
+      q.y += (wake + water) * 0.006 * sin(md.z * 6.2832 - uRipple);                              // rings travel outward, the wake streams aft
+      return q; }
     vec3 boatTarget(vec4 a, vec4 b, vec4 ma, vec4 mb){
       float m = boatMixT(a, b); vec3 q = mix(a.xyz, b.xyz, m); vec4 md = mix(ma, mb, m); float role = floor(md.x + 0.5);
       q.z += md.y * uFlap * 0.03 * sin(uTime * 3.4 + md.w * 6.0 - q.y * 5.0);                      // sail flutter: a ripple running across the chord
-      q.y += step(5.5, role) * step(role, 7.5) * 0.006 * sin(md.z * 6.2832 - uRipple);           // water rings travel outward and the wake streams aft
+      float fd; q = flowLocal(q, md, role, fd);
       q = uRot * (q - vec3(0.0, ${WATERLINE}, 0.0));                                          // uBoat is where the waterline centre sits
       return uBoat + q * uBoatScale + vec3(0.0, uBob, 0.0); }`;
 const SIM_VEL = SIM_NOISE + SIM_SHARED + `
@@ -106,7 +116,9 @@ const SIM_POS = SIM_SHARED + `
       vec4 st=starOf(uv); float sf=st.w*uStarForm;
       if (sf > 0.5 && distance(p.xyz, st.xyz) > uSnap) p.xyz = st.xyz + (p.xyz - st.xyz) * 0.12;   // a far recruit snaps most of the way instead of flying across the screen
       vec4 bA=texture2D(tBoatA,uv), bB=texture2D(tBoatB,uv);
-      if (uSnapBoat > 0.0 && boatFlag(bA,bB,w)*uForm > 0.5) { vec3 bt=boatTarget(bA,bB,texture2D(tMetaA,uv),texture2D(tMetaB,uv)); if (distance(p.xyz, bt) > uSnapBoat) p.xyz = bt + (p.xyz - bt) * 0.1; }   // on load the ship is already in place: no forming, no flight across the screen
+      if ((uSettle > 0.0 || uSnapBoat > 0.0) && boatFlag(bA,bB,w)*uForm > 0.5) { vec3 bt=boatTarget(bA,bB,texture2D(tMetaA,uv),texture2D(tMetaB,uv));
+        p.xyz = mix(p.xyz, bt, uSettle);                                                            // ship particles settle fast: the shape is there at scrolling speed, the spring and curl add the life
+        if (uSnapBoat > 0.0 && distance(p.xyz, bt) > uSnapBoat) p.xyz = bt + (p.xyz - bt) * 0.1; }   // on load the ship is already in place
       gl_FragColor=vec4(p.xyz,w); }`;
 const PTS_VS = SIM_SHARED + `
     uniform sampler2D tPos, tVel; uniform float uSize, uDPR, uP, uRadius, uIntro, uWake, uBoatPx; uniform vec3 uCam, uDir; attribute vec2 ref; attribute float aSize;
@@ -114,8 +126,9 @@ const PTS_VS = SIM_SHARED + `
     void main(){ vec4 p=texture2D(tPos,ref); vec3 v=texture2D(tVel,ref).xyz;
       vec4 bA=texture2D(tBoatA,ref), bB=texture2D(tBoatB,ref), mA=texture2D(tMetaA,ref), mB=texture2D(tMetaB,ref);
       float bf=boatFlag(bA,bB,p.w)*uForm; vBoat=bf; float m=boatMixT(bA,bB); vShade=clamp(mix(bA.w,bB.w,m),0.0,1.0); vec4 md=mix(mA,mB,m); float role=floor(md.x+0.5);
-      float water=step(5.5,role)*step(role,6.5), wake=step(6.5,role)*step(role,7.5);
-      vFade=1.0-bf*wake*(1.0-uWake*(1.0-md.w));                                         // the wake only shows under way, fading astern
+      float water=step(5.5,role)*step(role,6.5), wake=step(6.5,role)*step(role,7.5), fd;
+      flowLocal(mix(bA.xyz,bB.xyz,m), md, role, fd);
+      vFade=mix(1.0, uWake*fd, bf*wake)*mix(1.0, fd, bf*water);                         // the wake only shows under way and fades astern; the water lane fades at its ends
       vFade*=1.0-bf*(water+wake)*(0.55-0.45*sin(md.z*6.2832-uRipple));                  // rings travel outward, the wake streams aft: seen from above as moving bands
       vec4 st=starOf(ref); float sf=st.w*uStarForm; vStar=sf;
       vec3 pw=drawPos(p.xyz,max(bf,sf));
@@ -190,7 +203,7 @@ function startParticleLayer(THREE, GPUC, BOAT) {
     if (!levels.length) { const t = dataTex(new Float32Array(COUNT * 4)); levels.push({ pos: t, meta: t, scale: 1 }); }
     const starT = Array.from({ length: STAR_N }, () => new THREE.Vector4());   // shared by every material that needs the star targets
     const shipRot = new THREE.Matrix3(), shipAt = new THREE.Vector3();
-    const boatU = () => ({ tBoatA: { value: levels[0].pos }, tBoatB: { value: levels[0].pos }, tMetaA: { value: levels[0].meta }, tMetaB: { value: levels[0].meta }, uMix: { value: 0 }, uForm: { value: shipOn ? 1 : 0 }, uBob: { value: 0 }, uBoatScale: { value: 1 }, uBoat: { value: shipAt }, uRot: { value: shipRot }, uTime: { value: 0 }, uFlap: { value: pcfg.shipFlap }, uRipple: { value: 0 }, uStarT: { value: starT }, uN: { value: N }, uStarForm: { value: 0 }, uSnap: { value: 1.2 }, uSnapBoat: { value: 0.02 } });
+    const boatU = () => ({ tBoatA: { value: levels[0].pos }, tBoatB: { value: levels[0].pos }, tMetaA: { value: levels[0].meta }, tMetaB: { value: levels[0].meta }, uMix: { value: 0 }, uForm: { value: shipOn ? 1 : 0 }, uBob: { value: 0 }, uBoatScale: { value: 1 }, uBoat: { value: shipAt }, uRot: { value: shipRot }, uTime: { value: 0 }, uFlap: { value: pcfg.shipFlap }, uRipple: { value: 0 }, uFlow: { value: 0 }, uSettle: { value: 0 }, uStarT: { value: starT }, uN: { value: N }, uStarForm: { value: 0 }, uSnap: { value: 1.2 }, uSnapBoat: { value: 0.02 } });
     const velVar = gpu.addVariable('tVel', SIM_VEL, vel0), posVar = gpu.addVariable('tPos', SIM_POS, pos0);
     gpu.setVariableDependencies(velVar, [posVar, velVar]); gpu.setVariableDependencies(posVar, [posVar, velVar]);
     const velU = velVar.material.uniforms, posU = posVar.material.uniforms;
@@ -357,7 +370,7 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         }
         return M.clamp(y + off, 0, maxY);
     }
-    const ship = { sy: scrollY, keys: [], resolvedAt: -1e9, t0: -1, ripple: 0, lastScroll: scrollY, lo: -1, pose: {}, overlay: false, overlayY: Infinity, flipping: false };
+    const ship = { sy: scrollY, keys: [], resolvedAt: -1e9, t0: -1, ripple: 0, flow: 0, wind: 0, lastScroll: scrollY, lo: -1, pose: {}, overlay: false, overlayY: Infinity, flipping: false };
     const isLight = () => document.body.classList.contains('default-light') || document.body.classList.contains('default-light-colorblind');
     // the principles, testimonials, tools and footer paint an opaque ground over the layer; there the canvas moves above the page with a screen
     // blend (multiply in the light theme) behind a quick dip to black, so the voyage can end at the harbour instead of behind a wall
@@ -389,7 +402,12 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         // idle: bob, a slow heel and yaw wander; sails flutter and the water loops in the shader, and scrolling advances the loop
         const bob = pcfg.shipBob, dScroll = Math.abs(scrollY - ship.lastScroll); ship.lastScroll = scrollY;
         ship.ripple += (dt * 1.5 + dScroll * 0.01) * pcfg.shipRipple;
-        const heel = P.heel + bob * (2.5 * Math.sin(t * 0.6) + 1.2 * Math.sin(t * 1.7)), turn = P.turn + bob * 4 * Math.sin(t * 0.21), tilt = P.tilt + bob * 1.2 * Math.sin(t * 0.47);
+        // way on: scroll speed is the wind (quick to rise, slow to fall); with the pose's wake it sets how fast the water streams past the hull
+        const wt = Math.min(1, dScroll / Math.max(dt, 1e-3) / 1500);
+        ship.wind += (wt - ship.wind) * Math.min(1, dt / (wt > ship.wind ? 0.25 : 1.4));
+        const way = Math.max(P.wake, ship.wind);
+        ship.flow += dt * (0.08 + 1.5 * way) * pcfg.shipWay;
+        const heel = P.heel + 4 * ship.wind + bob * (2.5 * Math.sin(t * 0.6) + 1.2 * Math.sin(t * 1.7)), turn = P.turn + bob * 4 * Math.sin(t * 0.21), tilt = P.tilt + bob * 1.2 * Math.sin(t * 0.47);
         // evolution: the two level textures around the fractional level, mixed in the shader
         const L = M.clamp(P.level, 0, levels.length - 1), lo = Math.min(levels.length - 1, Math.floor(L)), hi = Math.min(levels.length - 1, lo + 1), mix = L - lo;
         if (lo !== ship.lo) { ship.lo = lo; for (const u of [velU, posU, U]) { u.tBoatA.value = levels[lo].pos; u.tMetaA.value = levels[lo].meta; u.tBoatB.value = levels[hi].pos; u.tMetaB.value = levels[hi].meta; } }
@@ -399,8 +417,9 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         shipRot.setFromMatrix4(_m4.makeRotationFromQuaternion(_qa));
         shipAt.set(P.x * visW / 2, P.y * visH / 2, 0);
         const snap = now - ship.t0 < 700 ? 0.02 : 0;
-        for (const u of [velU, posU, U]) { u.uMix.value = mix; u.uBoatScale.value = scale; u.uBob.value = bob * 0.012 * scale * Math.sin(t * 0.8); u.uTime.value = t; u.uRipple.value = ship.ripple; u.uFlap.value = pcfg.shipFlap; u.uSnapBoat.value = snap; }
-        U.uWake.value = P.wake; U.uBoatPx.value = M.clamp(0.6 + 0.25 * scale, 1.0, 2.2);   // a bigger ship is sparser: bigger dots
+        const settle = 1 - Math.exp(-dt * pcfg.shipSettle);
+        for (const u of [velU, posU, U]) { u.uMix.value = mix; u.uBoatScale.value = scale; u.uBob.value = bob * 0.012 * scale * Math.sin(t * 0.8); u.uTime.value = t; u.uRipple.value = ship.ripple; u.uFlow.value = ship.flow; u.uSettle.value = settle; u.uFlap.value = pcfg.shipFlap * (1 + 0.6 * ship.wind); u.uSnapBoat.value = snap; }
+        U.uWake.value = way; U.uBoatPx.value = M.clamp(0.6 + 0.25 * scale, 1.0, 2.2);   // a bigger ship is sparser: bigger dots
     }
     resize();
     function applyTheme() {
@@ -637,7 +656,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         const velVar = gpu.addVariable('tVel', SIM_VEL, vel0), posVar = gpu.addVariable('tPos', SIM_POS, pos0);
         gpu.setVariableDependencies(velVar, [posVar, velVar]); gpu.setVariableDependencies(posVar, [posVar, velVar]);
         const velU = velVar.material.uniforms, posU = posVar.material.uniforms;
-        const noBoat = () => ({ tBoatA: { value: home }, tBoatB: { value: home }, tMetaA: { value: home }, tMetaB: { value: home }, uMix: { value: 0 }, uForm: { value: 0 }, uBob: { value: 0 }, uBoatScale: { value: 1 }, uBoat: { value: new THREE.Vector3() }, uRot: { value: new THREE.Matrix3() }, uTime: { value: 0 }, uFlap: { value: 0 }, uRipple: { value: 0 }, uStarT: { value: Array.from({ length: 12 }, () => new THREE.Vector4()) }, uN: { value: N }, uStarForm: { value: 0 }, uSnap: { value: 1.2 }, uSnapBoat: { value: 0 } });
+        const noBoat = () => ({ tBoatA: { value: home }, tBoatB: { value: home }, tMetaA: { value: home }, tMetaB: { value: home }, uMix: { value: 0 }, uForm: { value: 0 }, uBob: { value: 0 }, uBoatScale: { value: 1 }, uBoat: { value: new THREE.Vector3() }, uRot: { value: new THREE.Matrix3() }, uTime: { value: 0 }, uFlap: { value: 0 }, uRipple: { value: 0 }, uFlow: { value: 0 }, uSettle: { value: 0 }, uStarT: { value: Array.from({ length: 12 }, () => new THREE.Vector4()) }, uN: { value: N }, uStarForm: { value: 0 }, uSnap: { value: 1.2 }, uSnapBoat: { value: 0 } });
         Object.assign(velU, { tHome: { value: home }, uDelta: { value: 0 }, uCurl: { value: cfg.pCurl }, uReturn: { value: cfg.pReturn }, uDamp: { value: cfg.pDamp }, uPull: { value: cfg.pPull }, uRadius: { value: cfg.pRadius }, uScroll: { value: 0 }, uH: { value: 1e5 }, uCam: { value: new THREE.Vector3() }, uDir: { value: new THREE.Vector3(0, 0, -1) } }, noBoat());
         Object.assign(posU, { tHome: { value: home }, uDelta: { value: 0 } }, noBoat());
         const err = gpu.init(); if (err) throw new Error(err);
@@ -1111,6 +1130,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
             ['boatX', 'ship: hero x (ndc)', -1, 1, 0.01], ['boatY', 'ship: hero y (ndc)', -1, 1, 0.01], ['boatSize', 'ship: hero size', 0.05, 0.6, 0.005],
             ['shipWorkSize', 'ship: size in work', 0.06, 0.5, 0.005], ['shipWorkY', 'ship: y in work (ndc)', -1, 1, 0.01], ['shipWorkTilt', 'ship: tilt in work (deg)', 0, 90, 1], ['shipWorkHeading', 'ship: heading in work', -180, 180, 5],
             ['shipEntry', 'ship: sail-in (s)', 0.5, 8, 0.1], ['shipFlap', 'ship: sail flutter', 0, 3, 0.05], ['shipRipple', 'ship: ripples', 0, 3, 0.05], ['shipBob', 'ship: bob', 0, 3, 0.05],
+            ['shipSettle', 'ship: settle speed (/s)', 1, 20, 0.5], ['shipWay', 'ship: water flow', 0, 3, 0.05],
             ['spineScale', 'spine scale', 0.4, 1.8, 0.02], ['spineSpacing', 'vertebra gap', 0.3, 1.2, 0.01], ['spineTwist', 'vertebra twist', 0, 1, 0.01],
         ];
         const el = document.createElement('div');
