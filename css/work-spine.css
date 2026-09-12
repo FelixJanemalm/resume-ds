@@ -172,3 +172,7 @@
 }
 .work-spine.is-glass .ws-card .teaser-body { background: transparent; }
 .work-spine.is-glass .ws-card .teaser-visual { opacity: 0.92; }
+
+/* The voyage: the page-wide particle layer sits behind the page (z-index -1), so a section that paints its own ground hides
+   the ship. The manifesto's ground is the page colour anyway; letting it stay transparent keeps the ship sailing under the words. */
+body:has(#ws-particles) .reader { background-color: transparent; }
