@@ -43,6 +43,10 @@ const pcfg = section ? {
     shipWorkSize: numAttr(section.dataset.shipWorkSize, 0.16), shipWorkY: numAttr(section.dataset.shipWorkY, -0.68), shipWorkTilt: numAttr(section.dataset.shipWorkTilt, 68), shipWorkHeading: numAttr(section.dataset.shipWorkHeading, -90),   // pose in the work section: seen from above in the band under the cards, sailing down the axis, wake streaming up the column (size is the on-screen hull length; it does not grow with the level here)
     shipFlap: numAttr(section.dataset.shipFlap, 1), shipRipple: numAttr(section.dataset.shipRipple, 1), shipBob: numAttr(section.dataset.shipBob, 1),   // idle motion strengths
     shipSettle: numAttr(section.dataset.shipSettle, 7),     // how fast ship particles take their places (per second): 7 lands a recruit in about 0.4 s
+    shipLag: numAttr(section.dataset.shipLag, 0.9), shipLagPos: numAttr(section.dataset.shipLagPos, 0.6), shipLagSize: numAttr(section.dataset.shipLagSize, 0.8),   // seconds the drawn pose takes to close 95% of a scroll jump: angles / position (x, y, wake) / framing (size and level share one lag so the hull length holds while the ship evolves)
+    shipLead: numAttr(section.dataset.shipLead, 140),                    // px of scroll the bow looks ahead along the track, so it turns before the track bends
+    shipYaw: numAttr(section.dataset.shipYaw, 25), shipYawMix: numAttr(section.dataset.shipYawMix, 0.6), shipYawSpeed: numAttr(section.dataset.shipYawSpeed, 0.35),   // motion-led heading: cap (deg from the keyframe heading), share of the track direction blended in at full speed, screen speed (viewport heights per second) that counts as full
+    shipLean: numAttr(section.dataset.shipLean, 0.04),                   // banking: deg of heel per deg/s of turn, capped at 5 (negative carves into the turn instead)
     shipWay: numAttr(section.dataset.shipWay, 1),           // how fast the water streams past the hull under way (hull lengths per second at full wake)
     shipGrounds: section.dataset.shipGrounds || 'overlay',   // the bottom sections paint their own ground over the layer: 'translucent' (work-spine.css thins those grounds so the ship shows through, the concept's pick) | 'overlay' (the canvas flips above the page there with a screen blend) | 'none'
 } : null;
@@ -332,7 +336,9 @@ function startParticleLayer(THREE, GPUC, BOAT) {
        Pose: x, y centre (NDC), size (hull length as a fraction of the visible width), heading (deg on screen: 0 bow to the right,
        -90 bow down the page), turn (deg, bow toward the viewer), tilt (deg: 0 seen from the side, 90 from straight above),
        heel (deg), level (0 dinghy, 1 sloop, 2 schooner, 3 tall ship), wake (0 at rest .. 1 under way). Between keyframes each
-       value eases (smoothstep), so every keyframe is a moment of rest and the motion never overshoots. */
+       value follows a monotone cubic (holds stay flat, nothing overshoots, velocity is continuous through every key), and the
+       drawn pose trails that target through a critically damped follower (pcfg.shipLag*), so a fast scroll parks the target
+       ahead and the ship catches up over about a second, like a camera operator following a mark. */
     const POSE_KEYS = ['x', 'y', 'size', 'heading', 'turn', 'tilt', 'heel', 'level', 'wake'];
     function keyframes() {
         const c = pcfg, LS = (BOAT && BOAT.LEVEL_SCALE) || [1, 1, 1, 1];
@@ -342,17 +348,22 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         return {
             landscape: [
                 { at: 'top', x: c.boatX, y: c.boatY, size: c.boatSize, heading: 0, turn: 35, tilt: 0, heel: 9, level: 0, wake: 0 },              // at anchor behind the headline, bow toward the swell
-                { at: 'top+250', x: c.boatX, y: c.boatY, size: c.boatSize, heading: 0, turn: 35, tilt: 0, heel: 9, level: 0, wake: 0 },          // hold: a wheel nudge does not disturb the hero
-                { at: '#work:center@0.5', x: -0.12, y: -0.36, size: 0.3, heading: -45, turn: 20, tilt: 35, heel: 12, level: 0.5, wake: 0.7 },  // casts off under the Lottie's trailing edge, jib unfurling, bow swinging down-page
-                { at: 'stage-pin', ...work(1) },
+                { at: 'top+120', x: c.boatX, y: c.boatY, size: c.boatSize, heading: 0, turn: 35, tilt: 0, heel: 9, level: 0, wake: 0 },          // hold: the cubic leaves a hold with zero velocity, so a wheel nudge does not disturb the hero
+                { at: '#work:center@0.66', x: c.boatX + 0.04, y: c.boatY - 0.01, size: c.boatSize - 0.01, heading: -8, turn: 33, tilt: 8, heel: 10, level: 0.15, wake: 0.35 },   // slips the mooring: barely moved, bow dipping, the view beginning to lift
+                { at: '#work:center@0.5', x: -0.12, y: -0.36, size: 0.3, heading: -40, turn: 22, tilt: 32, heel: 12, level: 0.5, wake: 0.7 },  // casts off under the Lottie's trailing edge, jib unfurling, bow swinging down-page
+                { at: '#work:center@0.25', x: -0.04, y: -0.52, size: 0.22, heading: -68, turn: 8, tilt: 54, heel: 13, level: 0.8, wake: 0.85 }, // three-quarters over: mostly from above already
+                { at: 'stage-pin', ...work(1), y: c.shipWorkY + 0.02, heading: c.shipWorkHeading + 6, tilt: c.shipWorkTilt - 6, turn: 2 },      // arrives in the band still finishing the turn
+                { at: 'stage@0.06', ...work(1) },                                                                                              // overhead view complete just after the pin
                 { at: 'stage@0.14', ...work(1) },                                                                                              // rests while card 1 fronts
                 { at: 'stage@0.3', ...work(2) },                                                                                               // schooner: morphed in transit, done before card 2 fronts
                 { at: 'stage@0.47', ...work(2) },
                 { at: 'stage@0.63', ...work(3) },                                                                                              // tall ship, done before card 3 fronts
                 { at: 'stage@0.8', ...work(3) },
-                { at: 'stage-release', x: 0.12, y: -0.55, size: 0.13, heading: -45, turn: 10, tilt: 50, heel: 12, level: 3, wake: 0.9 },       // levels out as the stage unpins
+                { at: 'stage@0.92', ...work(3), x: 0.03, y: c.shipWorkY + 0.03, heading: c.shipWorkHeading + 12, tilt: c.shipWorkTilt - 5, turn: 4, heel: 13 },   // weighs anchor before the stage lets go: no dead stop at the release
+                { at: 'stage-release', x: 0.1, y: -0.58, size: 0.12, heading: -58, turn: 9, tilt: 54, heel: 12, level: 3, wake: 0.95 },        // mid-turn as the stage unpins
+                { at: '#read:top@0.82', x: 0.25, y: -0.45, size: 0.14, heading: -38, turn: 17, tilt: 38, heel: 13, level: 3, wake: 1 },        // the view comes back down to the water
                 { at: '#read:top@0.5', x: 0.5, y: -0.18, size: 0.16, heading: -15, turn: 28, tilt: 12, heel: 12, level: 3, wake: 1 },          // open water at the right margin: hardest heel, full sail
-                { at: '#read:bottom@0.6', x: 0.7, y: -0.25, size: 0.15, heading: -5, turn: 32, tilt: 4, heel: 10, level: 3, wake: 0.9 },
+                { at: '#read:bottom@1.0', x: 0.7, y: -0.25, size: 0.15, heading: -5, turn: 32, tilt: 4, heel: 10, level: 3, wake: 0.9 },       // (bottom@0.6 was the same scroll as the horizon key: read's bottom is scalability's top, and it popped)
                 { at: '#scalability:top@0.6', x: 0.72, y: 0.55, size: 0.08, heading: 0, turn: -40, tilt: 8, heel: 4, level: 3, wake: 0.3 },    // horizon: stern quarter, hull-down, beside the heading
                 ...(translucent ? [
                     { at: '.testimonials-wrapper:top@0.5', x: -0.62, y: -0.45, size: 0.2, heading: -30, turn: 70, tilt: 6, heel: -8, level: 3, wake: 0.6 },    // back around from the left, bow-on, left of the quotes
@@ -365,17 +376,22 @@ function startParticleLayer(THREE, GPUC, BOAT) {
             ],
             portrait: [
                 { at: 'top', x: 0.55, y: 0.42, size: 0.36, heading: -180, turn: 35, tilt: 0, heel: 9, level: 0, wake: 0 },                     // beside the headline, bow left toward the flipped swell (sails in from the right)
-                { at: 'top+200', x: 0.55, y: 0.42, size: 0.36, heading: -180, turn: 35, tilt: 0, heel: 9, level: 0, wake: 0 },
-                { at: '#work:center@0.5', x: 0.15, y: -0.2, size: 0.32, heading: -120, turn: 20, tilt: 35, heel: 12, level: 0.5, wake: 0.7 },  // dives down-left toward the sea, behind the picker glass
-                { at: 'stage-pin', ...work(1), y: -0.66, size: 0.3 },
+                { at: 'top+100', x: 0.55, y: 0.42, size: 0.36, heading: -180, turn: 35, tilt: 0, heel: 9, level: 0, wake: 0 },
+                { at: '#work:center@0.66', x: 0.5, y: 0.38, size: 0.35, heading: -172, turn: 33, tilt: 8, heel: 10, level: 0.15, wake: 0.35 },
+                { at: '#work:center@0.5', x: 0.15, y: -0.2, size: 0.32, heading: -125, turn: 22, tilt: 32, heel: 12, level: 0.5, wake: 0.7 },  // dives down-left toward the sea, behind the picker glass
+                { at: '#work:center@0.25', x: 0.05, y: -0.45, size: 0.3, heading: -102, turn: 8, tilt: 54, heel: 13, level: 0.8, wake: 0.85 },
+                { at: 'stage-pin', ...work(1), y: -0.64, size: 0.3, heading: c.shipWorkHeading - 6, tilt: c.shipWorkTilt - 6, turn: 2 },       // portrait approaches -90 from -180, so it is still short here
+                { at: 'stage@0.06', ...work(1), y: -0.66, size: 0.3 },
                 { at: 'stage@0.14', ...work(1), y: -0.66, size: 0.3 },
                 { at: 'stage@0.3', ...work(2), y: -0.66, size: 0.24 },
                 { at: 'stage@0.47', ...work(2), y: -0.66, size: 0.24 },
                 { at: 'stage@0.63', ...work(3), y: -0.66, size: 0.2 },
                 { at: 'stage@0.8', ...work(3), y: -0.66, size: 0.2 },
-                { at: 'stage-release', x: 0.05, y: -0.62, size: 0.22, heading: -45, turn: 10, tilt: 50, heel: 12, level: 3, wake: 0.9 },
+                { at: 'stage@0.92', ...work(3), x: 0.02, y: -0.64, size: 0.2, heading: c.shipWorkHeading + 12, tilt: c.shipWorkTilt - 5, turn: 4, heel: 13 },
+                { at: 'stage-release', x: 0.05, y: -0.62, size: 0.22, heading: -58, turn: 9, tilt: 54, heel: 12, level: 3, wake: 0.95 },
+                { at: '#read:top@0.82', x: 0.18, y: -0.62, size: 0.25, heading: -40, turn: 18, tilt: 34, heel: 14, level: 3, wake: 1 },
                 { at: '#read:top@0.5', x: 0.3, y: -0.62, size: 0.28, heading: -20, turn: 30, tilt: 10, heel: 16, level: 3, wake: 1 },          // below the manifesto text
-                { at: '#read:bottom@0.6', x: 0.45, y: -0.6, size: 0.26, heading: -5, turn: 32, tilt: 4, heel: 12, level: 3, wake: 0.9 },
+                { at: '#read:bottom@1.0', x: 0.45, y: -0.6, size: 0.26, heading: -5, turn: 32, tilt: 4, heel: 12, level: 3, wake: 0.9 },
                 { at: '#scalability:top@0.6', x: 0.6, y: 0.6, size: 0.12, heading: 0, turn: -40, tilt: 8, heel: 4, level: 3, wake: 0.3 },
                 ...(translucent ? [
                     { at: '.testimonials-wrapper:top@0.5', x: -0.3, y: -0.55, size: 0.26, heading: -30, turn: 70, tilt: 6, heel: -8, level: 3, wake: 0.6 },
@@ -404,7 +420,50 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         }
         return M.clamp(y + off, 0, maxY);
     }
-    const ship = { sy: scrollY, keys: [], resolvedAt: -1e9, t0: -1, ripple: 0, flow: 0, wind: 0, lastScroll: scrollY, lo: -1, pose: {}, overlay: false, overlayY: Infinity, flipping: false };
+    const ship = { sy: scrollY, keys: [], resolvedAt: -1e9, t0: -1, ripple: 0, flow: 0, wind: 0, lastScroll: scrollY, lo: -1, pose: {}, follow: null, overlay: false, overlayY: Infinity, flipping: false };
+    /* Pose evaluation. Scroll -> target pose: a monotone cubic (Fritsch-Butland tangents) through the keyframes. A value only moves
+       inside segments whose two keys differ, so holds stay perfectly flat and nothing overshoots, yet velocity is continuous through
+       every keyframe: positions travel on arcs and the angles never stop dead at a key. Tangents are prepared once per resolve. */
+    function prepKeys(keys) {
+        for (let i = 0; i < keys.length; i++) {
+            const m = keys[i].m = {}, a = keys[i - 1], b = keys[i], c = keys[i + 1];
+            for (const key of POSE_KEYS) {
+                let t = 0;
+                if (a && c) {
+                    const h0 = b.y - a.y, h1 = c.y - b.y, d0 = h0 > 0 ? (b.k[key] - a.k[key]) / h0 : 0, d1 = h1 > 0 ? (c.k[key] - b.k[key]) / h1 : 0;
+                    if (d0 * d1 > 0) { const w0 = 2 * h1 + h0, w1 = h1 + 2 * h0; t = (w0 + w1) / (w0 / d0 + w1 / d1); }   // weighted harmonic mean: bounded by the smaller slope, hence monotone; zero at any hold or extremum
+                }
+                m[key] = t;   // value per scroll px
+            }
+        }
+    }
+    const segAt = s => { const keys = ship.keys; let i = 0; while (i < keys.length - 2 && s >= keys[i + 1].y) i++; return i; };
+    function poseAt(s, out) {   // the keyframe pose at scroll s (cubic Hermite per property)
+        const keys = ship.keys, i = segAt(s), a = keys[i], b = keys[Math.min(i + 1, keys.length - 1)], h = b.y - a.y;
+        const u = h > 0 ? M.clamp((s - a.y) / h, 0, 1) : 1, u2 = u * u, u3 = u2 * u;
+        const h00 = 2 * u3 - 3 * u2 + 1, h10 = (u3 - 2 * u2 + u) * h, h11 = (u3 - u2) * h;
+        for (const key of POSE_KEYS) out[key] = h00 * a.k[key] + h10 * a.m[key] + (1 - h00) * b.k[key] + h11 * b.m[key];
+        return out;
+    }
+    function trackDir(s) {   // direction of the track on screen at scroll s (deg, heading convention: 0 right, -90 down the page); NaN where the track rests
+        const keys = ship.keys, i = segAt(s), a = keys[i], b = keys[Math.min(i + 1, keys.length - 1)], h = b.y - a.y;
+        if (!(h > 0)) return NaN;
+        const u = M.clamp((s - a.y) / h, 0, 1), u2 = u * u, d00 = 6 * u2 - 6 * u, d10 = (3 * u2 - 4 * u + 1) * h, d11 = (3 * u2 - 2 * u) * h;
+        const tx = (d00 * (a.k.x - b.k.x) + d10 * a.m.x + d11 * b.m.x) * visW, ty = (d00 * (a.k.y - b.k.y) + d10 * a.m.y + d11 * b.m.y) * visH;   // aspect-correct
+        return tx * tx + ty * ty > 1e-10 ? Math.atan2(ty, tx) * 180 / Math.PI : NaN;
+    }
+    /* Target -> drawn pose: a critically damped follower per channel. It closes 95% of a jump in `lag` seconds, trails a moving
+       target by about 0.4 lag, and is clamped so it can never pass the mark. Angles are followed on their plain continuous values
+       (the key table never wraps), so there is no seam at 180. */
+    function follow(f, key, target, lag, dt) {
+        const w = 4.7 / Math.max(0.05, lag), x = w * dt, ex = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+        const d = f.p[key] - target, tmp = (f.v[key] + w * d) * dt;
+        let v = (f.v[key] - w * tmp) * ex, out = target + (d + tmp) * ex;
+        if ((d < 0) === (out > target)) { out = target; v = 0; }   // never past the mark
+        f.v[key] = v; f.p[key] = out;
+    }
+    const LAG_OF = { x: 'shipLagPos', y: 'shipLagPos', wake: 'shipLagPos', size: 'shipLagSize', level: 'shipLagSize', heading: 'shipLag', turn: 'shipLag', tilt: 'shipLag', heel: 'shipLag' };
+    const _tgt = {};
     const isLight = () => document.body.classList.contains('default-light') || document.body.classList.contains('default-light-colorblind');
     // the principles, testimonials, tools and footer paint an opaque ground over the layer; there the canvas moves above the page with a screen
     // blend (multiply in the light theme) behind a quick dip to black, so the voyage can end at the harbour instead of behind a wall
@@ -420,14 +479,23 @@ function startParticleLayer(THREE, GPUC, BOAT) {
             ship.resolvedAt = now;
             const src = innerHeight > innerWidth ? keyframes().portrait : keyframes().landscape;
             ship.keys = src.map(k => ({ y: resolveAt(k.at), k })).filter(e => e.y !== null).sort((a, b) => a.y - b.y);
+            prepKeys(ship.keys);
             const oy = pcfg.shipGrounds === 'overlay' ? resolveAt('#scalability:top@0.55') : null; ship.overlayY = oy === null ? Infinity : oy;   // from the principles down: their grounds are opaque
         }
         setOverlay(scrollY > ship.overlayY);
-        const keys = ship.keys; if (!keys.length) return;
-        ship.sy += (scrollY - ship.sy) * Math.min(1, dt * 10);
-        let i = 0; while (i < keys.length - 2 && ship.sy >= keys[i + 1].y) i++;
-        const a = keys[i], b = keys[Math.min(i + 1, keys.length - 1)], f = b.y > a.y ? M.smoothstep(ship.sy, a.y, b.y) : 1;
-        const P = ship.pose; for (const key of POSE_KEYS) P[key] = a.k[key] + (b.k[key] - a.k[key]) * f;
+        if (!ship.keys.length) return;
+        ship.sy = scrollY;   // scroll is the timeline; the follower below supplies all of the time smoothing
+        const T = poseAt(ship.sy, _tgt), F = ship.follow || (ship.follow = { p: { ...T }, v: Object.fromEntries(POSE_KEYS.map(k => [k, 0])), yaw: 0 });   // first frame: snap
+        // motion-led heading: the bow leans toward the direction the track takes a little further on (a lead), by a share that grows
+        // with the ship's actual screen speed. The tangent end nearest the authored heading is used, so scrolling up is a plain reversal.
+        const dir = trackDir(ship.sy + pcfg.shipLead);
+        if (dir === dir) { let dv = ((dir - T.heading) % 360 + 540) % 360 - 180; if (dv > 90) dv -= 180; else if (dv < -90) dv += 180; F.yaw = dv; }   // deg in (-90, 90]; kept while the lead point rests
+        const speed = Math.hypot(F.v.x * visW, F.v.y * visH) / (2 * visH);   // viewport heights per second, from the follower's own velocity: exactly zero at rest, so no low-speed noise
+        T.heading += M.clamp(pcfg.shipYawMix * M.smoothstep(speed, 0.12 * pcfg.shipYawSpeed, pcfg.shipYawSpeed) * F.yaw, -pcfg.shipYaw, pcfg.shipYaw);
+        for (const key of POSE_KEYS) follow(F, key, T[key], pcfg[LAG_OF[key]], dt);
+        const P = ship.pose; for (const key of POSE_KEYS) P[key] = F.p[key];
+        // banking: heel with the rate of turn (positive leans out of the turn like a displacement hull), mostly once seen from above
+        P.heel += M.clamp(pcfg.shipLean * F.v.heading, -5, 5) * (0.35 + 0.65 * M.clamp(P.tilt / 60, 0, 1));
         // sailing in: on load the ship is already formed off the left edge, under way, and eases into its first pose
         if (ship.t0 < 0) { ship.t0 = now; ship.entry = scrollY < 200; }   // a page that opens already scrolled shows the ship where it is
         const e = ship.entry ? Math.min(1, (now - ship.t0) / 1000 / Math.max(0.1, pcfg.shipEntry)) : 1, entry = Math.pow(1 - e, 3);
@@ -1165,6 +1233,8 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
             ['shipWorkSize', 'ship: size in work', 0.06, 0.5, 0.005], ['shipWorkY', 'ship: y in work (ndc)', -1, 1, 0.01], ['shipWorkTilt', 'ship: tilt in work (deg)', 0, 90, 1], ['shipWorkHeading', 'ship: heading in work', -180, 180, 5],
             ['shipEntry', 'ship: sail-in (s)', 0.5, 8, 0.1], ['shipFlap', 'ship: sail flutter', 0, 3, 0.05], ['shipRipple', 'ship: ripples', 0, 3, 0.05], ['shipBob', 'ship: bob', 0, 3, 0.05],
             ['shipSettle', 'ship: settle speed (/s)', 1, 20, 0.5], ['shipWay', 'ship: water flow', 0, 3, 0.05],
+            ['shipLag', 'ship: lag angles (s)', 0.1, 2.5, 0.05], ['shipLagPos', 'ship: lag position (s)', 0.1, 2.5, 0.05], ['shipLagSize', 'ship: lag framing (s)', 0.1, 2.5, 0.05],
+            ['shipLead', 'ship: bow lead (px)', 0, 400, 10], ['shipYaw', 'ship: yaw cap (deg)', 0, 60, 1], ['shipYawMix', 'ship: yaw mix', 0, 1, 0.05], ['shipYawSpeed', 'ship: yaw full at (vh/s)', 0.05, 1, 0.01], ['shipLean', 'ship: lean (deg per deg/s)', -0.2, 0.2, 0.005],
             ['spineScale', 'spine scale', 0.4, 1.8, 0.02], ['spineSpacing', 'vertebra gap', 0.3, 1.2, 0.01], ['spineTwist', 'vertebra twist', 0, 1, 0.01],
         ];
         const el = document.createElement('div');
