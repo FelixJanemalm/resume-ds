@@ -36,7 +36,7 @@ const SHIP = [
     { B: 0.078, f0: 0.055, fEnd: 0.240, post: 0.200, mast: 0.86, sailW: 0.64, sailH: 0.58, rooms: 17, shields: 2, oars: 24, head: 1.3, tail: 1.15, vane: 1, stripes: 12 },
 ];
 const SHROUD_PAIRS = [1, 1, 2, 2, 3, 3], SHROUD_X = [-0.07, -0.13, -0.19];
-const HULL_PRES = [0.5, 0.65, 0.78, 0.88, 0.95, 1];
+const HULL_PRES = [1, 1, 1, 1, 1, 1];   // every particle belongs to the ship at every level (a part that is absent hosts on one that exists), so the small boats are as dense as the big ones
 const SH_N = 26;                                                       // shield slots per side, u = 0.14 .. 0.86
 const YARD_A = [-0.5, 0, -0.866], SAIL_N = [0.866, 0, -0.5];            // the yard braced -30 deg (a reach): wide from the hero's course (turn 145), half width from the side; the shader fills / luffs along SQUARE_NORMAL
 export const SQUARE_NORMAL = SAIL_N;
@@ -129,7 +129,7 @@ function sailPt(S, s, up, edge) {
 }
 
 /* ---------------------------------------------------------------- allocation */
-const ROLE_W = [[ROLE.HULL, 0.20], [ROLE.DECK, 0.13], [ROLE.SAIL, 0.22], [ROLE.SPAR, 0.14], [ROLE.RIGGING, 0.07], [ROLE.WATER, 0.11], [ROLE.WAKE, 0.09], [ROLE.REFLECTION, 0.04]];
+const ROLE_W = [[ROLE.HULL, 0.18], [ROLE.DECK, 0.12], [ROLE.SAIL, 0.22], [ROLE.SPAR, 0.12], [ROLE.RIGGING, 0.06], [ROLE.WATER, 0.14], [ROLE.WAKE, 0.08], [ROLE.REFLECTION, 0.08]];
 const PARTS = {
     [ROLE.HULL]: { body: 0.86, posts: 0.14 },
     [ROLE.DECK]: { bench: 0.2, mastfish: 0.03, steer: 0.05, shields: 0.5, head: 0.14, tail: 0.05, vane: 0.03 },
@@ -170,10 +170,11 @@ export function buildBoatLevels(count, seed = 1) {
             case 'bench': return L => benchPt(SHIP[L], a, (b - 0.5) * 2, (c - 0.5) * 0.008);
             case 'mastfish': return L => mastFishPt(SHIP[L], a, b, c);
             case 'steer': return L => steerPt(SHIP[L], a, b, (c - 0.5) * 2);
-            case 'shields': { const i = Math.floor(a * SH_N), ang = b * 2 * PI; return L => shieldPt(SHIP[L], L, i, sgn, c, ang, d); }
-            case 'head': { const kind = a < 0.12 ? 1 : a < 0.22 ? 2 : 0; return L => headPt(SHIP[L], L, b, (c - 0.5) * 2, (d - 0.5) * 2, kind); }
-            case 'tail': return L => tailPt(SHIP[L], a, (b - 0.5) * 2, (c - 0.5) * 2);
-            case 'vane': return L => vanePt(SHIP[L], a, b, c < 0.35);
+            // fittings that a level lacks host on its benches, so the particle count on the ship never drops
+            case 'shields': { const i = Math.floor(a * SH_N), ang = b * 2 * PI; return L => shieldPt(SHIP[L], L, i, sgn, c, ang, d) || benchPt(SHIP[L], d, (b - 0.5) * 2, (c - 0.5) * 0.008); }
+            case 'head': { const kind = a < 0.12 ? 1 : a < 0.22 ? 2 : 0; return L => headPt(SHIP[L], L, b, (c - 0.5) * 2, (d - 0.5) * 2, kind) || benchPt(SHIP[L], b, (c - 0.5) * 2, (d - 0.5) * 0.008); }
+            case 'tail': return L => tailPt(SHIP[L], a, (b - 0.5) * 2, (c - 0.5) * 2) || benchPt(SHIP[L], a, (b - 0.5) * 2, (c - 0.5) * 0.008);
+            case 'vane': return L => vanePt(SHIP[L], a, b, c < 0.35) || benchPt(SHIP[L], a, (b - 0.5) * 2, (c - 0.5) * 0.008);
         }
         return () => null;
     };
@@ -182,13 +183,13 @@ export function buildBoatLevels(count, seed = 1) {
         switch (part) {
             case 'mast': return L => mastPt(SHIP[L], t, a, b);
             case 'yard': return L => yardPt(SHIP[L], t, a, b);
-            case 'oars': return L => oarPt(SHIP[L], k, sgn, t, w);
+            case 'oars': return L => oarPt(SHIP[L], k, sgn, t, w) || mastPt(SHIP[L], t, a, b);   // an oar the level lacks hosts on the mast
         }
         return () => null;
     };
     const genRig = part => {
         const t = rand(), jj = [j() * 0.004, j() * 0.004, j() * 0.004], jIdx = Math.floor(rand() * 3), sgn = rand() < 0.5 ? -1 : 1;
-        return L => { const seg = rigSeg(SHIP[L], L, part, jIdx, sgn); if (!seg) return null; const [A, B] = seg; return [lerp(A[0], B[0], t) + jj[0], lerp(A[1], B[1], t) + jj[1], lerp(A[2], B[2], t) + jj[2], 0.55]; };
+        return L => { const seg = rigSeg(SHIP[L], L, part, jIdx, sgn) || rigSeg(SHIP[L], L, 'forestay', 0, sgn); if (!seg) return null; const [A, B] = seg; return [lerp(A[0], B[0], t) + jj[0], lerp(A[1], B[1], t) + jj[1], lerp(A[2], B[2], t) + jj[2], 0.55]; };   // a line the level lacks hosts on the forestay
     };
     const genSail = () => { const s = rand(), r = rand(), up = 1 - Math.pow(r, 0.85), edge = rand() < 0.06 && (s < 0.03 || s > 0.97 || up < 0.03 || up > 0.97); return L => sailPt(SHIP[L], s, up, edge); };
     const genRefl = () => {

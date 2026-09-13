@@ -321,7 +321,7 @@ function deckPt(L, u, w, q) {
     for (const [f, wt] of FIT[L]) { d -= wt; if (d <= 0) return f(u, w); }
     return FIT[L][FIT[L].length - 1][0](u, w);
 }
-const HULL_PRES = [0.48, 0.68, 0.80, 0.90, 0.95, 1], DECK_PRES = [0.45, 0.68, 0.80, 0.90, 0.95, 1];   // the share of hull / deck particles present per level
+const HULL_PRES = [1, 1, 1, 1, 1, 1], DECK_PRES = [1, 1, 1, 1, 1, 1];   // every particle belongs to the ship at every level: the small boats are as dense as the big ones (a part a level lacks hosts on one it has, see the generators)
 
 /* ---------------------------------------------------------------- water and wake (shared by all levels) */
 export function waterPt(rand) {   // a disc of ripples around the hull: concentric rings (phase = ring position), denser, brighter and a little higher on the crests
@@ -346,7 +346,7 @@ export function wakePt(rand) {
 const SAIL_W = { main: 520, mizzen: 330, jib: 260, stay: 220, flying: 180, jib4: 120, topA: 380, topB: 150, foreG: 260, foreR: 170, mainC: 560, mainT: 400, mainG: 280, mainR: 180, mainSky: 100, mizG: 200, mizR: 130 };
 const SPAR_W = { mastA: 120, mastB: 110, mastC: 120, boomA: 45, gaffA: 40, boomB: 35, gaffB: 30, bowsprit: 55, yard_foreG: 32, yard_mainC: 40, yard_mainT: 36, yard_mainG: 32, yard_foreR: 24, yard_mainR: 26, yard_mainSky: 18, yard_mizT: 32, yard_mizG: 26, yard_mizR: 20 };
 const RIG_W = { shroudsA: 130, shroudsB: 110, shroudsC: 130, ratA: 190, ratB: 150, ratC: 200, foreStay: 60, jibStay: 50, flyingStay: 45, jib4Stay: 35, stays: 80, backstay: 50, backstays: 90, running: 100, braces: 170, footropes: 110 };
-const ROLE_W = [[ROLE.HULL, 0.19], [ROLE.DECK, 0.06], [ROLE.SAIL, 0.35], [ROLE.SPAR, 0.05], [ROLE.RIGGING, 0.09], [ROLE.WATER, 0.11], [ROLE.WAKE, 0.09], [ROLE.REFLECTION, 0.06]];
+const ROLE_W = [[ROLE.HULL, 0.18], [ROLE.DECK, 0.05], [ROLE.SAIL, 0.30], [ROLE.SPAR, 0.05], [ROLE.RIGGING, 0.08], [ROLE.WATER, 0.15], [ROLE.WAKE, 0.08], [ROLE.REFLECTION, 0.11]];   // the Sept-10 sailboat's mix: sails, water and the reflection carry most of the dots
 const PARTS = { [ROLE.SAIL]: SAIL_W, [ROLE.SPAR]: SPAR_W, [ROLE.RIGGING]: RIG_W };
 
 function slots(count) {   // [{role, part, n}] whose n sum to count exactly
@@ -440,16 +440,17 @@ export function buildBoatLevels(count, seed = 1) {
     const genSail = part => {
         const edgeP = rand() < 0.22 ? rand() : null, a = rand(), r = rand();
         const up = TRI_PARTS.has(part) ? 1 - Math.pow(r, 0.65) : SAILS[part].some(E => E && E.tack) ? 1 - Math.pow(r, 0.85) : r;   // fore-and-aft sails are fuller at the foot
-        return L => sailAt(L, part, a, up, edgeP);
+        const hq = rand();   // a sail the level lacks hosts its particles on the main (a third of them on the jib once there is one), so the cloth flows from sail to sail as the ship evolves
+        return L => sailAt(L, part, a, up, edgeP) || (hq < 0.35 ? sailAt(L, 'jib', a, up, edgeP) : null) || sailAt(L, 'main', a, up, edgeP);
     };
     const genDeck = () => { const u = rand(), w = rand() * 2 - 1, q = rand(), q2 = rand(); return L => q2 >= DECK_PRES[L] ? null : deckPt(L, u, w, q); };
     const genSpar = part => {
         const t = rand(), jx = (rand() - 0.5) * 0.01, jz = (rand() - 0.5) * 0.006, sh = SPAR_SHADE(part);
-        return L => { const S = SPAR[part][L]; if (!S) return null; const P = lerp3(S[0], S[1], t); return [P[0] + jx, P[1], P[2] + jz, sh]; };
+        return L => { const S = SPAR[part][L] || SPAR.mastA[L]; if (!S) return null; const P = lerp3(S[0], S[1], t); return [P[0] + jx, P[1], P[2] + jz, sh]; };   // a spar the level lacks hosts on the fore mast
     };
     const genRig = part => {
         const q = rand(), t = rand(), jx = (rand() - 0.5) * 0.005, jy = (rand() - 0.5) * 0.005, dq = rand(), dens = RIG_DENSITY[part], sh = RIG_SHADE(part);
-        return L => { const segs = RIG[part][L]; if (!segs || (dens && dq >= dens[L])) return null; const S = segs[Math.min(segs.length - 1, Math.floor(q * segs.length))]; if (!S) return null; const P = lerp3(S[0], S[1], t); return [P[0] + jx, P[1] + jy, P[2], sh]; };
+        return L => { let segs = RIG[part][L]; if (!segs || (dens && dq >= dens[L])) segs = RIG.shroudsA[L] || (SPAR.mastA[L] && [SPAR.mastA[L]]); if (!segs) return null; const S = segs[Math.min(segs.length - 1, Math.floor(q * segs.length))]; if (!S) return null; const P = lerp3(S[0], S[1], t); return [P[0] + jx, P[1] + jy, P[2], sh]; };   // a line the level lacks hosts on the fore shrouds, or the mast on the skiff
     };
     const genRefl = () => {
         const src = rand() < 0.65 ? genSail(pickWeighted(SAIL_W, rand())) : genHull();
