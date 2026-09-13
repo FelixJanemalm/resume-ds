@@ -18,6 +18,14 @@ export function mountRouteEditor(api) {
     const esc = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
     const normalise = l => l.map((w, i) => { const o = { at: String(w.at) }; for (const [k, min, max] of FIELDS) { const v = Number(w[k]); o[k] = Number.isFinite(v) ? clamp(v, min, max) : (k === 'cam' ? 0.5 : 0); } return o; });   // stored lists may predate a field or carry junk
+    const NLEV = Math.max(1, (api.levels && api.levels()) || 4) - 1; FIELDS[6][2] = NLEV;   // the level slider spans the module's levels
+    // the levers: the dynamics and camera settings the layer reads every frame (data-ship-* / data-boat-* attributes on the section)
+    const LEVERS = [
+        ['sea', [['shipSwell', 'swell height', 0, 4, 0.05], ['shipSwellDir', 'swell direction (deg)', 0, 180, 5], ['shipWave', 'bow wave height', 0, 3, 0.05], ['shipSpray', 'spray', 0, 3, 0.05], ['shipFoam', 'foam', 0, 3, 0.05], ['shipWay', 'water flow', 0, 3, 0.05], ['shipRipple', 'rest rings', 0, 3, 0.05]]],
+        ['ship', [['shipHeelWind', 'wind heel (deg)', 0, 25, 0.5], ['shipBob', 'motion (pitch/heave/roll)', 0, 3, 0.05], ['shipFlap', 'sail flutter', 0, 3, 0.05], ['shipSettle', 'settle speed (/s)', 1, 20, 0.5], ['shipLean', 'banking (deg per deg/s)', -0.2, 0.2, 0.005]]],
+        ['camera', [['shipLag', 'lag angles (s)', 0.1, 2.5, 0.05], ['shipLagPos', 'lag position (s)', 0.1, 2.5, 0.05], ['shipLagSize', 'lag framing (s)', 0.1, 2.5, 0.05], ['shipSoftStart', 'soft start', 0.05, 1, 0.05], ['shipEntry', 'ride-in (s)', 0.5, 8, 0.1], ['shipLottie', 'swell parallax', 0, 0.6, 0.05]]],
+        ['framing', [['boatX', 'hero x (ndc)', -1, 1, 0.01], ['boatY', 'hero y (ndc)', -1, 1, 0.01], ['boatSize', 'hero size', 0.05, 0.6, 0.005], ['shipWorkY', 'work y (ndc)', -1, 1, 0.01], ['shipWorkSize', 'work size', 0.06, 0.5, 0.005], ['shipWorkTilt', 'work tilt (deg)', 0, 90, 1]]],
+    ];
     let orientation = api.orientation(), list = normalise(api.tables()[orientation]);
     let selected = 0, overlayOn = true, saveTimer = 0, dragging = -1;
     function save() { clearTimeout(saveTimer); saveTimer = setTimeout(() => { api.set(orientation, normalise(list)); drawOverlay(); updateMarks(); }, 120); }
@@ -29,6 +37,9 @@ export function mountRouteEditor(api) {
     const B = 'position:static;display:inline-block;margin:0;height:auto;width:auto;line-height:1.3;font:inherit;text-transform:none;letter-spacing:0;box-shadow:none;transform:none;padding:4px 8px;border:1px solid rgba(255,255,255,.25);background:none;color:inherit;border-radius:6px;cursor:pointer';
     panel.innerHTML = `<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px"><b data-title style="letter-spacing:.08em;text-transform:uppercase;flex:1">route · ${orientation}</b>
         <button type="button" data-a="copy" style="${B}">Copy JSON</button><button type="button" data-a="reset" style="${B}">Reset</button><button type="button" data-a="overlay" style="${B}">Overlay</button></div>
+        <details style="margin:0 0 8px"><summary style="cursor:pointer;color:#9aa4b2">levers · sea, ship, camera, framing</summary>
+            <div data-levers style="margin-top:6px">${(api.params ? LEVERS : []).map(([grp, rows]) => `<div style="margin:6px 0 2px;letter-spacing:.08em;text-transform:uppercase;color:#9aa4b2">${grp}</div>` + rows.map(([k, l, min, max, st]) => `<label style="display:grid;grid-template-columns:1fr 96px 46px;gap:6px;align-items:center;margin:2px 0"><span>${l}</span><input type="range" data-p="${k}" min="${min}" max="${max}" step="${st}" value="${esc(api.params()[k])}" style="width:96px"><output style="text-align:right">${esc(api.params()[k])}</output></label>`).join('')).join('')}
+            <button type="button" data-a="attrs" style="${B};margin-top:6px">Copy levers as data-attributes</button></div></details>
         <div data-rows></div>
         <div style="display:flex;gap:6px;margin-top:8px"><button type="button" data-a="add" style="${B}">+ waypoint after selected</button><button type="button" data-a="del" style="${B}">× delete selected</button></div>
         <textarea readonly rows="3" data-out style="width:100%;box-sizing:border-box;margin-top:8px;font:11px/1.35 ui-monospace,Menlo,monospace;background:rgba(0,0,0,.35);color:#cfd6df;border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:6px" placeholder="Copy JSON puts the waypoints here (and on the clipboard) for baking into work-spine.js"></textarea>
@@ -55,6 +66,7 @@ export function mountRouteEditor(api) {
         });
     }
     panel.addEventListener('input', e => {
+        if (e.target.dataset.p) { api.setParam(e.target.dataset.p, +e.target.value); e.target.nextElementSibling.value = e.target.value; return; }   // a lever: applied live, kept for this page load; copy them out as attributes to keep
         const row = e.target.closest('[data-i]'); if (!row) return; const i = +row.dataset.i, w = list[i];
         if (e.target.dataset.k) { w[e.target.dataset.k] = +e.target.value; e.target.nextElementSibling.value = e.target.value; }
         else if (e.target.hasAttribute('data-at')) w.at = e.target.value;
@@ -62,6 +74,7 @@ export function mountRouteEditor(api) {
     });
     panel.addEventListener('click', e => {
         const a = e.target.dataset.a;
+        if (a === 'attrs') { out.value = api.attrs(LEVERS.flatMap(g => g[1].map(r => r[0]))); out.select(); navigator.clipboard?.writeText(out.value).catch(() => {}); return; }
         if (a === 'copy') { out.value = JSON.stringify(normalise(list), null, 1); out.select(); navigator.clipboard?.writeText(out.value).catch(() => {}); return; }
         if (a === 'reset') { clearTimeout(saveTimer); api.reset(); list = normalise(api.defaults()[orientation]); selected = 0; renderRows(); drawOverlay(); return; }
         if (a === 'overlay') { overlayOn = !overlayOn; svg.style.display = overlayOn ? 'block' : 'none'; return; }

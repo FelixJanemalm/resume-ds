@@ -349,9 +349,10 @@ function startParticleLayer(THREE, GPUC, BOAT) {
     }
     const levels = [];
     let hullWL = null;
+    const LEVEL_HEEL = (shipOn && BOAT.LEVEL_HEEL) || [0.58, 1.0, 1.3, 1.1], LEVEL_PIVOT = (shipOn && BOAT.LEVEL_PIVOT) || [-0.03, -0.02, -0.01, -0.04];   // per level; the four-level module predates these exports
     if (shipOn) {
         const built = BOAT.buildBoatLevels(boatCount, 1);
-        tagSailBellies(built, boatCount);
+        if (!BOAT.LEVEL_HEEL) tagSailBellies(built, boatCount);   // the six-level module bakes the sail bellies itself
         hullWL = measureHull(built, boatCount);
         for (let L = 0; L < BOAT.LEVELS.length; L++) {
             const pos = new Float32Array(COUNT * 4), meta = new Float32Array(COUNT * 4);
@@ -480,62 +481,64 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         return base;
     }
     function keyframeTables() {
-        const c = pcfg, LS = (BOAT && BOAT.LEVEL_SCALE) || [1, 1, 1, 1];
+        const c = pcfg, LS = (BOAT && BOAT.LEVEL_SCALE) || [1, 1, 1, 1], NL = LS.length;
+        // the evolution marks along the route: a level per case study, the finale in open water (with a four-level module the last two coincide)
+        const L1 = Math.min(1, NL - 1), L2 = Math.min(2, NL - 1), L3 = Math.min(3, NL - 1), L4 = Math.min(4, NL - 1), L5 = NL - 1;
         // the work stage: seen from above in the column, bow down the page; the hull keeps one on-screen length while the ship evolves
-        const work = (L, y) => ({ x: 0, y: y === undefined ? c.shipWorkY : y, size: c.shipWorkSize / LS[Math.min(3, Math.round(L))], turn: 90, tilt: c.shipWorkTilt, heel: 9, level: L, wake: L > 1.5 ? 1 : 0.9, cam: 1 });
+        const work = (L, y) => ({ x: 0, y: y === undefined ? c.shipWorkY : y, size: c.shipWorkSize / LS[Math.min(NL - 1, Math.round(L))], turn: 90, tilt: c.shipWorkTilt, heel: 9, level: L, wake: L > 1.5 ? 1 : 0.9, cam: 1 });
         const translucent = c.shipGrounds === 'translucent';
         return {
             landscape: [
                 { at: 'top', x: c.boatX, y: c.boatY, size: c.boatSize, turn: 145, tilt: 0, heel: 9, level: 0, wake: 0, cam: 0 },                         // at the foot of the swell, bow toward the headline
-                { at: '#work:center@0.72', x: c.boatX - 0.05, y: c.boatY - 0.06, size: c.boatSize - 0.01, turn: 135, tilt: 6, heel: 10, level: 0.1, wake: 0.35, cam: 0.2 },   // gathers way, bearing away toward the viewer
-                { at: '#work:center@0.5', x: c.boatX - 0.02, y: c.boatY - 0.18, size: 0.31, turn: 110, tilt: 24, heel: 12, level: 0.4, wake: 0.65, cam: 0.3 },              // the camera starts to crane up over the stern
-                { at: '#work:center@0.25', x: c.boatX + 0.15, y: c.boatY - 0.21, size: 0.24, turn: 92, tilt: 50, heel: 12, level: 0.75, wake: 0.85, cam: 0.5 },             // three-quarters over, sliding into the column
-                { at: 'stage-pin', ...work(1, c.shipWorkY - 0.06), x: -0.03, tilt: c.shipWorkTilt - 4, heel: 9, cam: 0.8 },                                                 // arrives in the column still finishing the turn
-                { at: 'stage@0.06', ...work(1) },                                                                                                                             // overhead view complete just after the pin
-                { at: 'stage@0.14', ...work(1) },                                                                                                                             // rests while card 1 fronts
-                { at: 'stage@0.3', ...work(2) },                                                                                                                              // schooner: morphed in transit, done before card 2 fronts
-                { at: 'stage@0.47', ...work(2) },
-                { at: 'stage@0.63', ...work(3) },                                                                                                                             // tall ship, done before card 3 fronts
-                { at: 'stage@0.8', ...work(3) },
-                { at: 'stage@0.92', ...work(3), x: 0.03, y: c.shipWorkY + 0.02, turn: 84, tilt: c.shipWorkTilt - 5, heel: 11, cam: 0.8 },                                  // weighs anchor before the stage lets go
-                { at: 'stage-release', x: 0.12, y: -0.36, size: 0.12, turn: 70, tilt: 50, heel: 12, level: 3, wake: 0.95, cam: 0.6 },                                       // the camera comes back down
-                { at: '#read:top@0.82', x: 0.27, y: -0.3, size: 0.14, turn: 45, tilt: 36, heel: 10, level: 3, wake: 1, cam: 0.5 },
-                { at: '#read:top@0.5', x: 0.5, y: -0.18, size: 0.16, turn: 30, tilt: 12, heel: 7, level: 3, wake: 1, cam: 0.3 },                                             // open water at the right margin: full sail
-                { at: '#read:bottom@1.0', x: 0.7, y: -0.25, size: 0.15, turn: 32, tilt: 4, heel: 6, level: 3, wake: 0.9, cam: 0.3 },
-                { at: '#scalability:top@0.6', x: 0.72, y: 0.55, size: 0.08, turn: -40, tilt: 8, heel: 4, level: 3, wake: 0.3, cam: 0 },                                     // horizon: stern quarter, hull-down, beside the heading
+                { at: '#work:center@0.72', x: c.boatX - 0.05, y: c.boatY - 0.06, size: c.boatSize - 0.01, turn: 135, tilt: 6, heel: 10, level: 0.1 * L1, wake: 0.35, cam: 0.2 },   // gathers way, bearing away toward the viewer
+                { at: '#work:center@0.5', x: c.boatX - 0.02, y: c.boatY - 0.18, size: 0.31, turn: 110, tilt: 24, heel: 12, level: 0.4 * L1, wake: 0.65, cam: 0.3 },              // the camera starts to crane up over the stern
+                { at: '#work:center@0.25', x: c.boatX + 0.15, y: c.boatY - 0.21, size: 0.24, turn: 92, tilt: 50, heel: 12, level: 0.75 * L1, wake: 0.85, cam: 0.5 },             // three-quarters over, sliding into the column
+                { at: 'stage-pin', ...work(L1, c.shipWorkY - 0.06), x: -0.03, tilt: c.shipWorkTilt - 4, heel: 9, cam: 0.8 },                                                 // arrives in the column still finishing the turn
+                { at: 'stage@0.06', ...work(L1) },                                                                                                                            // overhead view complete just after the pin
+                { at: 'stage@0.14', ...work(L1) },                                                                                                                            // rests while card 1 fronts
+                { at: 'stage@0.3', ...work(L2) },                                                                                                                             // a level up, morphed in transit, done before card 2 fronts
+                { at: 'stage@0.47', ...work(L2) },
+                { at: 'stage@0.63', ...work(L3) },                                                                                                                            // done before card 3 fronts
+                { at: 'stage@0.8', ...work(L3) },
+                { at: 'stage@0.92', ...work(L4), x: 0.03, y: c.shipWorkY + 0.02, turn: 84, tilt: c.shipWorkTilt - 5, heel: 11, cam: 0.8 },                                    // the fourth port                                  // weighs anchor before the stage lets go
+                { at: 'stage-release', x: 0.12, y: -0.36, size: 0.12, turn: 70, tilt: 50, heel: 12, level: L4, wake: 0.95, cam: 0.6 },                                       // the camera comes back down
+                { at: '#read:top@0.82', x: 0.27, y: -0.3, size: 0.14, turn: 45, tilt: 36, heel: 10, level: L4, wake: 1, cam: 0.5 },
+                { at: '#read:top@0.5', x: 0.5, y: -0.18, size: 0.16, turn: 30, tilt: 12, heel: 7, level: L5, wake: 1, cam: 0.3 },                                             // open water at the right margin: full sail
+                { at: '#read:bottom@1.0', x: 0.7, y: -0.25, size: 0.15, turn: 32, tilt: 4, heel: 6, level: L5, wake: 0.9, cam: 0.3 },
+                { at: '#scalability:top@0.6', x: 0.72, y: 0.55, size: 0.08, turn: -40, tilt: 8, heel: 4, level: L5, wake: 0.3, cam: 0 },                                     // horizon: stern quarter, hull-down, beside the heading
                 ...(translucent ? [
-                    { at: '.testimonials-wrapper:top@0.5', x: -0.62, y: -0.45, size: 0.2, turn: 42, tilt: 6, heel: -8, level: 3, wake: 0.6, cam: 0.3 },                     // back around from the left, a stern quarter, left of the quotes
-                    { at: '.tools:top@0.85', x: -0.2, y: -0.66, size: 0.16, turn: 38, tilt: 3, heel: 4, level: 3, wake: 0.3, cam: 0.3 },                                    // along the quay (the tools band)
-                    { at: 'end', x: -0.62, y: -0.8, size: 0.13, turn: 35, tilt: 3, heel: 0, level: 3, wake: 0, cam: 0 },                                                    // landfall: moored beside the Los Angeles pin, in the footer
+                    { at: '.testimonials-wrapper:top@0.5', x: -0.62, y: -0.45, size: 0.2, turn: 42, tilt: 6, heel: -8, level: L5, wake: 0.6, cam: 0.3 },                     // back around from the left, a stern quarter, left of the quotes
+                    { at: '.tools:top@0.85', x: -0.2, y: -0.66, size: 0.16, turn: 38, tilt: 3, heel: 4, level: L5, wake: 0.3, cam: 0.3 },                                    // along the quay (the tools band)
+                    { at: 'end', x: -0.62, y: -0.8, size: 0.13, turn: 35, tilt: 3, heel: 0, level: L5, wake: 0, cam: 0 },                                                    // landfall: moored beside the Los Angeles pin, in the footer
                 ] : [
-                    { at: '.testimonials-wrapper:center@0.5', x: 0.85, y: -0.28, size: 0.09, turn: 38, tilt: 0, heel: 5, level: 3, wake: 0.3, cam: 0.3 },                   // small and far along the right edge, clear of the quotes
-                    { at: 'end', x: 0.85, y: -0.28, size: 0.09, turn: 40, tilt: 3, heel: 2, level: 3, wake: 0, cam: 0 },
+                    { at: '.testimonials-wrapper:center@0.5', x: 0.85, y: -0.28, size: 0.09, turn: 38, tilt: 0, heel: 5, level: L5, wake: 0.3, cam: 0.3 },                   // small and far along the right edge, clear of the quotes
+                    { at: 'end', x: 0.85, y: -0.28, size: 0.09, turn: 40, tilt: 3, heel: 2, level: L5, wake: 0, cam: 0 },
                 ]),
             ],
             portrait: [
                 { at: 'top', x: 0.4, y: -0.8, size: 0.3, turn: 35, tilt: 0, heel: 9, level: 0, wake: 0, cam: 0 },                                                            // resting on the swell at the bottom-left, bow right (rides in from the left)
-                { at: '#work:center@0.72', x: 0.32, y: -0.78, size: 0.3, turn: 55, tilt: 6, heel: 10, level: 0.1, wake: 0.35, cam: 0.2 },
-                { at: '#work:center@0.5', x: 0.15, y: -0.7, size: 0.3, turn: 80, tilt: 24, heel: 12, level: 0.4, wake: 0.65, cam: 0.3 },                                      // turns toward the viewer and dives down the page
-                { at: '#work:center@0.25', x: 0.05, y: -0.6, size: 0.28, turn: 90, tilt: 50, heel: 12, level: 0.75, wake: 0.85, cam: 0.5 },
-                { at: 'stage-pin', ...work(1, -0.55), size: 0.3, tilt: c.shipWorkTilt - 4, cam: 0.8 },
-                { at: 'stage@0.06', ...work(1, -0.5), size: 0.3 },
-                { at: 'stage@0.14', ...work(1, -0.5), size: 0.3 },
-                { at: 'stage@0.3', ...work(2, -0.5), size: 0.24 },
-                { at: 'stage@0.47', ...work(2, -0.5), size: 0.24 },
-                { at: 'stage@0.63', ...work(3, -0.5), size: 0.2 },
-                { at: 'stage@0.8', ...work(3, -0.5), size: 0.2 },
-                { at: 'stage@0.92', ...work(3, -0.48), x: 0.02, size: 0.2, turn: 84, tilt: c.shipWorkTilt - 5, cam: 0.8 },
-                { at: 'stage-release', x: 0.05, y: -0.55, size: 0.22, turn: 70, tilt: 50, heel: 12, level: 3, wake: 0.95, cam: 0.6 },
-                { at: '#read:top@0.82', x: 0.18, y: -0.6, size: 0.25, turn: 45, tilt: 34, heel: 9, level: 3, wake: 1, cam: 0.5 },
-                { at: '#read:top@0.5', x: 0.3, y: -0.62, size: 0.28, turn: 30, tilt: 10, heel: 11, level: 3, wake: 1, cam: 0.3 },                                            // below the manifesto text
-                { at: '#read:bottom@1.0', x: 0.45, y: -0.6, size: 0.26, turn: 32, tilt: 4, heel: 7, level: 3, wake: 0.9, cam: 0.3 },
-                { at: '#scalability:top@0.6', x: 0.6, y: 0.6, size: 0.12, turn: -40, tilt: 8, heel: 4, level: 3, wake: 0.3, cam: 0 },
+                { at: '#work:center@0.72', x: 0.32, y: -0.78, size: 0.3, turn: 55, tilt: 6, heel: 10, level: 0.1 * L1, wake: 0.35, cam: 0.2 },
+                { at: '#work:center@0.5', x: 0.15, y: -0.7, size: 0.3, turn: 80, tilt: 24, heel: 12, level: 0.4 * L1, wake: 0.65, cam: 0.3 },                                      // turns toward the viewer and dives down the page
+                { at: '#work:center@0.25', x: 0.05, y: -0.6, size: 0.28, turn: 90, tilt: 50, heel: 12, level: 0.75 * L1, wake: 0.85, cam: 0.5 },
+                { at: 'stage-pin', ...work(L1, -0.55), size: 0.3, tilt: c.shipWorkTilt - 4, cam: 0.8 },
+                { at: 'stage@0.06', ...work(L1, -0.5), size: 0.3 },
+                { at: 'stage@0.14', ...work(L1, -0.5), size: 0.3 },
+                { at: 'stage@0.3', ...work(L2, -0.5), size: 0.24 },
+                { at: 'stage@0.47', ...work(L2, -0.5), size: 0.24 },
+                { at: 'stage@0.63', ...work(L3, -0.5), size: 0.2 },
+                { at: 'stage@0.8', ...work(L3, -0.5), size: 0.2 },
+                { at: 'stage@0.92', ...work(L4, -0.48), x: 0.02, size: 0.2, turn: 84, tilt: c.shipWorkTilt - 5, cam: 0.8 },
+                { at: 'stage-release', x: 0.05, y: -0.55, size: 0.22, turn: 70, tilt: 50, heel: 12, level: L4, wake: 0.95, cam: 0.6 },
+                { at: '#read:top@0.82', x: 0.18, y: -0.6, size: 0.25, turn: 45, tilt: 34, heel: 9, level: L4, wake: 1, cam: 0.5 },
+                { at: '#read:top@0.5', x: 0.3, y: -0.62, size: 0.28, turn: 30, tilt: 10, heel: 11, level: L5, wake: 1, cam: 0.3 },                                            // below the manifesto text
+                { at: '#read:bottom@1.0', x: 0.45, y: -0.6, size: 0.26, turn: 32, tilt: 4, heel: 7, level: L5, wake: 0.9, cam: 0.3 },
+                { at: '#scalability:top@0.6', x: 0.6, y: 0.6, size: 0.12, turn: -40, tilt: 8, heel: 4, level: L5, wake: 0.3, cam: 0 },
                 ...(translucent ? [
-                    { at: '.testimonials-wrapper:top@0.5', x: -0.3, y: -0.55, size: 0.26, turn: 42, tilt: 6, heel: -8, level: 3, wake: 0.6, cam: 0.3 },
-                    { at: 'end', x: -0.3, y: -0.7, size: 0.2, turn: 35, tilt: 3, heel: 0, level: 3, wake: 0, cam: 0 },
+                    { at: '.testimonials-wrapper:top@0.5', x: -0.3, y: -0.55, size: 0.26, turn: 42, tilt: 6, heel: -8, level: L5, wake: 0.6, cam: 0.3 },
+                    { at: 'end', x: -0.3, y: -0.7, size: 0.2, turn: 35, tilt: 3, heel: 0, level: L5, wake: 0, cam: 0 },
                 ] : [
-                    { at: '.testimonials-wrapper:center@0.5', x: 0.7, y: -0.6, size: 0.14, turn: 38, tilt: 0, heel: 5, level: 3, wake: 0.3, cam: 0.3 },
-                    { at: 'end', x: 0.7, y: -0.6, size: 0.14, turn: 40, tilt: 3, heel: 2, level: 3, wake: 0, cam: 0 },
+                    { at: '.testimonials-wrapper:center@0.5', x: 0.7, y: -0.6, size: 0.14, turn: 38, tilt: 0, heel: 5, level: L5, wake: 0.3, cam: 0.3 },
+                    { at: 'end', x: 0.7, y: -0.6, size: 0.14, turn: 40, tilt: 3, heel: 2, level: L5, wake: 0, cam: 0 },
                 ]),
             ],
         };
@@ -819,14 +822,15 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         const L = M.clamp(P.level, 0, levels.length - 1), lo = Math.min(levels.length - 1, Math.floor(L)), hi = Math.min(levels.length - 1, lo + 1), mix = L - lo;
         if (lo !== ship.lo) { ship.lo = lo; for (const u of [velU, posU, U]) { u.tBoatA.value = levels[lo].pos; u.tMetaA.value = levels[lo].meta; u.tBoatB.value = levels[hi].pos; u.tMetaB.value = levels[hi].meta; } }
         const LS = levels[lo].scale + (levels[hi].scale - levels[lo].scale) * mix, scale = P.size * visW * LS;
-        const lvl = M.clamp(P.level, 0, 3), lvi = Math.min(2, Math.floor(lvl)), lvf = lvl - lvi, tbl = T => T[lvi] + (T[lvi + 1] - T[lvi]) * lvf;   // per-level tables, linear between whole levels
+        const NL = levels.length, lvl = M.clamp(P.level, 0, NL - 1), lvi = Math.min(NL - 2, Math.floor(lvl)), lvf = lvl - lvi, tbl = T => T[lvi] + (T[lvi + 1] - T[lvi]) * lvf;   // per-level tables, linear between whole levels
+        const lvn = lvl * 3 / Math.max(1, NL - 1);   // the level on the old 0..3 scale, for the size-dependent constants below
         const hw = hullWL, hwA = hw && hw[lo], hwB = hw && hw[hi];
         // wind: the scroll speed (1 at 1500 px/s), quick to rise, slow to fall
         const wt = Math.min(1, dScroll / Math.max(dt, 1e-3) / 1500);
         ship.wind += (wt - ship.wind) * Math.min(1, dt / (wt > ship.wind ? 0.2 : 1.2));
         // way: the pose's wake is the designed speed (0.72 at full wake, so a scroll burst still has headroom to 1.2), the wind adds to it;
         // the hull gathers way over tauUp and carries it over tauDn, both longer for a bigger ship
-        const wayT = M.clamp(0.72 * P.wake + 0.55 * ship.wind, 0, 1.2), tauW = wayT > ship.way ? 0.35 + 0.15 * lvl : 1.3 + 0.5 * lvl;
+        const wayT = M.clamp(0.72 * P.wake + 0.55 * ship.wind, 0, 1.2), tauW = wayT > ship.way ? 0.35 + 0.15 * lvn : 1.3 + 0.5 * lvn;
         ship.way += (wayT - ship.way) * (1 - Math.exp(-dt / tauW));
         const way = ship.way, amp = way * way, sea = 0.3 + 0.7 * way;
         // gust: wind the sails feel before the hull has answered it (sails shake, the ship luffs and heels), smoothed and floored so a one-notch wheel does not twitch the sails
@@ -844,7 +848,7 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         ship.ripple = (ship.ripple + dt * 1.5 * (1 - way) * pcfg.shipRipple) % 6283.185;
         // the sea the hull rides: a swell of 2.4 L (fundamental + a 1.83x harmonic so it is never a metronome) met at the encounter rate;
         // pitch and heave are the quasi-static response of a hull that averages the wave over its length (sinc), bigger on a smaller ship
-        const omegaE = (0.9 + 1.5 * way) * (1.2 - 0.15 * lvl); ship.phiE = (ship.phiE + dt * omegaE) % 6283.185;
+        const omegaE = (0.9 + 1.5 * way) * (1.2 - 0.15 * lvn); ship.phiE = (ship.phiE + dt * omegaE) % 6283.185;
         if (ship.crest > 0) { const lp = lottiePhase(); if (lp >= 0) ship.phiE = 6.2832 * lp * 12; }   // on the wave, the ship breathes with the swell's own animation
         const ks = 6.2832 / 2.4, sinc = Math.sin(ks / 2) / (ks / 2), A = (0.008 + 0.010 * Math.min(amp, 1)) / LS * pcfg.shipSwell;   // the swell's height; the hull's answer to it scales with shipBob below
         shipU.swell.set(Math.cos(M.degToRad(pcfg.shipSwellDir)), Math.sin(M.degToRad(pcfg.shipSwellDir)), 0, 0);
@@ -857,13 +861,13 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         // heel: the keyframe's heel plus the wind's, per level (sail area x height over stiffness: the schooner heels most, the deep tall ship less),
         // as a damped roll that over-swings on a gust and settles in a roll period; the sea adds a slow roll on top
         const side = P.heel < 0 ? -1 : 1;   // the wind heels the ship the way the pose was authored
-        let heelT = P.heel + side * (pcfg.shipHeelWind * tbl([0.58, 1.0, 1.3, 1.1]) * Math.pow(way, 1.3) + 2.5 * gust);
+        let heelT = P.heel + side * (pcfg.shipHeelWind * tbl(LEVEL_HEEL) * Math.pow(way, 1.3) + 2.5 * gust);
         heelT = 18 * Math.tanh(heelT / 18);   // soft limit, so the roll never pins flat on a clamp
         if (ship.heel === null) { ship.heel = heelT; ship.heelVel = 0; shipRot0.copy(shipRot); shipAt0.copy(shipAt); }
-        const omegaR = 6.2832 / (2.6 + 1.6 * lvl);
+        const omegaR = 6.2832 / (2.6 + 1.6 * lvn);
         ship.heelVel += dt * (omegaR * omegaR * (heelT - ship.heel) - 1.9 * omegaR * ship.heelVel); ship.heel += dt * ship.heelVel;   // near critical damping: the roll settles, it does not ring
         ship.phiR = (ship.phiR + dt * 0.6 * omegaE) % 6283.185;
-        const pF = (1.5 - 0.33 * lvl) * pcfg.shipBob * pcfg.shipSwell, rollSea = (0.8 + 1.4 * sea) * pF * (Math.sin(ship.phiR) + 0.4 * Math.sin(1.7 * ship.phiR + 0.9)) / 1.4;
+        const pF = (1.5 - 0.33 * lvn) * pcfg.shipBob * pcfg.shipSwell, rollSea = (0.8 + 1.4 * sea) * pF * (Math.sin(ship.phiR) + 0.4 * Math.sin(1.7 * ship.phiR + 0.9)) / 1.4;
         const heel = 24 * Math.tanh((ship.heel + rollSea) / 24), turn = P.turn + 1.5 * Math.sin(t * 0.21) + 1.2 * gust, tilt = P.tilt + 0.8 * Math.sin(t * 0.47);
         // the sails: apparent wind from the weather (the pose's wake), the gust and the ship's own speed; a sail with wind fills, one with wind but not
         // drawing luffs (flogs), one with no wind hangs still; a gust shakes it. The flutter phase accumulates at a rate that follows the apparent wind.
@@ -883,7 +887,7 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         shipU.sail.set(bellyMul, flapAmp, ship.flutPh, fill);
         shipU.clock.set(ship.flick, ship.churnPh, sprayGain, churnGain);
         if (hw) { shipU.hull.set(hwA.stem + (hwB.stem - hwA.stem) * mix, hwA.stern + (hwB.stern - hwA.stern) * mix, entryGain, hwA.sternHalf + (hwB.sternHalf - hwA.sternHalf) * mix); for (let k = 0; k < 17; k++) shipU.beam[k] = hwA.beam[k] + (hwB.beam[k] - hwA.beam[k]) * mix; }
-        shipU.misc.set(tbl([-0.03, -0.02, -0.01, -0.04]), 0.25 * way * (1 - M.smoothstep(tilt, 45, 65)), (1 - way) * 0.15 * pcfg.shipRipple, isLight() ? 1.3 : 1.6);
+        shipU.misc.set(tbl(LEVEL_PIVOT), 0.25 * way * (1 - M.smoothstep(tilt, 45, 65)), (1 - way) * 0.15 * pcfg.shipRipple, isLight() ? 1.3 : 1.6);
         for (const u of [velU, posU, U]) { u.uMix.value = mix; u.uBoatScale.value = scale; u.uTime.value = t; u.uRipple.value = ship.ripple; u.uFlow.value = ship.flow; u.uWay.value = way; u.uSnapBoat.value = snap; }
         U.uWake.value = foamGain; U.uReflect.value = (1 - M.smoothstep(way, 0, 0.5)) * (1 - M.clamp((tilt - 10) / 30, 0, 1)); U.uBoatPx.value = M.clamp(0.6 + 0.25 * scale, 1.0, 2.2);   // a bigger ship is sparser: bigger dots
     }
@@ -934,6 +938,9 @@ function startParticleLayer(THREE, GPUC, BOAT) {
             set(o, list) { routeOverride = Object.assign({}, routeOverride || {}, { [o]: list }); try { localStorage.setItem(routeStore, JSON.stringify(routeOverride)); } catch (e) {} resolveRoute(performance.now()); },
             reset() { routeOverride = null; try { localStorage.removeItem(routeStore); } catch (e) {} resolveRoute(performance.now()); },
             rebuild() { resolveRoute(performance.now()); },
+            levels: () => levels.length,
+            params: () => pcfg, setParam(k, v) { if (k in pcfg) { pcfg[k] = v; layer.sync(); } },
+            attrs: keys => keys.filter(k => k in pcfg).map(k => `data-${k.replace(/[A-Z]/g, m => '-' + m.toLowerCase())}="${pcfg[k]}"`).join(' '),
             resolveAt, keys: () => ship.keys, sample: (sc, out) => ship.route ? ship.route.sample(sc, out) : null, pose: () => ship.pose, state: () => ship,
             toPx: (x, y) => [(x * 0.5 + 0.5) * innerWidth, (0.5 - y * 0.5) * innerHeight], fromPx: (px, py) => [px / innerWidth * 2 - 1, 1 - py / innerHeight * 2],
         },
