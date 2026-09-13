@@ -42,7 +42,7 @@ const pcfg = section ? {
     shipShare: numAttr(section.dataset.shipShare, coarse ? 0.3 : 0.2),   // share of the particles that belong to the ship
     shipEntry: numAttr(section.dataset.shipEntry, 4.5),                  // seconds the ship takes to ride in on the swell on load
     shipWorkSize: numAttr(section.dataset.shipWorkSize, 0.15), shipWorkY: numAttr(section.dataset.shipWorkY, -0.38), shipWorkTilt: numAttr(section.dataset.shipWorkTilt, 68),   // pose in the work section: seen from above in the band under the cards, sailing down the axis, wake streaming up the column (size is the on-screen hull length; it does not grow with the level here)
-    shipFlap: numAttr(section.dataset.shipFlap, 1), shipRipple: numAttr(section.dataset.shipRipple, 0), shipBob: numAttr(section.dataset.shipBob, 1),   // sail flutter amplitude | rest rings (0 = none) | motion: swell, pitch, heave, sea roll
+    shipFlap: numAttr(section.dataset.shipFlap, 1.2), shipRipple: numAttr(section.dataset.shipRipple, 0), shipBob: numAttr(section.dataset.shipBob, 1),   // sail flutter amplitude | rest rings (0 = none) | motion: swell, pitch, heave, sea roll
     shipHeelWind: numAttr(section.dataset.shipHeelWind, 12),   // deg of heel from the wind at full way on the sloop (per level x 0.58 dinghy, 1.3 schooner, 1.1 tall ship)
     shipSwell: numAttr(section.dataset.shipSwell, 1), shipSwellDir: numAttr(section.dataset.shipSwellDir, 0),   // the sea's swell: height (1 = default) and the direction it runs relative to the hull (0 = along it, 90 = across it)
     shipWave: numAttr(section.dataset.shipWave, 1), shipSpray: numAttr(section.dataset.shipSpray, 1), shipFoam: numAttr(section.dataset.shipFoam, 1),   // wave heights and crest brightness | spray | foam
