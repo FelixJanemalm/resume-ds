@@ -41,7 +41,7 @@ const pcfg = section ? {
     boatX: numAttr(section.dataset.boatX, -0.35), boatY: numAttr(section.dataset.boatY, -0.29), boatSize: numAttr(section.dataset.boatSize, 0.37),   // hero pose: waterline centre in NDC, hull length as a fraction of the visible width
     shipShare: numAttr(section.dataset.shipShare, coarse ? 0.3 : 0.2),   // share of the particles that belong to the ship
     shipEntry: numAttr(section.dataset.shipEntry, 3.2),                  // seconds the ship takes to sail into the frame on load
-    shipWorkSize: numAttr(section.dataset.shipWorkSize, 0.16), shipWorkY: numAttr(section.dataset.shipWorkY, -0.68), shipWorkTilt: numAttr(section.dataset.shipWorkTilt, 68), shipWorkHeading: numAttr(section.dataset.shipWorkHeading, -90),   // pose in the work section: seen from above in the band under the cards, sailing down the axis, wake streaming up the column (size is the on-screen hull length; it does not grow with the level here)
+    shipWorkSize: numAttr(section.dataset.shipWorkSize, 0.15), shipWorkY: numAttr(section.dataset.shipWorkY, -0.55), shipWorkTilt: numAttr(section.dataset.shipWorkTilt, 68), shipWorkHeading: numAttr(section.dataset.shipWorkHeading, -90),   // pose in the work section: seen from above in the band under the cards, sailing down the axis, wake streaming up the column (size is the on-screen hull length; it does not grow with the level here)
     shipFlap: numAttr(section.dataset.shipFlap, 1), shipRipple: numAttr(section.dataset.shipRipple, 1), shipBob: numAttr(section.dataset.shipBob, 1),   // sail flutter amplitude | rest rings (0 = none) | motion: swell, pitch, heave, sea roll
     shipHeelWind: numAttr(section.dataset.shipHeelWind, 12),   // deg of heel from the wind at full way on the sloop (per level x 0.58 dinghy, 1.3 schooner, 1.1 tall ship)
     shipWave: numAttr(section.dataset.shipWave, 1), shipSpray: numAttr(section.dataset.shipSpray, 1), shipFoam: numAttr(section.dataset.shipFoam, 1),   // wave heights and crest brightness | spray | foam
@@ -78,6 +78,10 @@ const WATERLINE = -0.37;   // boat space: hull length 1, bow at +x, y up, z towa
 const SIM_SHARED = `
     uniform sampler2D tBoatA, tBoatB, tMetaA, tMetaB; uniform float uMix, uForm, uScroll, uH, uBoatScale, uTime, uRipple, uFlow, uSettle, uWay, uReflect, uN, uStarForm, uSnap, uSnapBoat; uniform vec3 uBoat; uniform mat3 uRot; uniform vec4 uStarT[12];
     uniform vec4 uWave, uSea, uMotion, uSail, uClock, uHull, uMisc; uniform float uBeam[17];
+    uniform mat3 uRot0; uniform vec3 uBoat0; uniform float uScale0;
+    // a solid ship particle's position was last written relative to the pose of the last sim step (uRot0, uBoat0, uScale0); carried into
+    // the current pose it follows heading, tilt, turn, position and scale exactly, and the settle only has to close changes of shape
+    vec3 rideAlong(vec3 p){ vec3 v = (p - uBoat0) / uScale0; vec3 rel = vec3(dot(uRot0[0], v), dot(uRot0[1], v), dot(uRot0[2], v)); return uBoat + uRot * rel * uBoatScale; }
     // the first 12 particles can be recruited as constellation stars: uStarT holds their targets (xyz) and an on flag (w)
     vec4 starOf(vec2 uv){ int idx = int(floor(uv.x * uN) + floor(uv.y * uN) * uN + 0.5); vec4 st = vec4(0.0); for (int k = 0; k < 12; k++) { if (k == idx) st = uStarT[k]; } return st; }
     // where a particle is drawn: the field wraps vertically and scrolls with depth-dependent parallax; a ship particle is drawn where it is
@@ -119,7 +123,7 @@ const SIM_SHARED = `
       else if (water > 0.5) {
         float h1 = hash1(md.z * 5.3), h2 = hash1(md.z * 31.0), h3 = hash1(md.w * 77.0), h4 = hash1(md.z * 91.7), h5 = hash1(md.w * 13.7);
         float sgn = h5 < 0.5 ? -1.0 : 1.0, zl = sgn * 0.62 * pow(abs(h5 - 0.5) * 2.0, 1.4);          // the lane's cross section: denser at the hull (the baked disc is not used)
-        float x = 0.75 - mod(h1 * 2.6 + uFlow, 2.6);                                                // 0.25 L ahead of the stem .. 1.85 L astern, streaming aft
+        float x = 0.75 - mod(h1 * 2.6 + uFlow, 2.6); q.x = x;                                       // 0.25 L ahead of the stem .. 1.85 L astern, streaming aft
         float hb = hullBeam(x), s = uHull.x - x, az = abs(zl);
         // parted along the real waterline: a thin rim on the hull, thrown wider at the stem under way
         float inHull = step(az, hb + 0.008) * step(uHull.y, x) * step(x, uHull.x);
@@ -127,7 +131,7 @@ const SIM_SHARED = `
         q.z = mix(zl, sgn * side, inHull); az = abs(q.z);
         q.y = ${WATERLINE} + swellAt(x);
         // the bow wave: a crest just abaft the stem, a trough at half a wavelength, the stern crest at the quarter; height ~ way^2 x entry fullness
-        float nearB = exp(-pow((az - hb) / 0.06, 2.0)) * smoothstep(-0.03, 0.02, s) * smoothstep(uHull.y - 0.12, uHull.y - 0.02, x);
+        float eb = (az - hb) / 0.06, nearB = exp(-eb * eb) * smoothstep(-0.03, 0.02, s) * smoothstep(uHull.y - 0.12, uHull.y - 0.02, x);
         float waveS = cos(6.2832 * s / uWave.y) * exp(-s / 0.8);
         q.y += nearB * 0.025 * uWave.x * uHull.z * (0.85 + 0.3 * uSea.w) * waveS;
         float crest = nearB * max(0.0, waveS);
@@ -139,7 +143,7 @@ const SIM_SHARED = `
         float spray = zone * uClock.z * pulse * (1.0 - ph);
         // the Kelvin wedge: divergent crests from the stem (a crest AT the apex, a continuous arm), transverse crests inside, astern
         float wedge = 0.354 * s, edge = az - wedge, aft = smoothstep(-0.05, 0.05, s);
-        float div = aft * exp(-pow(edge / (0.025 + 0.03 * s), 2.0)) * exp(-s / 1.6) * smoothstep(hb, hb + 0.03, az);
+        float ew = edge / (0.025 + 0.03 * s), div = aft * exp(-ew * ew) * exp(-s / 1.6) * smoothstep(hb, hb + 0.03, az);
         float divPh = cos(6.2832 * s / (0.8 * uWave.y));
         q.y += 0.012 * uWave.x * div * divPh;
         float divLit = div * (0.35 + 0.65 * max(0.0, divPh));
@@ -149,7 +153,7 @@ const SIM_SHARED = `
         // the transom: the rooster hump where the flow closes, churn as wide as the transom spreading aft and pulsing with the squat
         float dd = uHull.y - x, d = max(0.0, dd), astern = smoothstep(-0.05, 0.05, dd), T = uHull.w;
         float churn = astern * fall(0.0, 1.5 * T + 0.05 + 0.12 * d, az) * exp(-d / 0.45) * (0.75 + 0.5 * uMotion.w);
-        float rooster = 0.03 * uWave.x * astern * exp(-pow((d - 0.15) / 0.12, 2.0)) * exp(-pow(az / (T + 0.05), 2.0));
+        float er = (d - 0.15) / 0.12, ez = az / (T + 0.05), rooster = 0.03 * uWave.x * astern * exp(-er * er) * exp(-ez * ez);
         q.y += rooster + 0.006 * uWay * churn * sin(uClock.y + h4 * 6.2832 + x * 10.0);
         float churnLit = churn * uClock.w * (0.55 + 0.45 * hash1(h4 * 7.7 + floor(uClock.x + h4 * 3.0)));
         // brightness: crests catch light, spray is brightest at launch, the swell only from low viewpoints (uMisc.y is 0 in the top view)
@@ -173,7 +177,7 @@ const SIM_SHARED = `
         // md.z: the baked belly along the belly normal (tagSailBellies): > 0 fore-and-aft (normal +z), < 0 square (normal (cos b, 0, -sin b), the wind from astern)
         vec3 n = md.z < 0.0 ? vec3(0.970, 0.0, 0.242) : vec3(0.0, 0.0, 1.0);
         float hs = hash1(md.w * 9.1 + md.y * 3.7);
-        float leech = mix(1.0, 0.35 + 0.65 * md.w, uSail.w);                                                                  // a drawing sail only shakes at the leech
+        float toLeech = md.z < 0.0 ? abs(2.0 * md.w - 1.0) : md.w, leech = mix(1.0, 0.35 + 0.65 * toLeech, uSail.w);            // a drawing sail only shakes at the leech (a square sail has two)
         float ripple = (sin(uSail.z + md.w * 6.0 - q.y * 5.0 + hs * 1.3) + 0.35 * sin(2.3 * uSail.z + md.w * 11.0 + hs * 4.0)) / 1.35;   // a ripple running across the chord, two harmonics
         q += n * (abs(md.z) * (uSail.x - 1.0) + md.y * uSail.y * leech * ripple); }                                            // fill: the belly scaled; luff: the flutter
       q = flowLocal(q, md, role, fade);
@@ -195,6 +199,7 @@ const SIM_VEL = SIM_NOISE + SIM_SHARED + `
       float roleV=floor(mix(mA,mB,boatMixT(bA,bB)).x+0.5), laneV=step(5.5,roleV)*step(roleV,7.5);
       if (bf > 0.5 && laneV > 0.5) { gl_FragColor=vec4(0.0,0.0,0.0,1.0); return; }               // water and foam carry no velocity: no spring, no curl, no cursor pull
       float fdv; vec3 tgt=mix(mix(h.xyz, boatTarget(bA,bB,mA,mB,fdv), bf), st.xyz, sf);
+      if (bf > 0.5) p = rideAlong(p);                                                                 // the spring sees the particle where the pose has carried it
       vec3 f=(tgt-p)*uReturn*(1.0+1.5*bf+2.5*sf);
       f+=curlNoise(p*0.28+vec3(0.0,uTime*0.05,0.0))*uCurl*(0.4+0.6*h.w)*(1.0-0.8*bf)*(1.0-0.7*sf);
       vec3 pw=drawPos(p,max(bf,sf));
@@ -213,6 +218,7 @@ const SIM_POS = SIM_SHARED + `
       if ((uSettle > 0.0 || uSnapBoat > 0.0) && boatFlag(bA,bB,w)*uForm > 0.5) {
         vec4 mA=texture2D(tMetaA,uv), mB=texture2D(tMetaB,uv); float fdp; vec3 bt=boatTarget(bA,bB,mA,mB,fdp);
         float roleP=floor(mix(mA,mB,boatMixT(bA,bB)).x+0.5), laneP=step(5.5,roleP)*step(roleP,7.5);
+        p.xyz = mix(rideAlong(p.xyz), p.xyz, laneP);                                                   // solids ride the rigid pose first
         p.xyz = mix(mix(p.xyz, bt, uSettle), bt, laneP);   // solid roles settle (uSettle from the simulated step) and keep their spring life; water and foam are PLACED: p == target every step, so a lane wrap is a one-step teleport between two points where the lane's fade is zero
         if (uSnapBoat > 0.0 && distance(p.xyz, bt) > uSnapBoat) p.xyz = bt + (p.xyz - bt) * 0.1; }   // on load the ship is already in place
       gl_FragColor=vec4(p.xyz,w); }`;
@@ -226,17 +232,18 @@ const PTS_VS = SIM_SHARED + `
       vec4 st=starOf(ref); float sf=st.w*uStarForm; vStar=sf;
       vec3 pw; float fd=1.0, nearT=1.0;
       if (bf > 0.5 && laneR > 0.5) { pw=boatTarget(bA,bB,mA,mB,fd); }                              // water and foam: drawn from the lane, never from tPos; position and fade come from ONE evaluation
-      else { pw=drawPos(p.xyz,max(bf,sf)); if (bf > 0.5) { float fdn; vec3 bt=boatTarget(bA,bB,mA,mB,fdn); nearT=1.0-smoothstep(0.12,0.5,distance(p.xyz,bt)/uBoatScale); } }   // a recruit arrives dark and lights up in place
+      else if (bf > 0.5) { pw=rideAlong(p.xyz); float fdn; vec3 bt=boatTarget(bA,bB,mA,mB,fdn); float rec=1.0-step(0.01,bA.w)*step(0.01,bB.w); nearT=mix(1.0, 1.0-smoothstep(0.12,0.5,distance(pw,bt)/uBoatScale), rec); }   // solids ride the pose; a recruit (absent at one of the two levels) arrives dark and lights up in place
+      else { pw=drawPos(p.xyz,sf); }
       vShade=mix(vShade, 0.5, laneR);
       vFade=min(uMisc.w, mix(1.0, fd, bf*laneR)*mix(1.0, uReflect, bf*refl)*mix(1.0, nearT, bf*(1.0-laneR)));
       vec3 rel=pw-uCam; float along=dot(rel,uDir); vec3 perp=rel-uDir*along; float d=length(perp);
-      vLit=(1.0-smoothstep(0.0,uRadius,d))*step(0.5,along)*(1.0-bf*laneR); vRand=p.w; vSpeed=length(v);
+      vLit=(1.0-smoothstep(0.0,uRadius,d))*step(0.5,along)*(1.0-bf*laneR)*(1.0-0.65*bf); vRand=p.w; vSpeed=length(v);   // the light barely touches the ship and not the sea
       vec4 mv=modelViewMatrix*vec4(pw,1.0);
       gl_PointSize=uSize*uDPR*aSize*(1.0+0.9*vLit+bf*(uBoatPx-1.0)+2.4*sf+0.25*bf*laneR*clamp(fd-1.0,0.0,1.5))*uP/max(-mv.z,1.0)*uIntro;
       gl_Position=projectionMatrix*mv; }`;
 const PTS_FS = `
     uniform vec3 uColorA, uColorB, uColorLit; uniform float uGlow; varying float vLit, vRand, vSpeed, vBoat, vShade, vStar, vFade;
-    void main(){ vec2 c=gl_PointCoord-0.5; float d=length(c); if(d>0.5||vFade<0.02) discard; float disc=smoothstep(0.5,0.08,d)*vFade;
+    void main(){ vec2 c=gl_PointCoord-0.5; float d=length(c); if(d>0.5||vFade<0.02) discard; float disc=(1.0-smoothstep(0.08,0.5,d))*vFade;
       vec3 col=mix(uColorA,uColorB,smoothstep(0.25,0.85,vRand)); col=mix(col,uColorLit,clamp(vLit*0.9+smoothstep(0.8,3.0,vSpeed)*0.15+0.7*vBoat*vShade+0.6*vStar,0.0,1.0));
       float a=disc*(0.24+0.5*vLit)*(1.0+vBoat*(0.1+1.4*vShade)+1.6*vStar)*uGlow; gl_FragColor=vec4(col*(0.85+0.35*vLit+0.3*vBoat*vShade+0.3*vStar),a); }`;
 
@@ -306,8 +313,14 @@ function startParticleLayer(THREE, GPUC, BOAT) {
                 if (az > beam[k]) beam[k] = az; n[k]++;
                 if (x > stem) stem = x; if (x < stern) stern = x;
             }
-            for (let k = 0; k < 17; k++) if (!n[k]) { const a = k > 0 ? beam[k - 1] : 0, b = k < 16 ? beam[k + 1] : 0; beam[k] = (a + b) * 0.5; }
-            for (let k = 0; k < 17; k++) beam[k] *= 0.96;
+            let total = 0; for (let k = 0; k < 17; k++) total += n[k];
+            if (total < 17 || !Number.isFinite(stem) || !Number.isFinite(stern)) {   // too few particles to measure (tiny budgets): the sloop's analytic waterline
+                for (let k = 0; k < 17; k++) { const x = -0.5 + k / 16; beam[k] = 0.15 * Math.sqrt(Math.max(0, 1 - Math.pow((x + 0.02) / 0.48, 2))); }
+                stem = 0.5; stern = -0.5;
+            } else {
+                for (let k = 0; k < 17; k++) if (!n[k]) { let a = k, b = k; while (a > 0 && !n[a]) a--; while (b < 16 && !n[b]) b++; beam[k] = n[a] && n[b] ? (beam[a] + beam[b]) * 0.5 : n[a] ? beam[a] : beam[b]; }   // fill gaps from the nearest measured stations
+                for (let k = 0; k < 17; k++) beam[k] *= 0.96;
+            }
             out.push({ beam, stem: Math.min(0.5, stem), stern: Math.max(-0.5, stern), entry: (beam[14] - beam[16]) / 0.125, sternHalf: Math.max(0.01, 0.7 * beam[0]) });
         }
         const ref = out[1].entry || 1;
@@ -348,10 +361,10 @@ function startParticleLayer(THREE, GPUC, BOAT) {
 
     if (!levels.length) { const t = dataTex(new Float32Array(COUNT * 4)); levels.push({ pos: t, meta: t, scale: 1 }); }
     const starT = Array.from({ length: STAR_N }, () => new THREE.Vector4());   // shared by every material that needs the star targets
-    const shipRot = new THREE.Matrix3(), shipAt = new THREE.Vector3();
+    const shipRot = new THREE.Matrix3(), shipAt = new THREE.Vector3(), shipRot0 = new THREE.Matrix3(), shipAt0 = new THREE.Vector3();
     const shipU = { wave: new THREE.Vector4(0, 0.3, 0, 0.15), sea: new THREE.Vector4(0, 2.618, 0, 0), motion: new THREE.Vector4(0, 0, 0, 0), sail: new THREE.Vector4(1, 0, 0, 0), clock: new THREE.Vector4(0, 0, 0, 0), hull: new THREE.Vector4(0.5, -0.5, 1, 0.02), misc: new THREE.Vector4(-0.02, 0, 0, 1.6), beam: new Float32Array(17) };
     const boatU = () => ({ tBoatA: { value: levels[0].pos }, tBoatB: { value: levels[0].pos }, tMetaA: { value: levels[0].meta }, tMetaB: { value: levels[0].meta }, uMix: { value: 0 }, uForm: { value: shipOn ? 1 : 0 }, uBoatScale: { value: 1 }, uBoat: { value: shipAt }, uRot: { value: shipRot }, uTime: { value: 0 }, uRipple: { value: 0 }, uFlow: { value: 0 }, uSettle: { value: 0 }, uWay: { value: 0 }, uReflect: { value: 1 }, uStarT: { value: starT }, uN: { value: N }, uStarForm: { value: 0 }, uSnap: { value: 1.2 }, uSnapBoat: { value: 0.02 },
-        uWave: { value: shipU.wave }, uSea: { value: shipU.sea }, uMotion: { value: shipU.motion }, uSail: { value: shipU.sail }, uClock: { value: shipU.clock }, uHull: { value: shipU.hull }, uMisc: { value: shipU.misc }, uBeam: { value: shipU.beam } });
+        uWave: { value: shipU.wave }, uSea: { value: shipU.sea }, uMotion: { value: shipU.motion }, uSail: { value: shipU.sail }, uClock: { value: shipU.clock }, uHull: { value: shipU.hull }, uMisc: { value: shipU.misc }, uBeam: { value: shipU.beam }, uRot0: { value: shipRot0 }, uBoat0: { value: shipAt0 }, uScale0: { value: 1 } });
     const velVar = gpu.addVariable('tVel', SIM_VEL, vel0), posVar = gpu.addVariable('tPos', SIM_POS, pos0);
     gpu.setVariableDependencies(velVar, [posVar, velVar]); gpu.setVariableDependencies(posVar, [posVar, velVar]);
     const velU = velVar.material.uniforms, posU = posVar.material.uniforms;
@@ -374,7 +387,7 @@ function startParticleLayer(THREE, GPUC, BOAT) {
     // each line vertex knows both endpoints (position texture refs and star indices) so the segment only shows once both stars are near their targets
     const LINE_VS = 'uniform sampler2D tPos; uniform vec4 uStarT[12]; attribute vec2 aRef, aRef2; attribute float aIdx, aIdx2, aT, aD, aA; varying float vT, vD, vA; '
         + 'vec4 tgt(float i){ int idx = int(i + 0.5); vec4 r = vec4(0.0); for (int k = 0; k < 12; k++) { if (k == idx) r = uStarT[k]; } return r; } '
-        + 'void main(){ vec3 p = texture2D(tPos, aRef).xyz, q = texture2D(tPos, aRef2).xyz; float near = smoothstep(0.45, 0.12, distance(p, tgt(aIdx).xyz)) * smoothstep(0.45, 0.12, distance(q, tgt(aIdx2).xyz)); vT = aT; vD = aD; vA = aA * near; gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }';
+        + 'void main(){ vec3 p = texture2D(tPos, aRef).xyz, q = texture2D(tPos, aRef2).xyz; float near = (1.0 - smoothstep(0.12, 0.45, distance(p, tgt(aIdx).xyz))) * (1.0 - smoothstep(0.12, 0.45, distance(q, tgt(aIdx2).xyz))); vT = aT; vD = aD; vA = aA * near; gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }';
     const LINE_FS = 'uniform float uVis; uniform vec3 uColor; varying float vT, vD, vA; void main(){ if (vT > vD) discard; gl_FragColor = vec4(uColor, 0.55 * vA * uVis); }';
     const SEGS = 40, lg = new THREE.BufferGeometry();
     const lref = new Float32Array(SEGS * 4), lref2 = new Float32Array(SEGS * 4), lidx = new Float32Array(SEGS * 2), lidx2 = new Float32Array(SEGS * 2), lt = new Float32Array(SEGS * 2), ld = new Float32Array(SEGS * 2), la = new Float32Array(SEGS * 2);
@@ -476,21 +489,21 @@ function startParticleLayer(THREE, GPUC, BOAT) {
                 { at: '#read:bottom@1.0', x: 0.7, y: -0.25, size: 0.15, heading: -5, turn: 32, tilt: 4, heel: 6, level: 3, wake: 0.9 },       // (bottom@0.6 was the same scroll as the horizon key: read's bottom is scalability's top, and it popped)
                 { at: '#scalability:top@0.6', x: 0.72, y: 0.55, size: 0.08, heading: 0, turn: -40, tilt: 8, heel: 4, level: 3, wake: 0.3 },    // horizon: stern quarter, hull-down, beside the heading
                 ...(translucent ? [
-                    { at: '.testimonials-wrapper:top@0.5', x: -0.62, y: -0.45, size: 0.2, heading: -30, turn: 70, tilt: 6, heel: -8, level: 3, wake: 0.6 },    // back around from the left, bow-on, left of the quotes
-                    { at: '.tools:top@0.85', x: -0.2, y: -0.62, size: 0.16, heading: 0, turn: 40, tilt: 3, heel: 4, level: 3, wake: 0.3 },                     // along the quay (the tools band)
-                    { at: 'end', x: -0.62, y: -0.68, size: 0.13, heading: 0, turn: 35, tilt: 3, heel: 0, level: 3, wake: 0 },                                  // landfall: moored beside the Los Angeles pin, bottom-left
+                    { at: '.testimonials-wrapper:top@0.5', x: -0.62, y: -0.45, size: 0.2, heading: -20, turn: 42, tilt: 6, heel: -8, level: 3, wake: 0.6 },    // back around from the left, a readable stern quarter, left of the quotes
+                    { at: '.tools:top@0.85', x: -0.2, y: -0.66, size: 0.16, heading: 0, turn: 38, tilt: 3, heel: 4, level: 3, wake: 0.3 },                     // along the quay (the tools band)
+                    { at: 'end', x: -0.62, y: -0.8, size: 0.13, heading: 0, turn: 35, tilt: 3, heel: 0, level: 3, wake: 0 },                                   // landfall: moored beside the Los Angeles pin, in the footer
                 ] : [
                     { at: '.testimonials-wrapper:center@0.5', x: 0.85, y: -0.28, size: 0.09, heading: 0, turn: 38, tilt: 0, heel: 5, level: 3, wake: 0.3 },  // small and far along the right edge, clear of the quotes
                     { at: 'end', x: 0.85, y: -0.28, size: 0.09, heading: 0, turn: 40, tilt: 3, heel: 2, level: 3, wake: 0 },
                 ]),
             ],
             portrait: [
-                { at: 'top', x: 0.55, y: 0.42, size: 0.36, heading: -180, turn: 35, tilt: 0, heel: 9, level: 0, wake: 0 },                     // beside the headline, bow left toward the flipped swell (sails in from the right)
-                { at: 'top+100', x: 0.55, y: 0.42, size: 0.36, heading: -180, turn: 35, tilt: 0, heel: 9, level: 0, wake: 0 },
-                { at: '#work:center@0.66', x: 0.5, y: 0.38, size: 0.35, heading: -172, turn: 33, tilt: 8, heel: 10, level: 0.15, wake: 0.35 },
-                { at: '#work:center@0.5', x: 0.15, y: -0.2, size: 0.32, heading: -125, turn: 22, tilt: 32, heel: 12, level: 0.5, wake: 0.7 },  // dives down-left toward the sea, behind the picker glass
-                { at: '#work:center@0.25', x: 0.05, y: -0.45, size: 0.3, heading: -102, turn: 8, tilt: 54, heel: 13, level: 0.8, wake: 0.85 },
-                { at: 'stage-pin', ...work(1), y: -0.64, size: 0.3, heading: c.shipWorkHeading - 6, tilt: c.shipWorkTilt - 6, turn: 2 },       // portrait approaches -90 from -180, so it is still short here
+                { at: 'top', x: 0.55, y: 0.42, size: 0.36, heading: 0, turn: 145, tilt: 0, heel: 9, level: 0, wake: 0 },                       // beside the headline, bow left toward the flipped swell: a turn past the viewer, never a roll (sails in from the right)
+                { at: 'top+100', x: 0.55, y: 0.42, size: 0.36, heading: 0, turn: 145, tilt: 0, heel: 9, level: 0, wake: 0 },
+                { at: '#work:center@0.66', x: 0.5, y: 0.38, size: 0.35, heading: -8, turn: 138, tilt: 8, heel: 10, level: 0.15, wake: 0.35 },
+                { at: '#work:center@0.5', x: 0.15, y: -0.2, size: 0.32, heading: -40, turn: 90, tilt: 32, heel: 12, level: 0.5, wake: 0.7 },   // dives down-left toward the sea, behind the picker glass
+                { at: '#work:center@0.25', x: 0.05, y: -0.45, size: 0.3, heading: -68, turn: 40, tilt: 54, heel: 13, level: 0.8, wake: 0.85 },
+                { at: 'stage-pin', ...work(1), y: -0.64, size: 0.3, heading: c.shipWorkHeading + 6, tilt: c.shipWorkTilt - 6, turn: 4 },
                 { at: 'stage@0.06', ...work(1), y: -0.66, size: 0.3 },
                 { at: 'stage@0.14', ...work(1), y: -0.66, size: 0.3 },
                 { at: 'stage@0.3', ...work(2), y: -0.66, size: 0.24 },
@@ -609,7 +622,7 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         // sailing in: on load the ship is already formed off the left edge, under way, and eases into its first pose
         if (ship.t0 < 0) { ship.t0 = now; ship.entry = scrollY < 200; }   // a page that opens already scrolled shows the ship where it is
         const e = ship.entry ? Math.min(1, (now - ship.t0) / 1000 / Math.max(0.1, pcfg.shipEntry)) : 1, entry = Math.pow(1 - e, 3);
-        if (Math.abs(P.heading) > 90) P.x += entry * (1 + P.size * 0.9 - P.x); else P.x -= entry * (P.x + 1 + P.size * 0.9);   // bow first, from whichever edge it points away from
+        if (Math.abs(P.heading) > 90 || Math.abs(P.turn) > 90) P.x += entry * (1 + P.size * 0.9 - P.x); else P.x -= entry * (P.x + 1 + P.size * 0.9);   // bow first, from whichever edge it points away from
         P.wake = Math.max(P.wake, entry); P.heel += entry * 4;
         // ---- the ship's dynamics (replaces everything from `// idle: bob, ...` to the uniform writes at the end of shipFrame). One speed
         //      scalar, ship.way, from the pose's wake and the scroll wind with hull inertia; every clock that depends on it is accumulated
@@ -646,25 +659,27 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         // the sea the hull rides: a swell of 2.4 L (fundamental + a 1.83x harmonic so it is never a metronome) met at the encounter rate;
         // pitch and heave are the quasi-static response of a hull that averages the wave over its length (sinc), bigger on a smaller ship
         const omegaE = (0.9 + 1.5 * way) * (1.2 - 0.15 * lvl); ship.phiE = (ship.phiE + dt * omegaE) % 6283.185;
-        const ks = 6.2832 / 2.4, sinc = Math.sin(ks / 2) / (ks / 2), A = (0.008 + 0.014 * amp) / LS * pcfg.shipBob;
-        const lift = 1 + 0.3 * M.smoothstep(P.tilt, 50, 60);   // from above the pitch reads small: a little more of it there
-        const thetaA = 1.4 * A * ks * sinc * lift, hA = A * sinc * lift, ph = ship.phiE;
+        const ks = 6.2832 / 2.4, sinc = Math.sin(ks / 2) / (ks / 2), A = (0.008 + 0.010 * Math.min(amp, 1)) / LS * pcfg.shipBob;
+        const lift = 1 + 0.3 * M.smoothstep(P.tilt, 50, 60);   // from above the heave reads small: a little more of it there (pitch stays under 4 degrees)
+        const thetaA = 1.4 * A * ks * sinc, hA = A * sinc * lift, ph = ship.phiE;
         const pitch = -thetaA * (Math.sin(ph) + 0.35 * Math.sin(1.83 * ph + 1.1)) / 1.35, heave = hA * (Math.cos(ph) + 0.35 * Math.cos(1.83 * ph + 1.1)) / 1.35;
         // where in the cycle the stem is deepest (plunge: spray and the bow wave) and the stern (squat: churn), from the bow's immersion in the fundamental
         const C = A * Math.cos(ks / 2) - hA, D = 0.5 * thetaA - A * Math.sin(ks / 2), psi = Math.atan2(D, C);
         const plunge = Math.pow(0.5 + 0.5 * Math.cos(ph - psi), 3), squat = Math.pow(0.5 + 0.5 * Math.cos(ph + psi), 3);
         // heel: the keyframe's heel plus the wind's, per level (sail area x height over stiffness: the schooner heels most, the deep tall ship less),
         // as a damped roll that over-swings on a gust and settles in a roll period; the sea adds a slow roll on top
-        const heelT = P.heel + pcfg.shipHeelWind * tbl([0.58, 1.0, 1.3, 1.1]) * Math.pow(way, 1.3) + 5 * gust;
-        if (ship.heel === null) { ship.heel = heelT; ship.heelVel = 0; }
+        const side = P.heel < 0 ? -1 : 1;   // the wind heels the ship the way the pose was authored
+        let heelT = P.heel + side * (pcfg.shipHeelWind * tbl([0.58, 1.0, 1.3, 1.1]) * Math.pow(way, 1.3) + 5 * gust);
+        heelT = 18 * Math.tanh(heelT / 18);   // soft limit, so the roll never pins flat on a clamp
+        if (ship.heel === null) { ship.heel = heelT; ship.heelVel = 0; shipRot0.copy(shipRot); shipAt0.copy(shipAt); }
         const omegaR = 6.2832 / (2.6 + 1.6 * lvl);
         ship.heelVel += dt * (omegaR * omegaR * (heelT - ship.heel) - 0.8 * omegaR * ship.heelVel); ship.heel += dt * ship.heelVel;
         ship.phiR = (ship.phiR + dt * 0.6 * omegaE) % 6283.185;
         const pF = (1.5 - 0.33 * lvl) * pcfg.shipBob, rollSea = (0.8 + 1.4 * sea) * pF * (Math.sin(ship.phiR) + 0.4 * Math.sin(1.7 * ship.phiR + 0.9)) / 1.4;
-        const heel = M.clamp(ship.heel + rollSea, -24, 24), turn = P.turn + 1.5 * Math.sin(t * 0.21) + 3 * gust, tilt = P.tilt + 0.8 * Math.sin(t * 0.47);
+        const heel = 24 * Math.tanh((ship.heel + rollSea) / 24), turn = P.turn + 1.5 * Math.sin(t * 0.21) + 3 * gust, tilt = P.tilt + 0.8 * Math.sin(t * 0.47);
         // the sails: apparent wind from the weather (the pose's wake), the gust and the ship's own speed; a sail with wind fills, one with wind but not
         // drawing luffs (flogs), one with no wind hangs still; a gust shakes it. The flutter phase accumulates at a rate that follows the apparent wind.
-        const Wt = 0.12 + 0.6 * P.wake + 0.5 * ship.wind, Wa = Math.min(1, Math.sqrt(Wt * Wt + 0.45 * Wt * way + 0.2 * way * way) / 1.28);
+        const Wt = 0.09 + 0.6 * P.wake + 0.5 * ship.wind, Wa = Math.min(1, Math.sqrt(Wt * Wt + 0.45 * Wt * way + 0.2 * way * way) / 1.28);   // a light air at anchor: the sails stir, they do not flog
         const fill = M.smoothstep(Wa, 0.08, 0.3), luff = M.smoothstep(Wa, 0.03, 0.12) * (1 - fill);
         const flapAmp = 0.03 * pcfg.shipFlap * (0.15 + 0.6 * luff + 1.2 * gust), bellyMul = 0.6 + 0.6 * fill;
         ship.flutPh = (ship.flutPh + dt * (1.8 + 4.0 * Wa + 2.5 * gust)) % 6283.185;
@@ -714,7 +729,8 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         if (!qual.done) { qual.acc += dt; qual.frames++; if (qual.acc > 2.5) { qual.done = true; const ms = qual.acc / qual.frames * 1000; if (ms > 20) { qual.half = true; gl.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5)); geo.setDrawRange(0, Math.floor(COUNT / 2)); resize(); console.info('work-spine: slow device (' + ms.toFixed(1) + ' ms/frame), reduced quality'); } } }
         starsFrame(t, dt);
         qual.simDt += dt;
-        if (!qual.half || (qual.tick++ % 2 === 0)) { velU.uDelta.value = qual.simDt; posU.uDelta.value = qual.simDt; posU.uSettle.value = shipOn ? 1 - Math.exp(-qual.simDt * pcfg.shipSettle) : 0; qual.simDt = 0; gpu.compute(); }
+        if (!qual.half || (qual.tick++ % 2 === 0)) { velU.uDelta.value = qual.simDt; posU.uDelta.value = qual.simDt; posU.uSettle.value = shipOn ? 1 - Math.exp(-qual.simDt * pcfg.shipSettle) : 0; qual.simDt = 0; gpu.compute();
+            shipRot0.copy(shipRot); shipAt0.copy(shipAt); for (const u of [velU, posU, U]) u.uScale0.value = U.uBoatScale.value; }   // solids were just written against this pose
         U.tPos.value = gpu.getCurrentRenderTarget(posVar).texture; U.tVel.value = gpu.getCurrentRenderTarget(velVar).texture;
         U.uIntro.value = Math.min(1, U.uIntro.value + dt * 0.5);
         gl.render(scene, camera);
@@ -920,7 +936,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         gpu.setVariableDependencies(velVar, [posVar, velVar]); gpu.setVariableDependencies(posVar, [posVar, velVar]);
         const velU = velVar.material.uniforms, posU = posVar.material.uniforms;
         const noBoat = () => ({ tBoatA: { value: home }, tBoatB: { value: home }, tMetaA: { value: home }, tMetaB: { value: home }, uMix: { value: 0 }, uForm: { value: 0 }, uBoatScale: { value: 1 }, uBoat: { value: new THREE.Vector3() }, uRot: { value: new THREE.Matrix3() }, uTime: { value: 0 }, uRipple: { value: 0 }, uFlow: { value: 0 }, uSettle: { value: 0 }, uWay: { value: 0 }, uReflect: { value: 1 }, uStarT: { value: Array.from({ length: 12 }, () => new THREE.Vector4()) }, uN: { value: N }, uStarForm: { value: 0 }, uSnap: { value: 1.2 }, uSnapBoat: { value: 0 },
-            uWave: { value: new THREE.Vector4(0, 0.3, 0, 0.15) }, uSea: { value: new THREE.Vector4(0, 2.618, 0, 0) }, uMotion: { value: new THREE.Vector4() }, uSail: { value: new THREE.Vector4(1, 0, 0, 0) }, uClock: { value: new THREE.Vector4() }, uHull: { value: new THREE.Vector4(0.5, -0.5, 1, 0.02) }, uMisc: { value: new THREE.Vector4(-0.02, 0, 0, 1.6) }, uBeam: { value: new Float32Array(17) } });
+            uWave: { value: new THREE.Vector4(0, 0.3, 0, 0.15) }, uSea: { value: new THREE.Vector4(0, 2.618, 0, 0) }, uMotion: { value: new THREE.Vector4() }, uSail: { value: new THREE.Vector4(1, 0, 0, 0) }, uClock: { value: new THREE.Vector4() }, uHull: { value: new THREE.Vector4(0.5, -0.5, 1, 0.02) }, uMisc: { value: new THREE.Vector4(-0.02, 0, 0, 1.6) }, uBeam: { value: new Float32Array(17) }, uRot0: { value: new THREE.Matrix3() }, uBoat0: { value: new THREE.Vector3() }, uScale0: { value: 1 } });
         Object.assign(velU, { tHome: { value: home }, uDelta: { value: 0 }, uCurl: { value: cfg.pCurl }, uReturn: { value: cfg.pReturn }, uDamp: { value: cfg.pDamp }, uPull: { value: cfg.pPull }, uRadius: { value: cfg.pRadius }, uScroll: { value: 0 }, uH: { value: 1e5 }, uCam: { value: new THREE.Vector3() }, uDir: { value: new THREE.Vector3(0, 0, -1) } }, noBoat());
         Object.assign(posU, { tHome: { value: home }, uDelta: { value: 0 } }, noBoat());
         const err = gpu.init(); if (err) throw new Error(err);
