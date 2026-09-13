@@ -346,7 +346,7 @@ export function wakePt(rand) {
 const SAIL_W = { main: 520, mizzen: 330, jib: 260, stay: 220, flying: 180, jib4: 120, topA: 380, topB: 150, foreG: 260, foreR: 170, mainC: 560, mainT: 400, mainG: 280, mainR: 180, mainSky: 100, mizG: 200, mizR: 130 };
 const SPAR_W = { mastA: 120, mastB: 110, mastC: 120, boomA: 45, gaffA: 40, boomB: 35, gaffB: 30, bowsprit: 55, yard_foreG: 32, yard_mainC: 40, yard_mainT: 36, yard_mainG: 32, yard_foreR: 24, yard_mainR: 26, yard_mainSky: 18, yard_mizT: 32, yard_mizG: 26, yard_mizR: 20 };
 const RIG_W = { shroudsA: 130, shroudsB: 110, shroudsC: 130, ratA: 190, ratB: 150, ratC: 200, foreStay: 60, jibStay: 50, flyingStay: 45, jib4Stay: 35, stays: 80, backstay: 50, backstays: 90, running: 100, braces: 170, footropes: 110 };
-const ROLE_W = [[ROLE.HULL, 0.17], [ROLE.DECK, 0.04], [ROLE.SAIL, 0.30], [ROLE.SPAR, 0.05], [ROLE.RIGGING, 0.05], [ROLE.WATER, 0.18], [ROLE.WAKE, 0.07], [ROLE.REFLECTION, 0.14]];   // the Sept-10 sailboat's mix: sails 39, hull 18, water 18, reflection 16 (with the rigging on the hull at the first two levels)
+const ROLE_W = [[ROLE.HULL, 0.17], [ROLE.DECK, 0.04], [ROLE.SAIL, 0.28], [ROLE.SPAR, 0.05], [ROLE.RIGGING, 0.05], [ROLE.WATER, 0.22], [ROLE.WAKE, 0.07], [ROLE.REFLECTION, 0.12]];   // the Sept-10 sailboat's mix: sails 39, hull 18, water 18, reflection 16 (with the rigging on the hull at the first two levels)
 const PARTS = { [ROLE.SAIL]: SAIL_W, [ROLE.SPAR]: SPAR_W, [ROLE.RIGGING]: RIG_W };
 
 function slots(count) {   // [{role, part, n}] whose n sum to count exactly
