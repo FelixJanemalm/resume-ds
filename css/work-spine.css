@@ -192,3 +192,5 @@ body:has(#ws-particles) .reader { background-color: transparent; }
    so the work stage must stack above the layer, and the swell drifts ahead of the page a little (--ws-lottie-y from work-spine.js). */
 .work-spine.is-3d .work-spine__stage { z-index: 2; }
 .hero-wrapper dotlottie-player { translate: 0 var(--ws-lottie-y, 0px); }
+.hero-wrapper #scroll-down-arrow { z-index: 2; }
+.work-heading { position: relative; z-index: 2; }
