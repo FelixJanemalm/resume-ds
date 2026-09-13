@@ -538,7 +538,8 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
             landscape: [   // Felix's route (baked from the editor, 2026-09-12) with the exit reworked the same night: the skiff at the foot of the swell, a wide
                            // sweep up and round into the column, one arc out of the column down to a side shot beside the quote, where the ship levels up
                            // ketch -> schooner -> barque -> clipper as the words are revealed (the reveal runs from #read's top over ~5 px per character)
-                { at: 'top', x: c.boatX, y: c.boatY, size: c.boatSize, turn: 145, tilt: 0, heel: 9, level: L1, wake: 0, cam: 0 },                      // the Sept-10 hero: the sloop, bow left 35 deg toward the viewer, the WHOLE scene heeled 9 deg and swaying on the long swell (shipSway), bobbing, dots like the field's
+                { at: 'top', x: c.boatX, y: c.boatY, size: c.boatSize, turn: 215.5, tilt: 9.2, heel: 0, level: L1, wake: 0, cam: 0 },                   // the Sept-10 hero, copied: its yaw -0.62 rad about the vertical (bow at -x there, so turn = 180 + 35.5), its roll 0.16 rad about
+                                                                                                                                                       // the screen's horizontal axis on the WHOLE scene = tilt 9.2 (water included), pivot on the waterline; sway and bob at rest (shipSway, shipBob)
                 { at: '#work:center@0.72', x: -0.35, y: -0.06, size: 0.315, turn: 135, tilt: 6, heel: 5, level: L1, wake: 0.35, cam: 0.2 },
                 { at: '#work:center@0.5', x: -0.3, y: 0.065, size: 0.35, turn: 110, tilt: 24, heel: 5, level: L1, wake: 0.65, cam: 0.3 },
                 { at: '#work:center@0.25', x: -0.2, y: -0.1, size: 0.35, turn: 92, tilt: 50, heel: 5, level: L1, wake: 0.85, cam: 0.5 },                 // authored heel stays small: the wind adds its own (~12 deg at this speed) and the sum is soft-limited at 18
@@ -914,8 +915,8 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         ship.phiR = (ship.phiR + dt * 0.6 * omegaE) % 6283.185;
         const pF = (1.5 - 0.33 * lvn) * pcfg.shipBob * pcfg.shipSwell, rollSea = (0.8 + 1.4 * sea) * pF * (Math.sin(ship.phiR) + 0.4 * Math.sin(1.7 * ship.phiR + 0.9)) / 1.4;
         const restW = 1 - M.smoothstep(way, 0.05, 0.4), sway = pcfg.shipSway * pcfg.shipBob * restW;   // at anchor: the long quiet swell rocks the whole scene (step 1's idle), gone under way where the sea must stay level
-        const sceneHeel = restW * P.heel + sway * (3.4 * Math.sin(t * 0.6) + 1.0 * Math.sin(t * 1.7 + 0.8)), sceneTilt = sway * 1.0 * Math.sin(t * 0.47 + 2.0);   // at rest the authored heel is the SCENE's (the water heels with the hull, as the Sept-10 build did), with the sway on top
-        const heel = 24 * Math.tanh((ship.heel - restW * P.heel + rollSea) / 24), turn = P.turn + (1.5 + 3.5 * sway) * Math.sin(t * 0.21) + 1.2 * gust, tilt = P.tilt + 0.8 * Math.sin(t * 0.47) + sceneTilt;
+        const sceneTilt = sway * 3.44 * Math.sin(t * 0.6);   // at rest the whole scene sways on the long swell, as the Sept-10 build did: 0.06 rad at 0.6 rad/s on its roll (today's tilt) and 0.09 rad at 0.21 on its yaw (today's turn)
+        const heel = 24 * Math.tanh((ship.heel + rollSea) / 24), turn = P.turn + (1.5 + 3.7 * sway) * Math.sin(t * 0.21) + 1.2 * gust, tilt = P.tilt + 0.8 * Math.sin(t * 0.47) * (1 - restW) + sceneTilt;
         // the sails: apparent wind from the weather (the pose's wake), the gust and the ship's own speed; a sail with wind fills, one with wind but not
         // drawing luffs (flogs), one with no wind hangs still; a gust shakes it. The flutter phase accumulates at a rate that follows the apparent wind.
         const Wt = 0.09 + 0.6 * P.wake + 0.5 * ship.wind, Wa = Math.min(1, Math.sqrt(Wt * Wt + 0.45 * Wt * way + 0.2 * way * way) / 1.28);   // a light air at anchor: the sails stir, they do not flog
@@ -923,7 +924,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         const flapAmp = 0.03 * pcfg.shipFlap * (0.15 + 0.6 * luff + 1.2 * gust), bellyMul = 0.6 + 0.6 * fill;
         ship.flutPh = (ship.flutPh + dt * (1.8 + 4.0 * Wa + 2.5 * gust)) % 6283.185;
         // the sea pose: heading, tilt, turn only. Heel, pitch and heave are applied per role in the shader about the waterline pivot, so the water stays level
-        _qa.setFromAxisAngle(X, M.degToRad(tilt)).multiply(_qb.setFromAxisAngle(Y, -M.degToRad(turn))).multiply(_qb.setFromAxisAngle(X, M.degToRad(sceneHeel)));   // the sea pose: tilt, course, and at anchor the scene's own slow heel about the keel line (the water rocks with the hull); the ship's roll, pitch and heave are per role in the shader
+        _qa.setFromAxisAngle(X, M.degToRad(tilt)).multiply(_qb.setFromAxisAngle(Y, -M.degToRad(turn)));   // the sea pose: tilt (a rotation of the whole scene about the screen's horizontal axis, the Sept-10 build's roll) and course; the ship's roll, pitch and heave are per role in the shader
         shipRot.setFromMatrix4(_m4.makeRotationFromQuaternion(_qa));
         shipAt.set(P.x * visW / 2, P.y * visH / 2 + restW * pcfg.shipBob * 0.04 * Math.sin(t * 0.8), 0);   // at rest the whole scene bobs (Sept 10: 0.04 units at 0.8 rad/s)
         const snap = now - ship.t0 < 700 ? 0.02 : 0;
