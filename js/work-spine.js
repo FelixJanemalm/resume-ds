@@ -540,12 +540,12 @@ function startParticleLayer(THREE, GPUC, BOAT) {
                 { at: 'stage@0.92', x: -0.02, y: -0.45, size: 0.22, turn: 84, tilt: 63, heel: 4, level: L2, wake: 1, cam: 0.8 },
                 { at: 'stage-release', x: 0, y: -0.45, size: 0.24, turn: 78, tilt: 56, heel: 7, level: L2, wake: 0.95, cam: 0.8 },
                 { at: 'stage-release+450', x: -0.15, y: -0.55, size: 0.28, turn: 45, tilt: 26, heel: 7, level: L2, wake: 0.9, cam: 0.8 },
-                { at: '#read:top@0', x: -0.05, y: -0.8, size: 0.28, turn: 0, tilt: 0, heel: 3, level: L2, wake: 0.85, cam: 1 },                                          // the side shot below the quote
-                { at: '#read:top@0+180', x: -0.05, y: -0.8, size: 0.28, turn: 0, tilt: 0, heel: 3, level: L3, wake: 0.9, cam: 1 },
-                { at: '#read:top@0+360', x: -0.05, y: -0.8, size: 0.28, turn: 0, tilt: 0, heel: 3, level: L4, wake: 0.95, cam: 1 },
-                { at: '#read:top@0+540', x: -0.05, y: -0.8, size: 0.28, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1 },
+                { at: '#read:top@0', x: -0.05, y: -0.82, size: 0.22, turn: 0, tilt: 0, heel: 3, level: L2, wake: 0.85, cam: 1 },                                          // the side shot below the quote
+                { at: '#read:top@0+180', x: -0.05, y: -0.82, size: 0.22, turn: 0, tilt: 0, heel: 3, level: L3, wake: 0.9, cam: 1 },
+                { at: '#read:top@0+360', x: -0.05, y: -0.82, size: 0.22, turn: 0, tilt: 0, heel: 3, level: L4, wake: 0.95, cam: 1 },
+                { at: '#read:top@0+540', x: -0.05, y: -0.82, size: 0.22, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1 },
                 ...(RK < 0 ? [] : [
-                    { at: '#scalability:top@0.55', x: -0.05, y: -0.8, size: 0.28, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1 },
+                    { at: '#scalability:top@0.55', x: -0.05, y: -0.82, size: 0.22, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1 },
                     { at: '#scalability:top@0.25', x: 0.5, y: -0.95, size: 0.26, turn: -90, tilt: 90, heel: 0, level: RK, wake: 0.7, cam: 1 },
                     { at: 'footer:top@1', x: 0.5, y: -0.95, size: 0.26, turn: -90, tilt: 90, heel: 0, level: RK, wake: 0.85, cam: 1 },
                     { at: 'end', x: 0.5, y: -0.62, size: 0.26, turn: -90, tilt: 90, heel: 0, level: RK, wake: 0.85, cam: 1 },
