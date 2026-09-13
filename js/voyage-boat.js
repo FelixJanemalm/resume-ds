@@ -364,8 +364,9 @@ const pickWeighted = (W, r) => { const ks = Object.keys(W), tot = ks.reduce((s, 
    turn -90 / tilt 90 stands it nose-up on the screen with its +y side (the porthole) toward the viewer, the foam
    strip streaming aft from the measured "stern" becomes the exhaust plume, and the hull measurement (the radius at
    the waterline) sizes that plume at the nozzle. HULL -> body and nose, DECK -> four swept fins, SPAR -> the nozzle
-   bell, the nose spike and the fins' bright edges, RIGGING -> four landing legs with pads, WAKE -> the plume (shared
-   with the ships); sails, water and the reflection are absent here, so those particles return to the field. */
+   bell, the nose spike and the fins' bright edges, RIGGING -> four landing legs with pads, WAKE -> the plume, WATER -> the air
+   streaks past the body and the sparks under the nozzle (both placed by the shader's rocket branch); sails and the reflection are
+   absent here, so those particles return to the field. */
 const RK = { R: 0.075, x0: -0.5, x1: 0.5, xc: 0.16, flare: 0.015, finR: 0.19, foot: [-0.56, 0.155] };
 const FIN_A = [45, 135, 225, 315].map(d => d * PI / 180), LEG_A = [0, 90, 180, 270].map(d => d * PI / 180);
 function rocketR(x) {   // the body's radius along x: a flared skirt, the cylinder, an ogive nose
@@ -404,8 +405,8 @@ function rocketLevel(count, role, rand, wakePos, wakeMeta) {
             else if (q < 0.8) { x = lerp(-0.45, RK.foot[0], t); rad = lerp(RK.R, RK.foot[1], t); }
             else { x = lerp(RK.foot[0] - 0.012, RK.foot[0] + 0.012, t); rad = RK.foot[1] + (rand() - 0.5) * 0.02; }
             put(i, [x + j(), WL + rad * ca + j(), rad * sa + j(), 0.7]);
-        } else if (r === ROLE.WAKE) { const o = i * 4; for (let k = 0; k < 4; k++) { pos[o + k] = wakePos[o + k]; meta[o + k] = wakeMeta[o + k]; } }
-        // sails, water, reflection: absent (shade 0)
+        } else if (r === ROLE.WAKE || r === ROLE.WATER) { const o = i * 4; for (let k = 0; k < 4; k++) { pos[o + k] = wakePos[o + k]; meta[o + k] = wakeMeta[o + k]; } }   // the plume, and the air streaks / sparks (both placed by the shader)
+        // sails, reflection: absent (shade 0)
     }
     return { pos, meta };
 }
