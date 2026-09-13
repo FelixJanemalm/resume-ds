@@ -35,8 +35,8 @@ const pcfg = section ? {
     mode: new URLSearchParams(location.search).get('particles') || section.dataset.particles || 'page',   // 'page': one fixed layer behind the whole page | 'stage': inside the work stage | 'none'
     pCount: numAttr(section.dataset.pCount, coarse ? 128 : 256),
     pCurl: numAttr(section.dataset.pCurl, 1.4), pReturn: numAttr(section.dataset.pReturn, 1.2), pPull: numAttr(section.dataset.pPull, 3), pDamp: numAttr(section.dataset.pDamp, 0.92),
-    pSize: numAttr(section.dataset.pSize, 1.7), pGlow: numAttr(section.dataset.pGlow, 1.0), pRadius: numAttr(section.dataset.pRadius, 1.6),
-    pParallax: numAttr(section.dataset.pParallax, 0.004),    // units of field per scrolled pixel at mid depth; near particles move faster, far ones slower
+    pSize: numAttr(section.dataset.pSize, 1.7), pGlow: numAttr(section.dataset.pGlow, 1.0), pRadius: numAttr(section.dataset.pRadius, 1),
+    pParallax: numAttr(section.dataset.pParallax, 0),    // units of field per scrolled pixel at mid depth; near particles move faster, far ones slower
     boat: section.dataset.boat || 'voyage',                  // the ship of particles: 'voyage' (sails in at the top and down the page with you) | 'off'
     boatX: numAttr(section.dataset.boatX, -0.235), boatY: numAttr(section.dataset.boatY, -0.41), boatSize: numAttr(section.dataset.boatSize, 0.37),   // hero pose: waterline centre in NDC, hull length as a fraction of the visible width
     shipShare: numAttr(section.dataset.shipShare, coarse ? 0.3 : 0.2),   // share of the particles that belong to the ship
@@ -209,11 +209,11 @@ const SIM_VEL = SIM_NOISE + SIM_SHARED + `
       if (bf > 0.5 && laneV > 0.5) { gl_FragColor=vec4(0.0,0.0,0.0,1.0); return; }               // water and foam carry no velocity: no spring, no curl, no cursor pull
       float fdv; vec3 tgt=mix(mix(h.xyz, boatTarget(bA,bB,mA,mB,fdv), bf), st.xyz, sf);
       if (bf > 0.5) p = rideAlong(p);                                                                 // the spring sees the particle where the pose has carried it
-      vec3 f=(tgt-p)*uReturn*(1.0+1.5*bf+2.5*sf);
+      vec3 f=(tgt-p)*uReturn*(1.0+0.3*bf+2.5*sf);   // the ship's spring is only a little stiffer than the field's, so the cursor can stir it
       f+=curlNoise(p*0.28+vec3(0.0,uTime*0.05,0.0))*uCurl*(0.4+0.6*h.w)*(1.0-0.8*bf)*(1.0-0.7*sf);
       vec3 pw=drawPos(p,max(bf,sf));
       vec3 rel=pw-uCam; float along=dot(rel,uDir); vec3 perp=rel-uDir*along; float d=length(perp);
-      float infl=(1.0-smoothstep(0.0,uRadius,d))*step(0.5,along)*(1.0-0.7*bf);   // the hull answers the light a little; the sea (above) not at all
+      float infl=(1.0-smoothstep(0.0,uRadius,d))*step(0.5,along)*(1.0-0.3*bf);   // the hull answers the light; the sea (above) not at all
       vec3 toRay=-perp/max(d,1e-4);
       f+=toRay*infl*uPull+cross(uDir,toRay)*infl*uPull*0.6;
       v=v*uDamp+f*uDelta; gl_FragColor=vec4(v,1.0); }`;
@@ -581,7 +581,7 @@ function startParticleLayer(THREE, GPUC, BOAT) {
     const lottieEl = document.querySelector('.hero-wrapper dotlottie-player');
     function lottiePhase() { try { const l = lottieEl && lottieEl.getLottie && lottieEl.getLottie(); return l && l.totalFrames ? (l.currentFrame % l.totalFrames) / l.totalFrames : -1; } catch (e) { return -1; } }
     function lottieParallax() { if (!lottieEl || !(pcfg.shipLottie > 0)) return; const h = lottieEl.parentElement ? lottieEl.parentElement.offsetHeight : innerHeight; lottieEl.style.setProperty('--ws-lottie-y', (-pcfg.shipLottie * Math.min(scrollY, h)).toFixed(1) + 'px'); }
-    const ship = { sy: scrollY, keys: [], resolvedAt: -1e9, t0: -1, ripple: 0, flow: 0, wind: 0, way: 0, gust: 0, heel: null, heelVel: 0, phiE: 0, phiR: 0, flutPh: 0, flick: 0, churnPh: 0, lambda: 0.3, driftX: 0, driftY: 0, camW: 0, par: -scrollY * pcfg.pParallax, parScroll: scrollY, lastScroll: scrollY, lo: -1, pose: {}, follow: null, route: null, entryRoute: null, entryEnd: null, seen: -1, speedAvg: 0, heroY: -1, overlay: false, overlayY: Infinity, layerZ: '', flipping: false };
+    const ship = { sy: scrollY, keys: [], resolvedAt: -1e9, t0: -1, ripple: 0, flow: 0, wind: 0, way: 0, gust: 0, heel: null, heelVel: 0, phiE: 0, phiR: 0, flutPh: 0, flick: 0, churnPh: 0, lambda: 0.3, lastMix: 0, settleGain: 1, driftX: 0, driftY: 0, camW: 0, par: -scrollY * pcfg.pParallax, parScroll: scrollY, lastScroll: scrollY, lo: -1, pose: {}, follow: null, route: null, entryRoute: null, entryEnd: null, seen: -1, speedAvg: 0, heroY: -1, overlay: false, overlayY: Infinity, layerZ: '', flipping: false };
     /* Pose evaluation. Scroll -> target pose: a monotone cubic (Fritsch-Butland tangents) through the keyframes. A value only moves
        inside segments whose two keys differ, so holds stay perfectly flat and nothing overshoots, yet velocity is continuous through
        every keyframe: positions travel on arcs and the angles never stop dead at a key. Tangents are prepared once per resolve. */
@@ -814,6 +814,8 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         const dScroll = Math.abs(scrollY - ship.lastScroll); ship.lastScroll = scrollY;
         // evolution: the two level textures around the fractional level, mixed in the shader
         const L = M.clamp(P.level, 0, levels.length - 1), lo = Math.min(levels.length - 1, Math.floor(L)), hi = Math.min(levels.length - 1, lo + 1), mix = L - lo;
+        const mixRate = Math.abs(mix - ship.lastMix) / Math.max(dt, 1e-3); ship.lastMix = mix;   // wraps of mix at a level boundary count as a morph too, which is right
+        ship.settleGain += (0.3 + 0.7 * Math.min(1, mixRate * 2) - ship.settleGain) * Math.min(1, dt / (mixRate > 0.1 ? 0.05 : 0.6));   // the settle holds at full rate through a morph and relaxes after it
         if (lo !== ship.lo) { ship.lo = lo; for (const u of [velU, posU, U]) { u.tBoatA.value = levels[lo].pos; u.tMetaA.value = levels[lo].meta; u.tBoatB.value = levels[hi].pos; u.tMetaB.value = levels[hi].meta; } }
         const LS = levels[lo].scale + (levels[hi].scale - levels[lo].scale) * mix, scale = P.size * visW * LS;
         const NL = levels.length, lvl = M.clamp(P.level, 0, NL - 1), lvi = Math.min(NL - 2, Math.floor(lvl)), lvf = lvl - lvi, tbl = T => T[lvi] + (T[lvi + 1] - T[lvi]) * lvf;   // per-level tables, linear between whole levels
@@ -927,7 +929,7 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         if (!qual.done) { qual.acc += dt; qual.frames++; if (qual.acc > 2.5) { qual.done = true; const ms = qual.acc / qual.frames * 1000; if (ms > 20) { qual.half = true; gl.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5)); geo.setDrawRange(0, Math.floor(COUNT / 2)); resize(); console.info('work-spine: slow device (' + ms.toFixed(1) + ' ms/frame), reduced quality'); } } }
         starsFrame(t, dt);
         qual.simDt += dt;
-        if (!qual.half || (qual.tick++ % 2 === 0)) { velU.uDelta.value = qual.simDt; posU.uDelta.value = qual.simDt; posU.uSettle.value = shipOn ? 1 - Math.exp(-qual.simDt * pcfg.shipSettle) : 0; qual.simDt = 0; gpu.compute();
+        if (!qual.half || (qual.tick++ % 2 === 0)) { velU.uDelta.value = qual.simDt; posU.uDelta.value = qual.simDt; posU.uSettle.value = shipOn ? 1 - Math.exp(-qual.simDt * pcfg.shipSettle * ship.settleGain) : 0; qual.simDt = 0; gpu.compute();
             shipRot0.copy(shipRot); shipAt0.copy(shipAt); for (const u of [velU, posU, U]) u.uScale0.value = U.uBoatScale.value; }   // solids were just written against this pose
         U.tPos.value = gpu.getCurrentRenderTarget(posVar).texture; U.tVel.value = gpu.getCurrentRenderTarget(velVar).texture;
         U.uIntro.value = Math.min(1, U.uIntro.value + dt * 0.5);
