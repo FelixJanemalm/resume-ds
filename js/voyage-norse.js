@@ -5,10 +5,11 @@
    belly | phase, aux), so js/work-spine.js can swap it in for the Atlantic lineage without any shader change.
 
    The lineage: a clinker-built double-ender all the way, one mast, one striped square sail (braced -30 deg; the
-   module exports that normal for the shader), rising stem and stern posts. The faering rows (oars out) under a small sail, the karvi
-   has more oars and shrouds, the snekkja ships its oars, hangs the shield row and raises a dragon head, the skeid adds
-   the tail curl and a second pair of shrouds, the drakkar the weather vane and a third pair, the Long Serpent the full
-   shield row with bigger shields and the tallest posts. WATER / WAKE / the rocket come from voyage-boat.js. */
+   module exports that normal for the shader), rising stem and stern posts, oars out at every level. The steps must read
+   from a distance, so each one changes the silhouette: the faering is a wide rowing boat with three oars a side under a
+   plain scrap of sail; the karvi eight oars, a real striped sail and shrouds; the snekkja twelve, the shield row and a
+   dragon head; the skeid sixteen, the tail curl and a second pair of shrouds; the drakkar twenty, the weather vane and a
+   third pair; the Long Serpent twenty-four, bigger shields, the tallest posts and the biggest sail. WATER / WAKE / the rocket come from voyage-boat.js. */
 import { ROLE, WATERLINE, mulberry32, shadeN, waterPt, wakePt, rocketLevel } from './voyage-boat.js';
 export { ROLE, WATERLINE };
 export const THEME = { id: 'norse', name: 'Norse', title: 'Faering to the Long Serpent' };
@@ -25,14 +26,14 @@ const TOP = shadeN([0, 1, 0]);
 
 /* per level: B max half-beam, f0 / fEnd freeboard amidships / at the ends, post height above the sheer, mast height,
    sail width and height, rooms (rowing benches), shields (0 none, 1 every other / all, 2 all and bigger), oars per side,
-   head / tail / vane flags, sail stripes */
+   head / tail / vane sizes, sail stripes (1 = plain) */
 const SHIP = [
-    { B: 0.150, f0: 0.075, fEnd: 0.140, post: 0.050, mast: 0.50, sailW: 0.34, sailH: 0.28, rooms: 3, shields: 0, oars: 2, head: 0, tail: 0, vane: 0, stripes: 5 },
-    { B: 0.120, f0: 0.065, fEnd: 0.150, post: 0.080, mast: 0.58, sailW: 0.42, sailH: 0.34, rooms: 6, shields: 0, oars: 6, head: 0, tail: 0, vane: 0, stripes: 7 },
-    { B: 0.095, f0: 0.060, fEnd: 0.160, post: 0.100, mast: 0.64, sailW: 0.48, sailH: 0.40, rooms: 10, shields: 1, oars: 0, head: 0.8, tail: 0, vane: 0, stripes: 8 },
-    { B: 0.085, f0: 0.058, fEnd: 0.170, post: 0.120, mast: 0.70, sailW: 0.52, sailH: 0.45, rooms: 13, shields: 1, oars: 0, head: 0.95, tail: 0.9, vane: 0, stripes: 9 },
-    { B: 0.080, f0: 0.056, fEnd: 0.180, post: 0.140, mast: 0.76, sailW: 0.56, sailH: 0.50, rooms: 16, shields: 1, oars: 0, head: 1.1, tail: 1.0, vane: 1, stripes: 10 },
-    { B: 0.078, f0: 0.055, fEnd: 0.200, post: 0.170, mast: 0.82, sailW: 0.60, sailH: 0.55, rooms: 17, shields: 2, oars: 0, head: 1.25, tail: 1.1, vane: 1, stripes: 12 },
+    { B: 0.150, f0: 0.075, fEnd: 0.130, post: 0.030, mast: 0.42, sailW: 0.26, sailH: 0.20, rooms: 3, shields: 0, oars: 3, head: 0, tail: 0, vane: 0, stripes: 1 },
+    { B: 0.120, f0: 0.065, fEnd: 0.150, post: 0.070, mast: 0.55, sailW: 0.40, sailH: 0.32, rooms: 6, shields: 0, oars: 8, head: 0, tail: 0, vane: 0, stripes: 4 },
+    { B: 0.095, f0: 0.060, fEnd: 0.170, post: 0.100, mast: 0.64, sailW: 0.48, sailH: 0.40, rooms: 10, shields: 1, oars: 12, head: 0.8, tail: 0, vane: 0, stripes: 6 },
+    { B: 0.085, f0: 0.058, fEnd: 0.190, post: 0.130, mast: 0.70, sailW: 0.53, sailH: 0.46, rooms: 13, shields: 1, oars: 16, head: 0.95, tail: 0.9, vane: 0, stripes: 8 },
+    { B: 0.080, f0: 0.056, fEnd: 0.210, post: 0.160, mast: 0.78, sailW: 0.58, sailH: 0.52, rooms: 16, shields: 1, oars: 20, head: 1.1, tail: 1.0, vane: 1, stripes: 10 },
+    { B: 0.078, f0: 0.055, fEnd: 0.240, post: 0.200, mast: 0.86, sailW: 0.64, sailH: 0.58, rooms: 17, shields: 2, oars: 24, head: 1.3, tail: 1.15, vane: 1, stripes: 12 },
 ];
 const SHROUD_PAIRS = [1, 1, 2, 2, 3, 3], SHROUD_X = [-0.07, -0.13, -0.19];
 const HULL_PRES = [0.5, 0.65, 0.78, 0.88, 0.95, 1];
@@ -99,7 +100,7 @@ function mastPt(S, t, jx, jz) { const r = 0.006 * (1 - 0.4 * t); return [0.02 + 
 function yardPt(S, t, jx, jz) { const half = S.sailW * 0.55, k = (t - 0.5) * 2 * half; return [0.02 + YARD_A[0] * k + jx * 0.005, WL + 0.85 * S.mast + jz * 0.005, YARD_A[2] * k, 0.62]; }
 function oarPt(S, k, sgn, t, w) {
     if (k >= S.oars) return null;
-    const x = -0.3 + (k + 0.5) * (0.6 / S.oars), A = [x, railY(S, x), sgn * hbX(S, x)], B = [x - 0.06, WL - 0.025, sgn * (hbX(S, x) + 0.14)];
+    const x = -0.34 + (k + 0.5) * (0.68 / S.oars), A = [x, railY(S, x), sgn * hbX(S, x)], B = [x - 0.06, WL - 0.025, sgn * (hbX(S, x) + 0.14)];
     const P = [lerp(A[0], B[0], t), lerp(A[1], B[1], t), lerp(A[2], B[2], t)], blade = t > 0.85 ? 0.012 * (w - 0.5) * 2 : 0.003 * (w - 0.5);
     return [P[0] + blade, P[1], P[2], 0.6];
 }
@@ -128,11 +129,11 @@ function sailPt(S, s, up, edge) {
 }
 
 /* ---------------------------------------------------------------- allocation */
-const ROLE_W = [[ROLE.HULL, 0.22], [ROLE.DECK, 0.13], [ROLE.SAIL, 0.24], [ROLE.SPAR, 0.10], [ROLE.RIGGING, 0.07], [ROLE.WATER, 0.11], [ROLE.WAKE, 0.09], [ROLE.REFLECTION, 0.04]];
+const ROLE_W = [[ROLE.HULL, 0.20], [ROLE.DECK, 0.13], [ROLE.SAIL, 0.22], [ROLE.SPAR, 0.14], [ROLE.RIGGING, 0.07], [ROLE.WATER, 0.11], [ROLE.WAKE, 0.09], [ROLE.REFLECTION, 0.04]];
 const PARTS = {
     [ROLE.HULL]: { body: 0.86, posts: 0.14 },
     [ROLE.DECK]: { bench: 0.2, mastfish: 0.03, steer: 0.05, shields: 0.5, head: 0.14, tail: 0.05, vane: 0.03 },
-    [ROLE.SPAR]: { mast: 0.3, yard: 0.28, oars: 0.42 },
+    [ROLE.SPAR]: { mast: 0.22, yard: 0.2, oars: 0.58 },
     [ROLE.RIGGING]: { forestay: 0.1, backstay: 0.1, shrouds: 0.35, braces: 0.2, sheets: 0.25 },
 };
 function slots(count) {
@@ -177,7 +178,7 @@ export function buildBoatLevels(count, seed = 1) {
         return () => null;
     };
     const genSpar = part => {
-        const t = rand(), a = j() * 2, b = j() * 2, k = Math.floor(rand() * 8), sgn = rand() < 0.5 ? -1 : 1, w = rand();
+        const t = rand(), a = j() * 2, b = j() * 2, k = Math.floor(rand() * 24), sgn = rand() < 0.5 ? -1 : 1, w = rand();
         switch (part) {
             case 'mast': return L => mastPt(SHIP[L], t, a, b);
             case 'yard': return L => yardPt(SHIP[L], t, a, b);

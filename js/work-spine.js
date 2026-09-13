@@ -38,7 +38,7 @@ const pcfg = section ? {
     pSize: numAttr(section.dataset.pSize, 1.7), pGlow: numAttr(section.dataset.pGlow, 1.0), pRadius: numAttr(section.dataset.pRadius, 1),
     pParallax: numAttr(section.dataset.pParallax, 0),    // units of field per scrolled pixel at mid depth; near particles move faster, far ones slower
     boat: section.dataset.boat || 'voyage',                  // the ship of particles: 'voyage' (sails in at the top and down the page with you) | 'off'
-    boatX: numAttr(section.dataset.boatX, -0.235), boatY: numAttr(section.dataset.boatY, -0.41), boatSize: numAttr(section.dataset.boatSize, 0.37),   // hero pose: waterline centre in NDC, hull length as a fraction of the visible width
+    boatX: numAttr(section.dataset.boatX, -0.35), boatY: numAttr(section.dataset.boatY, -0.29), boatSize: numAttr(section.dataset.boatSize, 0.42),   // hero pose: waterline centre in NDC, hull length as a fraction of the visible width
     shipShare: numAttr(section.dataset.shipShare, coarse ? 0.3 : 0.2),   // share of the particles that belong to the ship
     shipEntry: numAttr(section.dataset.shipEntry, 4.5),                  // seconds the ship takes to ride in on the swell on load
     shipWorkSize: numAttr(section.dataset.shipWorkSize, 0.15), shipWorkY: numAttr(section.dataset.shipWorkY, -0.38), shipWorkTilt: numAttr(section.dataset.shipWorkTilt, 68),   // pose in the work section: seen from above in the band under the cards, sailing down the axis, wake streaming up the column (size is the on-screen hull length; it does not grow with the level here)
@@ -46,6 +46,8 @@ const pcfg = section ? {
     shipHeelWind: numAttr(section.dataset.shipHeelWind, 12),   // deg of heel from the wind at full way on the sloop (per level x 0.58 dinghy, 1.3 schooner, 1.1 tall ship)
     shipSwell: numAttr(section.dataset.shipSwell, 1), shipSwellDir: numAttr(section.dataset.shipSwellDir, 0),   // the sea's swell: height (1 = default) and the direction it runs relative to the hull (0 = along it, 90 = across it)
     shipWave: numAttr(section.dataset.shipWave, 1), shipSpray: numAttr(section.dataset.shipSpray, 1), shipFoam: numAttr(section.dataset.shipFoam, 1),   // wave heights and crest brightness | spray | foam
+    shipSway: numAttr(section.dataset.shipSway, 1),                     // at anchor the WHOLE scene (ship and water) heels and yaws slowly on a long quiet swell, as step 1 did; 0 = the sea stays level
+    shipDotsRest: numAttr(section.dataset.shipDotsRest, 0.35),          // at rest the ship's dots keep this much of their size boost (0 = drawn like the field's specks, as step 1 read); under way the full boost
     shipSettle: numAttr(section.dataset.shipSettle, 7),     // how fast ship particles take their places (per second): 7 lands a recruit in about 0.4 s
     shipLag: numAttr(section.dataset.shipLag, 0.9), shipLagPos: numAttr(section.dataset.shipLagPos, 0.6), shipLagSize: numAttr(section.dataset.shipLagSize, 0.8),   // seconds the drawn pose takes to close 95% of a scroll jump: angles / position (x, y, wake) / framing (size and level share one lag so the hull length holds while the ship evolves)
     shipLean: numAttr(section.dataset.shipLean, 0.02),                   // banking: deg of heel per deg/s of turn, capped at 5 (negative carves into the turn instead)
@@ -534,7 +536,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
             landscape: [   // Felix's route (baked from the editor, 2026-09-12) with the exit reworked the same night: the skiff at the foot of the swell, a wide
                            // sweep up and round into the column, one arc out of the column down to a side shot beside the quote, where the ship levels up
                            // ketch -> schooner -> barque -> clipper as the words are revealed (the reveal runs from #read's top over ~5 px per character)
-                { at: 'top', x: c.boatX, y: c.boatY, size: c.boatSize, turn: 145, tilt: 0, heel: 2, level: 0, wake: 0, cam: 0 },                       // at anchor a boat sits upright: the swell rolls it
+                { at: 'top', x: c.boatX, y: c.boatY, size: c.boatSize, turn: 145, tilt: 0, heel: 2, level: 0, wake: 0, cam: 0 },                       // at anchor where step 1 had it (higher, further left, a little bigger); the whole scene rocks on the long swell (shipSway)
                 { at: '#work:center@0.72', x: -0.35, y: -0.06, size: 0.315, turn: 135, tilt: 6, heel: 5, level: 0, wake: 0.35, cam: 0.2 },
                 { at: '#work:center@0.5', x: -0.3, y: 0.065, size: 0.35, turn: 110, tilt: 24, heel: 5, level: L1, wake: 0.65, cam: 0.3 },
                 { at: '#work:center@0.25', x: -0.2, y: -0.1, size: 0.35, turn: 92, tilt: 50, heel: 5, level: L1, wake: 0.85, cam: 0.5 },                 // authored heel stays small: the wind adds its own (~12 deg at this speed) and the sum is soft-limited at 18
@@ -909,7 +911,9 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         ship.heelVel += dt * (omegaR * omegaR * (heelT - ship.heel) - 1.9 * omegaR * ship.heelVel); ship.heel += dt * ship.heelVel;   // near critical damping: the roll settles, it does not ring
         ship.phiR = (ship.phiR + dt * 0.6 * omegaE) % 6283.185;
         const pF = (1.5 - 0.33 * lvn) * pcfg.shipBob * pcfg.shipSwell, rollSea = (0.8 + 1.4 * sea) * pF * (Math.sin(ship.phiR) + 0.4 * Math.sin(1.7 * ship.phiR + 0.9)) / 1.4;
-        const heel = 24 * Math.tanh((ship.heel + rollSea) / 24), turn = P.turn + 1.5 * Math.sin(t * 0.21) + 1.2 * gust, tilt = P.tilt + 0.8 * Math.sin(t * 0.47);
+        const restW = 1 - M.smoothstep(way, 0.05, 0.4), sway = pcfg.shipSway * pcfg.shipBob * restW;   // at anchor: the long quiet swell rocks the whole scene (step 1's idle), gone under way where the sea must stay level
+        const sceneHeel = sway * (2.5 * Math.sin(t * 0.6) + 1.2 * Math.sin(t * 1.7 + 0.8)), sceneTilt = sway * 1.2 * Math.sin(t * 0.47 + 2.0);
+        const heel = 24 * Math.tanh((ship.heel + rollSea) / 24), turn = P.turn + (1.5 + 2.5 * sway) * Math.sin(t * 0.21) + 1.2 * gust, tilt = P.tilt + 0.8 * Math.sin(t * 0.47) + sceneTilt;
         // the sails: apparent wind from the weather (the pose's wake), the gust and the ship's own speed; a sail with wind fills, one with wind but not
         // drawing luffs (flogs), one with no wind hangs still; a gust shakes it. The flutter phase accumulates at a rate that follows the apparent wind.
         const Wt = 0.09 + 0.6 * P.wake + 0.5 * ship.wind, Wa = Math.min(1, Math.sqrt(Wt * Wt + 0.45 * Wt * way + 0.2 * way * way) / 1.28);   // a light air at anchor: the sails stir, they do not flog
@@ -917,7 +921,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         const flapAmp = 0.03 * pcfg.shipFlap * (0.15 + 0.6 * luff + 1.2 * gust), bellyMul = 0.6 + 0.6 * fill;
         ship.flutPh = (ship.flutPh + dt * (1.8 + 4.0 * Wa + 2.5 * gust)) % 6283.185;
         // the sea pose: heading, tilt, turn only. Heel, pitch and heave are applied per role in the shader about the waterline pivot, so the water stays level
-        _qa.setFromAxisAngle(X, M.degToRad(tilt)).multiply(_qb.setFromAxisAngle(Y, -M.degToRad(turn)));   // the sea pose: tilt and course; the ship's own roll, pitch and heave are applied per role in the shader
+        _qa.setFromAxisAngle(X, M.degToRad(tilt)).multiply(_qb.setFromAxisAngle(Y, -M.degToRad(turn))).multiply(_qb.setFromAxisAngle(X, M.degToRad(sceneHeel)));   // the sea pose: tilt, course, and at anchor the scene's own slow heel about the keel line (the water rocks with the hull); the ship's roll, pitch and heave are per role in the shader
         shipRot.setFromMatrix4(_m4.makeRotationFromQuaternion(_qa));
         shipAt.set(P.x * visW / 2, P.y * visH / 2, 0);
         const snap = now - ship.t0 < 700 ? 0.02 : 0;
@@ -940,7 +944,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         if (hw) { shipU.hull.set(hwA.stem + (hwB.stem - hwA.stem) * mix, hwA.stern + (hwB.stern - hwA.stern) * mix, entryGain, hwA.sternHalf + (hwB.sternHalf - hwA.sternHalf) * mix); for (let k = 0; k < 17; k++) shipU.beam[k] = hwA.beam[k] + (hwB.beam[k] - hwA.beam[k]) * mix; }
         shipU.misc.set(tbl(LEVEL_PIVOT), 0.25 * way * (1 - M.smoothstep(tilt, 45, 65)), (1 - way) * 0.15 * pcfg.shipRipple, isLight() ? 1.3 : 1.6);
         for (const u of [velU, posU, U]) { u.uRocket.value = rocketMix; u.uMix.value = mix; u.uBoatScale.value = scale; u.uTime.value = t; u.uRipple.value = ship.ripple; u.uFlow.value = ship.flow; u.uWay.value = way; u.uSnapBoat.value = snap; }
-        U.uWake.value = foamGain; U.uReflect.value = (1 - M.smoothstep(way, 0, 0.5)) * (1 - M.clamp((tilt - 10) / 30, 0, 1)); U.uBoatPx.value = M.clamp(0.6 + 0.25 * scale, 1.0, 2.2);   // a bigger ship is sparser: bigger dots
+        U.uWake.value = foamGain; U.uReflect.value = (1 - M.smoothstep(way, 0, 0.5)) * (1 - M.clamp((tilt - 10) / 30, 0, 1)); U.uBoatPx.value = 1 + (M.clamp(0.6 + 0.25 * scale, 1.0, 2.2) - 1) * (1 - restW * (1 - pcfg.shipDotsRest));   // a bigger ship is sparser: bigger dots; at rest most of that boost is dropped so the ship's dots read like the field's
     }
     resize();
     // Theme from the ground the dots are actually drawn on: additive light dots only on a dark ground; as the picked colour lightens
