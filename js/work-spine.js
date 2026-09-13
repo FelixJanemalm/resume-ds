@@ -242,7 +242,7 @@ const SIM_VEL = SIM_NOISE + SIM_SHARED + `
       float fdv; vec3 tgt=mix(mix(h.xyz, boatTarget(bA,bB,mA,mB,fdv), bf), st.xyz, sf);
       if (bf > 0.5) p = carry(p);                                                                     // the spring sees the particle where the pose has carried it (rigidly under way, not at rest)
       vec3 f=(tgt-p)*uReturn*(1.0+0.3*bf+2.5*sf)*(1.0-0.5*bf*uLoose);   // the ship's spring is only a little stiffer than the field's (and half that while loose), so the cursor can stir it
-      f+=curlNoise(p*0.28+vec3(0.0,uTime*0.05,0.0))*uCurl*(0.4+0.6*h.w)*(1.0-0.8*bf*(1.0-0.5*uSoft))*(1.0-0.7*sf);   // the curl wanders the loose ship's dots more
+      f+=curlNoise(p*0.28+vec3(0.0,uTime*0.05,0.0))*uCurl*(0.4+0.6*h.w)*(1.0-0.8*bf*(1.0-0.2*uSoft))*(1.0-0.7*sf);   // the curl wanders the loose ship's dots a little more
       vec3 pw=drawPos(p,max(bf,sf));
       vec3 rel=pw-uCam; float along=dot(rel,uDir); vec3 perp=rel-uDir*along; float d=length(perp);
       float infl=(1.0-smoothstep(0.0,uRadius,d))*step(0.5,along)*(1.0-0.3*bf);   // the hull answers the light; the sea (above) not at all
@@ -955,8 +955,8 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         shipU.clock.set(ship.flick, ship.churnPh, sprayGain, churnGain);
         if (hw) { shipU.hull.set(hwA.stem + (hwB.stem - hwA.stem) * mix, hwA.stern + (hwB.stern - hwA.stern) * mix, entryGain, hwA.sternHalf + (hwB.sternHalf - hwA.sternHalf) * mix); for (let k = 0; k < 17; k++) shipU.beam[k] = hwA.beam[k] + (hwB.beam[k] - hwA.beam[k]) * mix; }
         shipU.misc.set(tbl(LEVEL_PIVOT), 0.25 * way * (1 - M.smoothstep(tilt, 45, 65)), restW * 0.5, isLight() ? 1.3 : 1.6);   // .z: the rest disc's shading contrast (Sept 10: crests at twice the troughs)
-        const soft = pcfg.shipSoft * (1 - M.smoothstep(lvl, pcfg.shipSoftUntil - 1, pcfg.shipSoftUntil));   // barely existing at the first levels, solid by shipSoftUntil
-        for (const u of [velU, posU, U]) { u.uSoft.value = soft; u.uLoose.value = soft * (0.5 + 0.5 * Math.max(restW, entry > 0 ? 1 : 0)); u.uRocket.value = rocketMix; u.uMix.value = mix; u.uBoatScale.value = scale; u.uTime.value = t; u.uRipple.value = ship.ripple; u.uFlow.value = ship.flow; u.uWay.value = way; u.uSnapBoat.value = snap; }   // uLoose: the spring at half strength at anchor and through the ride-in
+        const soft = pcfg.shipSoft * (1 - M.smoothstep(lvl, pcfg.shipSoftUntil - 1, pcfg.shipSoftUntil)) * (0.3 + 0.7 * restW);   // soft at anchor, a lean toward soft while moving through the first levels, solid by shipSoftUntil
+        for (const u of [velU, posU, U]) { u.uSoft.value = soft; u.uLoose.value = 0.15 * soft; u.uRocket.value = rocketMix; u.uMix.value = mix; u.uBoatScale.value = scale; u.uTime.value = t; u.uRipple.value = ship.ripple; u.uFlow.value = ship.flow; u.uWay.value = way; u.uSnapBoat.value = snap; }   // uLoose: the spring a touch weaker while soft
         U.uWake.value = foamGain; U.uReflect.value = (1 - M.smoothstep(way, 0, 0.5)) * (1 - M.clamp((tilt - 10) / 30, 0, 1)); U.uBoatPx.value = M.lerp(M.clamp(0.6 + 0.25 * scale, 1.0, 2.2), pcfg.shipDotsRest, restW);   // a bigger ship is sparser: bigger dots; at rest a fixed small factor so the ship's dots read like the field's
     }
     resize();
