@@ -469,7 +469,16 @@ function startParticleLayer(THREE, GPUC, BOAT) {
        follow the direction of travel on screen; 1 where the camera holds still and the ship really sails across the frame, 0 where the
        camera is the one moving, as it cranes up over the stern on the way into the work section). Positions travel along one smooth
        curve through the waypoints (buildRoute); everything else eases through a monotone cubic over scroll. */
+    // ?route=1 mounts the path editor (js/voyage-editor.js): its edits live in localStorage and apply only with that parameter, until they are baked into the tables below
+    const routeStore = 'ws-route-v1';
+    let routeOverride = null;
+    try { if (new URLSearchParams(location.search).has('route')) routeOverride = JSON.parse(localStorage.getItem(routeStore) || 'null'); } catch (e) { routeOverride = null; }
     function keyframes() {
+        const base = keyframeTables();
+        if (routeOverride) for (const o of ['landscape', 'portrait']) if (Array.isArray(routeOverride[o]) && routeOverride[o].length > 1) base[o] = routeOverride[o];
+        return base;
+    }
+    function keyframeTables() {
         const c = pcfg, LS = (BOAT && BOAT.LEVEL_SCALE) || [1, 1, 1, 1];
         // the work stage: seen from above in the column, bow down the page; the hull keeps one on-screen length while the ship evolves
         const work = (L, y) => ({ x: 0, y: y === undefined ? c.shipWorkY : y, size: c.shipWorkSize / LS[Math.min(3, Math.round(L))], turn: 90, tilt: c.shipWorkTilt, heel: 9, level: L, wake: L > 1.5 ? 1 : 0.9, cam: 1 });
@@ -895,6 +904,15 @@ function startParticleLayer(THREE, GPUC, BOAT) {
     }
     let running = true; last = performance.now(); requestAnimationFrame(frame);   // a hidden tab simply stops getting animation frames
     layer = {
+        // the path editor's window on the route (js/voyage-editor.js, ?route=1)
+        routeApi: {
+            orientation: () => innerHeight > innerWidth ? 'portrait' : 'landscape',
+            tables: () => keyframes(), defaults: () => keyframeTables(), stored: () => routeOverride,
+            set(o, list) { routeOverride = Object.assign({}, routeOverride || {}, { [o]: list }); try { localStorage.setItem(routeStore, JSON.stringify(routeOverride)); } catch (e) {} ship.resolvedAt = -1e9; },
+            reset() { routeOverride = null; try { localStorage.removeItem(routeStore); } catch (e) {} ship.resolvedAt = -1e9; },
+            resolveAt, keys: () => ship.keys, sample: (sc, out) => ship.route ? ship.route.sample(sc, out) : null, pose: () => ship.pose, state: () => ship,
+            toPx: (x, y) => [(x * 0.5 + 0.5) * innerWidth, (0.5 - y * 0.5) * innerHeight], fromPx: (px, py) => [px / innerWidth * 2 - 1, 1 - py / innerHeight * 2],
+        },
         // called by the work section every frame while it is active: figure index and where the figure sits on screen (px)
         setStars(k, cx, cy, w, h) { if (k !== stars.fig) starsSetFigure(k); stars.cx = cx; stars.cy = cy; stars.w = w; stars.h = h; stars.last = performance.now(); },
         sync() { velU.uCurl.value = pcfg.pCurl; velU.uReturn.value = pcfg.pReturn; velU.uDamp.value = pcfg.pDamp; velU.uPull.value = pcfg.pPull; velU.uRadius.value = pcfg.pRadius; U.uSize.value = pcfg.pSize; U.uRadius.value = pcfg.pRadius; applyTheme(); resize(); },
@@ -925,6 +943,7 @@ async function boot() {
     let BOAT = null;
     if (pcfg.boat !== 'off') { try { BOAT = await import('./voyage-boat.js'); } catch (e) { console.warn('work-spine: no ship model, particles only', e); } }
     if (pcfg.mode === 'page') startParticleLayer(THREE, GPUC, BOAT);
+    if (layer && new URLSearchParams(location.search).has('route')) import('./voyage-editor.js').then(m => m.mountRouteEditor(layer.routeApi)).catch(e => console.warn('work-spine: route editor', e));
     if (cards.length < 2) return;
     // the work section itself waits until it is within 1.5 viewports
     await new Promise(resolve => {
