@@ -581,7 +581,7 @@ function startParticleLayer(THREE, GPUC, BOAT) {
     const lottieEl = document.querySelector('.hero-wrapper dotlottie-player');
     function lottiePhase() { try { const l = lottieEl && lottieEl.getLottie && lottieEl.getLottie(); return l && l.totalFrames ? (l.currentFrame % l.totalFrames) / l.totalFrames : -1; } catch (e) { return -1; } }
     function lottieParallax() { if (!lottieEl || !(pcfg.shipLottie > 0)) return; const h = lottieEl.parentElement ? lottieEl.parentElement.offsetHeight : innerHeight; lottieEl.style.setProperty('--ws-lottie-y', (-pcfg.shipLottie * Math.min(scrollY, h)).toFixed(1) + 'px'); }
-    const ship = { sy: scrollY, keys: [], resolvedAt: -1e9, t0: -1, ripple: 0, flow: 0, wind: 0, way: 0, gust: 0, heel: null, heelVel: 0, phiE: 0, phiR: 0, flutPh: 0, flick: 0, churnPh: 0, lambda: 0.3, driftX: 0, driftY: 0, lastScroll: scrollY, lo: -1, pose: {}, follow: null, route: null, entryRoute: null, entryEnd: null, seen: -1, speedAvg: 0, heroY: -1, overlay: false, overlayY: Infinity, layerZ: '', flipping: false };
+    const ship = { sy: scrollY, keys: [], resolvedAt: -1e9, t0: -1, ripple: 0, flow: 0, wind: 0, way: 0, gust: 0, heel: null, heelVel: 0, phiE: 0, phiR: 0, flutPh: 0, flick: 0, churnPh: 0, lambda: 0.3, driftX: 0, driftY: 0, camW: 0, par: -scrollY * pcfg.pParallax, parScroll: scrollY, lastScroll: scrollY, lo: -1, pose: {}, follow: null, route: null, entryRoute: null, entryEnd: null, seen: -1, speedAvg: 0, heroY: -1, overlay: false, overlayY: Infinity, layerZ: '', flipping: false };
     /* Pose evaluation. Scroll -> target pose: a monotone cubic (Fritsch-Butland tangents) through the keyframes. A value only moves
        inside segments whose two keys differ, so holds stay perfectly flat and nothing overshoots, yet velocity is continuous through
        every keyframe: positions travel on arcs and the angles never stop dead at a key. Tangents are prepared once per resolve. */
@@ -878,9 +878,9 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         // along the hull's x axis as it projects on the screen (so from above the sea runs along the course, from the side it runs along the
         // horizon, and a ship sailing into the depth leaves the field still); a still field belongs to a ship at anchor or to a camera
         // that stands while the ship crosses the frame. Nearer particles stream faster (drawPos parallax), and the field dims a little
-        const camW = M.clamp(P.cam, 0, 1) * pcfg.shipCurrent, hx = Math.cos(M.degToRad(turn)), hy = -Math.sin(M.degToRad(turn)) * Math.sin(M.degToRad(tilt));
+        const camW = M.clamp(P.cam, 0, 1) * Math.min(1, pcfg.shipCurrent), hx = Math.cos(M.degToRad(turn)), hy = -Math.sin(M.degToRad(turn)) * Math.sin(M.degToRad(tilt));
         const Vsea = Vflow * scale * camW;   // world units per second: the lane's flow in hull lengths x the hull's on-screen length
-        ship.driftX -= dt * Vsea * hx; ship.driftY -= dt * Vsea * hy;
+        ship.driftX -= dt * Vsea * hx * Math.max(1, pcfg.shipCurrent); ship.driftY -= dt * Vsea * hy * Math.max(1, pcfg.shipCurrent); ship.camW = camW;
         velU.uDrift.value.set(ship.driftX, ship.driftY); U.uDrift.value.set(ship.driftX, ship.driftY);
         U.uFieldDim.value = 1 - pcfg.shipFieldDim * M.clamp(P.cam, 0, 1) * M.smoothstep(way, 0.1, 0.5);
         // uniforms: the vec4s and uBeam are shared instances across the three materials (see boatU), written once; uSettle is set in frame() from the simulated step
@@ -919,7 +919,10 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         raycaster.setFromCamera(pointer.ndc, camera);
         velU.uCam.value.copy(raycaster.ray.origin); velU.uDir.value.copy(raycaster.ray.direction);
         U.uCam.value.copy(raycaster.ray.origin); U.uDir.value.copy(raycaster.ray.direction);
-        velU.uScroll.value = U.uScroll.value = -scrollY * pcfg.pParallax;
+        // the field's scroll parallax, accumulated so it can hand over to the sea: while the camera holds the ship (ship.camW, from the
+        // last shipFrame) the scroll does not move the field at all, only the water's flow does (drawPos: uDrift), so the two never fight
+        ship.par -= (scrollY - ship.parScroll) * pcfg.pParallax * (1 - ship.camW); ship.parScroll = scrollY;
+        velU.uScroll.value = U.uScroll.value = ship.par;
         shipFrame(t, dt, now);
         if (!qual.done) { qual.acc += dt; qual.frames++; if (qual.acc > 2.5) { qual.done = true; const ms = qual.acc / qual.frames * 1000; if (ms > 20) { qual.half = true; gl.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5)); geo.setDrawRange(0, Math.floor(COUNT / 2)); resize(); console.info('work-spine: slow device (' + ms.toFixed(1) + ' ms/frame), reduced quality'); } } }
         starsFrame(t, dt);
