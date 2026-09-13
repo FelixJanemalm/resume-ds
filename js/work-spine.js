@@ -165,7 +165,12 @@ const SIM_SHARED = `
         float win = fall(0.45, 0.75, x) * smoothstep(-1.85, -1.45, x) * fall(0.38, 0.62, az) * (0.6 + 0.4 * h3);
         float r = length(vec2(x, q.z * 1.6));
         float ring = uMisc.z * (0.5 - 0.5 * sin(r * 9.0 - uRipple * 0.6));                            // at anchor only: faint slow rings spreading from the hull
-        fade = win * (0.5 + min(lit, 2.2)) * (1.0 - ring); }
+        // the calm sheet (still specks all round the hull) belongs to the ship at anchor; under way it would slide along as a loose
+        // rectangle of dots, so it fades out with the way and the sea then shows only where the ship disturbs it: the lit features,
+        // plus a faint body of broken water inside the wedge so the wake reads as a surface and not as a few bright arms
+        float calm = fall(0.06, 0.45, uWay);
+        float body = aft * fall(wedge - 0.08, wedge + 0.02, az) * exp(-s / 1.6) * (0.4 + 0.6 * h2);
+        fade = win * (0.5 * calm + (1.0 - calm) * (0.16 * body + 0.35 * min(lit, 2.2)) + calm * min(lit, 2.2)) * (1.0 - ring); }
       return q; }
     // The ship's target for one particle, and for the water and foam their lane fade. Sails fill and luff in boat space along their
     // belly normal; the solid roles (hull, deck, sails, spars, rigging, and the reflection with every motion mirrored) roll, pitch
