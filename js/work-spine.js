@@ -54,7 +54,7 @@ const pcfg = section ? {
     shipFieldDim: numAttr(section.dataset.shipFieldDim, 0.35),           // how much the field dims under way while the camera holds the ship (0 = not at all)
     shipLottie: numAttr(section.dataset.shipLottie, 0.25),               // parallax on the hero Lottie while the hero is on screen: fraction of the scroll the swell moves ahead of the page (0 = none)
     shipWay: numAttr(section.dataset.shipWay, 1),           // how fast the water streams past the hull under way (hull lengths per second at full wake)
-    shipGrounds: section.dataset.shipGrounds || 'overlay',   // the bottom sections paint their own ground over the layer: 'translucent' (work-spine.css thins those grounds so the ship shows through, the concept's pick) | 'overlay' (the canvas flips above the page there with a screen blend) | 'none'
+    shipGrounds: section.dataset.shipGrounds || 'opaque',   // the bottom sections paint their own ground over the layer: 'opaque' (the ship stays at the quote and the sections below cover it) | 'translucent' (work-spine.css thins those grounds so the ship shows through, the concept's pick) | 'overlay' (the canvas flips above the page there with a screen blend) | 'none'
 } : null;
 if (pcfg) for (const [k, v] of new URLSearchParams(location.search)) if (k in pcfg && v !== '') pcfg[k] = Number.isNaN(+v) ? v : +v;   // dev aid: ?shipWorkTilt=45&boat=off
 let layer = null;
@@ -504,7 +504,7 @@ function startParticleLayer(THREE, GPUC, BOAT) {
                 { at: '#work:center@0.5', x: -0.3, y: 0.065, size: 0.35, turn: 110, tilt: 24, heel: 5, level: L1, wake: 0.65, cam: 0.3 },
                 { at: '#work:center@0.25', x: -0.2, y: -0.1, size: 0.35, turn: 92, tilt: 50, heel: 5, level: L1, wake: 0.85, cam: 0.5 },                 // authored heel stays small: the wind adds its own (~12 deg at this speed) and the sum is soft-limited at 18
                 { at: 'stage@0.14', x: 0, y: -0.38, size: 0.26, turn: 70, tilt: 54, heel: 4, level: L1, wake: 0.9, cam: 1 },                            // the crane keeps rising into the top view (was 37: a dip)
-                { at: 'stage@0.92', x: 0.03, y: -0.36, size: 0.1, turn: 84, tilt: 63, heel: 4, level: L2, wake: 1, cam: 0.8 },
+                { at: 'stage@0.92', x: -0.02, y: -0.36, size: 0.1, turn: 84, tilt: 63, heel: 4, level: L2, wake: 1, cam: 0.8 },                 // a touch left, toward the exit's first mark, so the swing out of the column is shorter
                 { at: 'stage-release', x: -0.06, y: -0.38, size: 0.12, turn: 78, tilt: 56, heel: 7, level: L2, wake: 0.95, cam: 0.8 },                  // one left-hand arc out of the column (was 126 then 70: a wag)
                 { at: 'stage-release+450', x: -0.17, y: -0.5, size: 0.14, turn: 45, tilt: 26, heel: 7, level: L2, wake: 0.9, cam: 0.8 },
                 { at: '#read:top@0', x: -0.08, y: -0.66, size: 0.18, turn: 0, tilt: 0, heel: 3, level: L2, wake: 0.85, cam: 1 },                        // the side shot below the quote, holding course; the sea streams past
