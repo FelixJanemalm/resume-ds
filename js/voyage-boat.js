@@ -31,12 +31,14 @@ export const LEVELS = ['skiff', 'sloop', 'ketch', 'schooner', 'barque', 'clipper
 export const LEVEL_SCALE = [0.7, 0.85, 1.0, 1.15, 1.32, 1.5, 1.0];              // on-screen size multiplier per level
 export const LEVEL_HEEL = [0.62, 1.0, 1.12, 1.3, 1.05, 0.95, 0.2];               // wind-heel gain: sail area x CE height / (beam^2 x depth), the sloop = 1
 export const LEVEL_PIVOT = [0.0, -0.02, -0.03, -0.04, -0.05, -0.06, 0.0];
-export const ROCKET = 6;         // pitch pivot x (the centre of flotation drifts aft with the finer, longer hulls)
+export const ROCKET = 6;
+export const THEME = { id: 'atlantic', name: 'Atlantic', title: 'Skiff to clipper' };
+export const SQUARE_NORMAL = [0.970, 0, 0.242];   // the square sails' belly normal: the yards braced -14 deg         // pitch pivot x (the centre of flotation drifts aft with the finer, longer hulls)
 export const ROLE = { HULL: 1, DECK: 2, SAIL: 3, SPAR: 4, RIGGING: 5, WATER: 6, WAKE: 7, REFLECTION: 8 };
 
 const NL = 6, WL = WATERLINE, PI = Math.PI;   // NL: the SHIP levels; the rocket is built apart, after them
 const LIGHT = [-0.45, 0.72, 0.53];
-const shadeN = n => { const l = Math.hypot(n[0], n[1], n[2]) || 1; const d = (n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2]) / l; return Math.min(1, 0.3 + 0.7 * Math.max(0, d)); };
+export const shadeN = n => { const l = Math.hypot(n[0], n[1], n[2]) || 1; const d = (n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2]) / l; return Math.min(1, 0.3 + 0.7 * Math.max(0, d)); };
 const lerp = (a, b, t) => a + (b - a) * t;
 const lerp2 = (A, B, t) => [lerp(A[0], B[0], t), lerp(A[1], B[1], t)];
 const lerp3 = (A, B, t) => [lerp(A[0], B[0], t), lerp(A[1], B[1], t), lerp(A[2], B[2], t)];
@@ -46,7 +48,7 @@ const TOP = shadeN([0, 1, 0]);
 const nulls = n => new Array(n).fill(null);
 const from = (L0, ...vals) => nulls(L0).concat(vals);   // a per-level table for a part that appears at level L0
 
-function mulberry32(seed) {
+export function mulberry32(seed) {
     let a = seed >>> 0;
     return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 }
@@ -322,7 +324,7 @@ function deckPt(L, u, w, q) {
 const HULL_PRES = [0.48, 0.68, 0.80, 0.90, 0.95, 1], DECK_PRES = [0.45, 0.68, 0.80, 0.90, 0.95, 1];   // the share of hull / deck particles present per level
 
 /* ---------------------------------------------------------------- water and wake (shared by all levels) */
-function waterPt(rand) {   // a disc of ripples around the hull: concentric rings (phase = ring position), denser, brighter and a little higher on the crests
+export function waterPt(rand) {   // a disc of ripples around the hull: concentric rings (phase = ring position), denser, brighter and a little higher on the crests
     let x = 0, z = 0, rr = 0, ph = 0, rip = 0;
     for (let k = 0; k < 12; k++) {
         const a = rand() * PI * 2; rr = Math.pow(rand(), 0.6); x = Math.cos(a) * rr * 1.25; z = Math.sin(a) * rr * 0.75;
@@ -332,7 +334,7 @@ function waterPt(rand) {   // a disc of ripples around the hull: concentric ring
     return { p: [x, WL - 0.008 + 0.016 * rip, z, 0.15 + 0.68 * rip], flap: 0, phase: frac(ph / (2 * PI)), aux: rr };
 }
 const KELVIN = Math.tan(19.5 * PI / 180);
-function wakePt(rand) {
+export function wakePt(rand) {
     const d = 0.004 + Math.pow(rand(), 2.8) * 1.596, f = d / 1.6, half = KELVIN * d, arm = rand() < 0.55 * (1 - 0.5 * f);   // starts just abaft the stern; density, arm share and shade fall off with distance so the V dissolves
     let z, shade;
     if (arm) { z = (rand() < 0.5 ? -1 : 1) * half + (rand() - 0.5) * (0.012 * (1 + d) + 0.02 * f); shade = 0.65 * (1 - 0.9 * f) ** 1.5; }
@@ -374,7 +376,7 @@ function rocketR(x) {   // the body's radius along x: a flared skirt, the cylind
     if (x <= RK.xc) return RK.R;
     const t = Math.min(1, (x - RK.xc) / (RK.x1 - RK.xc)); return RK.R * Math.pow(Math.max(0, 1 - Math.pow(t, 1.8)), 0.7);
 }
-function rocketLevel(count, role, rand, wakePos, wakeMeta) {
+export function rocketLevel(count, role, rand, wakePos, wakeMeta) {
     const pos = new Float32Array(count * 4), meta = new Float32Array(count * 4);
     const put = (i, p) => { const o = i * 4; pos[o] = p[0]; pos[o + 1] = p[1]; pos[o + 2] = p[2]; pos[o + 3] = Math.max(0.02, Math.min(1, p[3])); };
     const j = () => (rand() - 0.5) * 0.003;

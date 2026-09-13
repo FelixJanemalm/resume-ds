@@ -194,3 +194,12 @@ body:has(#ws-particles) .reader { background-color: transparent; }
 .hero-wrapper dotlottie-player { translate: 0 var(--ws-lottie-y, 0px); }
 .hero-wrapper #scroll-down-arrow { z-index: 2; }
 .work-heading { position: relative; z-index: 2; }
+
+/* The ship's lineage: an icon row under the colour picker (mounted by work-spine.js). The chosen one takes the picked accent. */
+.ws-themes { display: flex; gap: 8px; margin-top: 14px; }
+#color-picker-container .ws-theme { position: static; transform: none; z-index: auto; width: 38px; height: 34px; padding: 0; display: grid; place-items: center; border-radius: 8px; cursor: pointer;   /* testimonials.css positions every button absolutely: undone here */
+    border: 1px solid color-mix(in srgb, var(--text, #fff) 22%, transparent); background: color-mix(in srgb, var(--text, #fff) 6%, transparent);
+    color: var(--text, #fff); opacity: 0.72; transition: opacity 0.2s, border-color 0.2s, background-color 0.2s, color 0.2s; }
+.ws-theme:hover { opacity: 1; }
+.ws-theme[aria-pressed="true"] { opacity: 1; color: var(--button-color, #4faad1); border-color: var(--button-color, #4faad1); background: color-mix(in srgb, var(--button-color, #4faad1) 18%, transparent); }
+#color-picker-container .ws-theme svg { display: block; fill: none; }
