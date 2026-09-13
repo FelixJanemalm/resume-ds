@@ -259,11 +259,20 @@ const PTS_FS = `
 
 /* The picked colour, pushed to a vivid tint: the page's --button-color is derived from the picker with
    lightness tweaks that can leave it muted, and additive blending over a grey ground washes it out further. */
-function vividAccent(THREE, light) {
+function vividAccent(THREE, light, lightness) {
     const c = new THREE.Color();
     try { c.setStyle((getComputedStyle(document.body).getPropertyValue('--button-color') || '').trim() || '#4faad1'); } catch (e) { c.set(0x4faad1); }
     const hsl = { h: 0, s: 0, l: 0 }; c.getHSL(hsl);
-    return c.setHSL(hsl.h, Math.max(hsl.s, 0.8), light ? 0.38 : 0.6);
+    return c.setHSL(hsl.h, Math.max(hsl.s, 0.8), lightness !== undefined ? lightness : light ? 0.38 : 0.6);
+}
+/* The page ground's relative luminance (0 black .. 1 white), from the body's computed background: the picker can land on a mid
+   or pale ground while the body class still says "dark" (its threshold is the picked colour's lightness, not the ground's). */
+function groundLum() {
+    try {
+        const m = /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/.exec(getComputedStyle(document.body).backgroundColor || ''); if (!m) return 0.05;
+        const f = v => { v = Math.min(255, +v) / 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+        return 0.2126 * f(m[1]) + 0.7152 * f(m[2]) + 0.0722 * f(m[3]);
+    } catch (e) { return 0.05; }
 }
 
 const FIGURES = [
@@ -495,8 +504,6 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         const L1 = Math.min(1, NL - 1), L2 = Math.min(2, NL - 1), L3 = Math.min(3, NL - 1), L4 = Math.min(4, NL - 1), L5 = Math.min(5, NL - 1);
         const RK = BOAT && BOAT.ROCKET !== undefined && BOAT.ROCKET < NL ? BOAT.ROCKET : -1;   // the rocket level, when the module has one
         // the work stage: seen from above in the column, bow down the page; the hull keeps one on-screen length while the ship evolves
-        const work = (L, y) => ({ x: 0, y: y === undefined ? c.shipWorkY : y, size: c.shipWorkSize / LS[Math.min(NL - 1, Math.round(L))], turn: 90, tilt: c.shipWorkTilt, heel: 9, level: L, wake: L > 1.5 ? 1 : 0.9, cam: 1 });
-        const translucent = c.shipGrounds === 'translucent';
         return {
             landscape: [   // Felix's route (baked from the editor, 2026-09-12) with the exit reworked the same night: the skiff at the foot of the swell, a wide
                            // sweep up and round into the column, one arc out of the column down to a side shot beside the quote, where the ship levels up
@@ -522,30 +529,26 @@ function startParticleLayer(THREE, GPUC, BOAT) {
                     { at: 'end', x: -0.45, y: -0.57, size: 0.12, turn: -90, tilt: 90, heel: 0, level: RK, wake: 0.85, cam: 1 },
                 ]),
             ],
-            portrait: [
-                { at: 'top', x: 0.4, y: -0.8, size: 0.3, turn: 35, tilt: 0, heel: 9, level: 0, wake: 0, cam: 0 },                                                            // resting on the swell at the bottom-left, bow right (rides in from the left)
-                { at: '#work:center@0.72', x: 0.32, y: -0.78, size: 0.3, turn: 55, tilt: 6, heel: 10, level: 0.1 * L1, wake: 0.35, cam: 0.2 },
-                { at: '#work:center@0.5', x: 0.15, y: -0.7, size: 0.3, turn: 80, tilt: 24, heel: 12, level: 0.4 * L1, wake: 0.65, cam: 0.3 },                                      // turns toward the viewer and dives down the page
-                { at: '#work:center@0.25', x: 0.05, y: -0.6, size: 0.28, turn: 90, tilt: 50, heel: 12, level: 0.75 * L1, wake: 0.85, cam: 0.5 },
-                { at: 'stage-pin', ...work(L1, -0.55), size: 0.3, tilt: c.shipWorkTilt - 4, cam: 0.8 },
-                { at: 'stage@0.06', ...work(L1, -0.5), size: 0.3 },
-                { at: 'stage@0.14', ...work(L1, -0.5), size: 0.3 },
-                { at: 'stage@0.3', ...work(L2, -0.5), size: 0.24 },
-                { at: 'stage@0.47', ...work(L2, -0.5), size: 0.24 },
-                { at: 'stage@0.63', ...work(L3, -0.5), size: 0.2 },
-                { at: 'stage@0.8', ...work(L3, -0.5), size: 0.2 },
-                { at: 'stage@0.92', ...work(L4, -0.48), x: 0.02, size: 0.2, turn: 84, tilt: c.shipWorkTilt - 5, cam: 0.8 },
-                { at: 'stage-release', x: 0.05, y: -0.55, size: 0.22, turn: 70, tilt: 50, heel: 12, level: L4, wake: 0.95, cam: 0.6 },
-                { at: '#read:top@0.82', x: 0.18, y: -0.6, size: 0.25, turn: 45, tilt: 34, heel: 9, level: L4, wake: 1, cam: 0.5 },
-                { at: '#read:top@0.5', x: 0.3, y: -0.62, size: 0.28, turn: 30, tilt: 10, heel: 11, level: L5, wake: 1, cam: 0.3 },                                            // below the manifesto text
-                { at: '#read:bottom@1.0', x: 0.45, y: -0.6, size: 0.26, turn: 32, tilt: 4, heel: 7, level: L5, wake: 0.9, cam: 0.3 },
-                { at: '#scalability:top@0.6', x: 0.6, y: 0.6, size: 0.12, turn: -40, tilt: 8, heel: 4, level: L5, wake: 0.3, cam: 0 },
-                ...(translucent ? [
-                    { at: '.testimonials-wrapper:top@0.5', x: -0.3, y: -0.55, size: 0.26, turn: 42, tilt: 6, heel: -8, level: L5, wake: 0.6, cam: 0.3 },
-                    { at: 'end', x: -0.3, y: -0.7, size: 0.2, turn: 35, tilt: 3, heel: 0, level: L5, wake: 0, cam: 0 },
-                ] : [
-                    { at: '.testimonials-wrapper:center@0.5', x: 0.7, y: -0.6, size: 0.14, turn: 38, tilt: 0, heel: 5, level: L5, wake: 0.3, cam: 0.3 },
-                    { at: 'end', x: 0.7, y: -0.6, size: 0.14, turn: 40, tilt: 3, heel: 2, level: L5, wake: 0, cam: 0 },
+            portrait: [   // phones: the same voyage, sized for a narrow screen (size is a fraction of the visible WIDTH, so ~2x the desktop values read alike).
+                          // The swell is flipped to the bottom-left and the hero copy sits on the left, so the ship rests at the bottom-right and the sweep
+                          // climbs up the right side, above the cards (the stage is drawn over the canvas, so anything low would be hidden by the first card)
+                { at: 'top', x: 0.55, y: -0.82, size: 0.42, turn: 35, tilt: 0, heel: 2, level: 0, wake: 0, cam: 0 },                                                        // resting on the swell at the bottom-right, bow right (rides in from the left)
+                { at: '#work:center@0.72', x: 0.3, y: -0.45, size: 0.42, turn: 60, tilt: 8, heel: 5, level: 0, wake: 0.35, cam: 0.2 },
+                { at: '#work:center@0.5', x: 0.1, y: -0.1, size: 0.42, turn: 85, tilt: 24, heel: 5, level: L1, wake: 0.65, cam: 0.3 },
+                { at: '#work:center@0.25', x: -0.05, y: 0.1, size: 0.4, turn: 92, tilt: 50, heel: 5, level: L1, wake: 0.85, cam: 0.5 },
+                { at: 'stage@0.14', x: 0, y: -0.45, size: 0.32, turn: 70, tilt: 54, heel: 4, level: L1, wake: 0.9, cam: 1 },                                             // the column, seen from above between the cards
+                { at: 'stage@0.92', x: -0.02, y: -0.45, size: 0.22, turn: 84, tilt: 63, heel: 4, level: L2, wake: 1, cam: 0.8 },
+                { at: 'stage-release', x: 0, y: -0.45, size: 0.24, turn: 78, tilt: 56, heel: 7, level: L2, wake: 0.95, cam: 0.8 },
+                { at: 'stage-release+450', x: -0.15, y: -0.55, size: 0.28, turn: 45, tilt: 26, heel: 7, level: L2, wake: 0.9, cam: 0.8 },
+                { at: '#read:top@0', x: -0.05, y: -0.8, size: 0.28, turn: 0, tilt: 0, heel: 3, level: L2, wake: 0.85, cam: 1 },                                          // the side shot below the quote
+                { at: '#read:top@0+180', x: -0.05, y: -0.8, size: 0.28, turn: 0, tilt: 0, heel: 3, level: L3, wake: 0.9, cam: 1 },
+                { at: '#read:top@0+360', x: -0.05, y: -0.8, size: 0.28, turn: 0, tilt: 0, heel: 3, level: L4, wake: 0.95, cam: 1 },
+                { at: '#read:top@0+540', x: -0.05, y: -0.8, size: 0.28, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1 },
+                ...(RK < 0 ? [] : [
+                    { at: '#scalability:top@0.55', x: -0.05, y: -0.8, size: 0.28, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1 },
+                    { at: '#scalability:top@0.25', x: 0.5, y: -0.95, size: 0.26, turn: -90, tilt: 90, heel: 0, level: RK, wake: 0.7, cam: 1 },
+                    { at: 'footer:top@1', x: 0.5, y: -0.95, size: 0.26, turn: -90, tilt: 90, heel: 0, level: RK, wake: 0.85, cam: 1 },
+                    { at: 'end', x: 0.5, y: -0.62, size: 0.26, turn: -90, tilt: 90, heel: 0, level: RK, wake: 0.85, cam: 1 },
                 ]),
             ],
         };
@@ -757,7 +760,7 @@ function startParticleLayer(THREE, GPUC, BOAT) {
     function applyLayer() {
         const overlay = scrollY > ship.overlayY, z = overlay ? '12' : scrollY < ship.heroY ? '1' : '-1';
         if (z === ship.layerZ || ship.flipping) return;
-        const apply = () => { ship.layerZ = z; ship.overlay = overlay; canvas.style.zIndex = z; canvas.style.mixBlendMode = overlay ? (isLight() ? 'multiply' : 'screen') : ''; };
+        const apply = () => { ship.layerZ = z; ship.overlay = overlay; canvas.style.zIndex = z; canvas.style.mixBlendMode = overlay ? (isLight() || groundLum() > 0.2 ? 'multiply' : 'screen') : ''; };
         if (!shown) { apply(); return; }   // the first frame: no dip
         ship.flipping = true; const prev = canvas.style.transition; canvas.style.transition = 'opacity 0.22s ease'; canvas.style.opacity = '0';
         setTimeout(() => { apply(); canvas.style.opacity = '1'; setTimeout(() => { ship.flipping = false; canvas.style.transition = prev; }, 240); }, 240);
@@ -897,7 +900,7 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         const Vsea = Vflow * scale * camW;   // world units per second: the lane's flow in hull lengths x the hull's on-screen length
         ship.driftX -= dt * Vsea * hx * Math.max(1, pcfg.shipCurrent); ship.driftY -= dt * Vsea * hy * Math.max(1, pcfg.shipCurrent); ship.camW = camW;
         velU.uDrift.value.set(ship.driftX, ship.driftY); U.uDrift.value.set(ship.driftX, ship.driftY);
-        U.uFieldDim.value = 1 - pcfg.shipFieldDim * M.clamp(P.cam, 0, 1) * M.smoothstep(way, 0.1, 0.5);
+        U.uFieldDim.value = fieldTheme * (1 - pcfg.shipFieldDim * M.clamp(P.cam, 0, 1) * M.smoothstep(way, 0.1, 0.5));
         // uniforms: the vec4s and uBeam are shared instances across the three materials (see boatU), written once; uSettle is set in frame() from the simulated step
         shipU.wave.set(amp * pcfg.shipWave, ship.lambda, foamGain, foamLen);
         shipU.sea.set(A, ks, ph, plunge);
@@ -910,19 +913,30 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         U.uWake.value = foamGain; U.uReflect.value = (1 - M.smoothstep(way, 0, 0.5)) * (1 - M.clamp((tilt - 10) / 30, 0, 1)); U.uBoatPx.value = M.clamp(0.6 + 0.25 * scale, 1.0, 2.2);   // a bigger ship is sparser: bigger dots
     }
     resize();
+    // Theme from the ground the dots are actually drawn on: additive light dots only on a dark ground; as the picked colour lightens
+    // the ground (pale: 0 at luminance 0.06 .. 1 at 0.4) the dots turn into dark, opaque, normally blended ink of the same hue, a
+    // little bigger and denser, so the ship and the field stay readable on every colour the picker can produce. Re-applied on a class
+    // change and whenever the body's background changes (polled in frame(): the picker sets variables, not classes, within a mode).
+    let groundKey = '', fieldTheme = 1;
     function applyTheme() {
-        const light = document.body.classList.contains('default-light') || document.body.classList.contains('default-light-colorblind');
-        const v = vividAccent(THREE, light);
+        const cls = document.body.classList.contains('default-light') || document.body.classList.contains('default-light-colorblind');
+        const lum = groundLum(), pale = M.smoothstep(lum, 0.06, 0.4), light = cls || pale > 0.5;
+        const v = vividAccent(THREE, light, 0.6 - 0.38 * pale);   // the hue kept, the lightness from 0.6 (dark ground) to 0.22 (pale ground)
         U.uColorA.value.copy(v);
-        U.uColorB.value.copy(v).lerp(new THREE.Color(light ? 0x000000 : 0xffffff), light ? 0.15 : 0.2);
-        U.uColorLit.value.copy(v).lerp(new THREE.Color(0xffffff), light ? 0.2 : 0.55);
-        U.uGlow.value = pcfg.pGlow * (light ? 1.6 : 1);
-        lines.material.uniforms.uColor.value.copy(v).lerp(new THREE.Color(0xffffff), light ? 0 : 0.2);
-        mat.blending = light ? THREE.NormalBlending : THREE.AdditiveBlending; mat.needsUpdate = true;
+        U.uColorB.value.copy(v).lerp(new THREE.Color(0xffffff), 0.2 * (1 - pale)).lerp(new THREE.Color(0x000000), 0.25 * pale);
+        U.uColorLit.value.copy(v).lerp(new THREE.Color(0xffffff), 0.55 * (1 - pale)).lerp(new THREE.Color(0x000000), 0.15 * pale);
+        U.uGlow.value = pcfg.pGlow * (1 + 1.3 * pale);
+        U.uSize.value = pcfg.pSize * (1 + 0.3 * pale);
+        fieldTheme = 1 - 0.45 * pale;   // the boost is for the ship: the field keeps about its dark-ground weight (applied through uFieldDim in shipFrame)
+        lines.material.uniforms.uColor.value.copy(v).lerp(new THREE.Color(0xffffff), 0.2 * (1 - pale));
+        mat.blending = pale > 0.3 ? THREE.NormalBlending : THREE.AdditiveBlending; mat.needsUpdate = true;
         if (ship.overlay) canvas.style.mixBlendMode = light ? 'multiply' : 'screen';
+        try { groundKey = getComputedStyle(document.body).backgroundColor; } catch (e) {}
     }
     applyTheme();
     new MutationObserver(applyTheme).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    let groundAt = 0;
+    function watchGround(now) { if (now - groundAt < 600) return; groundAt = now; let k = ''; try { k = getComputedStyle(document.body).backgroundColor; } catch (e) {} if (k !== groundKey) applyTheme(); }
     let last = performance.now();
     // adaptive quality: after the first 2.5 s, a slow device gets a lower pixel ratio, half the drawn particles and a half-rate simulation
     const qual = { acc: 0, frames: 0, done: false, half: false, tick: 0, simDt: 0 };
@@ -938,6 +952,7 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         // last shipFrame) the scroll does not move the field at all, only the water's flow does (drawPos: uDrift), so the two never fight
         ship.par -= (scrollY - ship.parScroll) * pcfg.pParallax * (1 - ship.camW); ship.parScroll = scrollY;
         velU.uScroll.value = U.uScroll.value = ship.par;
+        watchGround(now);
         shipFrame(t, dt, now);
         if (!qual.done) { qual.acc += dt; qual.frames++; if (qual.acc > 2.5) { qual.done = true; const ms = qual.acc / qual.frames * 1000; if (ms > 20) { qual.half = true; gl.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5)); geo.setDrawRange(0, Math.floor(COUNT / 2)); resize(); console.info('work-spine: slow device (' + ms.toFixed(1) + ' ms/frame), reduced quality'); } } }
         starsFrame(t, dt);
