@@ -40,16 +40,16 @@ const pcfg = section ? {
     boat: section.dataset.boat || 'voyage',                  // the ship of particles: 'voyage' (sails in at the top and down the page with you) | 'off'
     boatX: numAttr(section.dataset.boatX, -0.35), boatY: numAttr(section.dataset.boatY, -0.29), boatSize: numAttr(section.dataset.boatSize, 0.37),   // hero pose: waterline centre in NDC, hull length as a fraction of the visible width
     shipShare: numAttr(section.dataset.shipShare, coarse ? 0.3 : 0.2),   // share of the particles that belong to the ship
-    shipEntry: numAttr(section.dataset.shipEntry, 3.2),                  // seconds the ship takes to sail into the frame on load
-    shipWorkSize: numAttr(section.dataset.shipWorkSize, 0.15), shipWorkY: numAttr(section.dataset.shipWorkY, -0.55), shipWorkTilt: numAttr(section.dataset.shipWorkTilt, 68), shipWorkHeading: numAttr(section.dataset.shipWorkHeading, -90),   // pose in the work section: seen from above in the band under the cards, sailing down the axis, wake streaming up the column (size is the on-screen hull length; it does not grow with the level here)
+    shipEntry: numAttr(section.dataset.shipEntry, 4.5),                  // seconds the ship takes to ride in on the swell on load
+    shipWorkSize: numAttr(section.dataset.shipWorkSize, 0.15), shipWorkY: numAttr(section.dataset.shipWorkY, -0.38), shipWorkTilt: numAttr(section.dataset.shipWorkTilt, 68),   // pose in the work section: seen from above in the band under the cards, sailing down the axis, wake streaming up the column (size is the on-screen hull length; it does not grow with the level here)
     shipFlap: numAttr(section.dataset.shipFlap, 1), shipRipple: numAttr(section.dataset.shipRipple, 1), shipBob: numAttr(section.dataset.shipBob, 1),   // sail flutter amplitude | rest rings (0 = none) | motion: swell, pitch, heave, sea roll
     shipHeelWind: numAttr(section.dataset.shipHeelWind, 12),   // deg of heel from the wind at full way on the sloop (per level x 0.58 dinghy, 1.3 schooner, 1.1 tall ship)
     shipWave: numAttr(section.dataset.shipWave, 1), shipSpray: numAttr(section.dataset.shipSpray, 1), shipFoam: numAttr(section.dataset.shipFoam, 1),   // wave heights and crest brightness | spray | foam
     shipSettle: numAttr(section.dataset.shipSettle, 7),     // how fast ship particles take their places (per second): 7 lands a recruit in about 0.4 s
     shipLag: numAttr(section.dataset.shipLag, 0.9), shipLagPos: numAttr(section.dataset.shipLagPos, 0.6), shipLagSize: numAttr(section.dataset.shipLagSize, 0.8),   // seconds the drawn pose takes to close 95% of a scroll jump: angles / position (x, y, wake) / framing (size and level share one lag so the hull length holds while the ship evolves)
-    shipLead: numAttr(section.dataset.shipLead, 140),                    // px of scroll the bow looks ahead along the track, so it turns before the track bends
-    shipYaw: numAttr(section.dataset.shipYaw, 25), shipYawMix: numAttr(section.dataset.shipYawMix, 0.6), shipYawSpeed: numAttr(section.dataset.shipYawSpeed, 0.35),   // motion-led heading: cap (deg from the keyframe heading), share of the track direction blended in at full speed, screen speed (viewport heights per second) that counts as full
     shipLean: numAttr(section.dataset.shipLean, 0.04),                   // banking: deg of heel per deg/s of turn, capped at 5 (negative carves into the turn instead)
+    shipSoftStart: numAttr(section.dataset.shipSoftStart, 0.3),          // the route's velocity at the very first pixel of scroll, relative to the first leg's mean: motion begins at once, gently
+    shipLottie: numAttr(section.dataset.shipLottie, 0.25),               // parallax on the hero Lottie while the hero is on screen: fraction of the scroll the swell moves ahead of the page (0 = none)
     shipWay: numAttr(section.dataset.shipWay, 1),           // how fast the water streams past the hull under way (hull lengths per second at full wake)
     shipGrounds: section.dataset.shipGrounds || 'overlay',   // the bottom sections paint their own ground over the layer: 'translucent' (work-spine.css thins those grounds so the ship shows through, the concept's pick) | 'overlay' (the canvas flips above the page there with a screen blend) | 'none'
 } : null;
@@ -462,69 +462,89 @@ function startParticleLayer(THREE, GPUC, BOAT) {
        value follows a monotone cubic (holds stay flat, nothing overshoots, velocity is continuous through every key), and the
        drawn pose trails that target through a critically damped follower (pcfg.shipLag*), so a fast scroll parks the target
        ahead and the ship catches up over about a second, like a camera operator following a mark. */
-    const POSE_KEYS = ['x', 'y', 'size', 'heading', 'turn', 'tilt', 'heel', 'level', 'wake'];
+    const POSE_KEYS = ['x', 'y', 'size', 'turn', 'tilt', 'heel', 'level', 'wake', 'cam'];
+    /* The route. Waypoints carry a position (NDC, the waterline centre) and the pose at that point: size (hull length as a fraction of
+       the visible width), turn (course: 0 bow to the right, 90 toward the viewer, 180 bow left), tilt (0 seen from the side, 90 from
+       straight above), heel, level (0 dinghy .. 3 tall ship), wake (0 at rest .. 1 under way) and cam (0..1: how far the course should
+       follow the direction of travel on screen; 1 where the camera holds still and the ship really sails across the frame, 0 where the
+       camera is the one moving, as it cranes up over the stern on the way into the work section). Positions travel along one smooth
+       curve through the waypoints (buildRoute); everything else eases through a monotone cubic over scroll. */
     function keyframes() {
         const c = pcfg, LS = (BOAT && BOAT.LEVEL_SCALE) || [1, 1, 1, 1];
-        // the work stage: top view in the band under the cards; the hull keeps one on-screen length while the ship evolves
-        const work = L => ({ x: 0, y: c.shipWorkY, size: c.shipWorkSize / LS[Math.min(3, Math.round(L))], heading: c.shipWorkHeading, turn: 0, tilt: c.shipWorkTilt, heel: 9, level: L, wake: L > 1.5 ? 1 : 0.9 });
+        // the work stage: seen from above in the column, bow down the page; the hull keeps one on-screen length while the ship evolves
+        const work = (L, y) => ({ x: 0, y: y === undefined ? c.shipWorkY : y, size: c.shipWorkSize / LS[Math.min(3, Math.round(L))], turn: 90, tilt: c.shipWorkTilt, heel: 9, level: L, wake: L > 1.5 ? 1 : 0.9, cam: 1 });
         const translucent = c.shipGrounds === 'translucent';
         return {
             landscape: [
-                { at: 'top', x: c.boatX, y: c.boatY, size: c.boatSize, heading: 0, turn: 35, tilt: 0, heel: 9, level: 0, wake: 0 },              // at anchor behind the headline, bow toward the swell
-                { at: 'top+120', x: c.boatX, y: c.boatY, size: c.boatSize, heading: 0, turn: 35, tilt: 0, heel: 9, level: 0, wake: 0 },          // hold: the cubic leaves a hold with zero velocity, so a wheel nudge does not disturb the hero
-                { at: '#work:center@0.66', x: c.boatX + 0.04, y: c.boatY - 0.01, size: c.boatSize - 0.01, heading: -8, turn: 33, tilt: 8, heel: 10, level: 0.15, wake: 0.35 },   // slips the mooring: barely moved, bow dipping, the view beginning to lift
-                { at: '#work:center@0.5', x: -0.12, y: -0.36, size: 0.3, heading: -40, turn: 22, tilt: 32, heel: 12, level: 0.5, wake: 0.7 },  // casts off under the Lottie's trailing edge, jib unfurling, bow swinging down-page
-                { at: '#work:center@0.25', x: -0.04, y: -0.52, size: 0.22, heading: -68, turn: 8, tilt: 54, heel: 13, level: 0.8, wake: 0.85 }, // three-quarters over: mostly from above already
-                { at: 'stage-pin', ...work(1), y: c.shipWorkY + 0.02, heading: c.shipWorkHeading + 6, tilt: c.shipWorkTilt - 6, turn: 2 },      // arrives in the band still finishing the turn
-                { at: 'stage@0.06', ...work(1) },                                                                                              // overhead view complete just after the pin
-                { at: 'stage@0.14', ...work(1) },                                                                                              // rests while card 1 fronts
-                { at: 'stage@0.3', ...work(2) },                                                                                               // schooner: morphed in transit, done before card 2 fronts
+                { at: 'top', x: c.boatX, y: c.boatY, size: c.boatSize, turn: 145, tilt: 0, heel: 9, level: 0, wake: 0, cam: 0 },                         // at the foot of the swell, bow toward the headline
+                { at: '#work:center@0.72', x: c.boatX - 0.05, y: c.boatY - 0.06, size: c.boatSize - 0.01, turn: 135, tilt: 6, heel: 10, level: 0.1, wake: 0.35, cam: 0.2 },   // gathers way, bearing away toward the viewer
+                { at: '#work:center@0.5', x: c.boatX - 0.02, y: c.boatY - 0.18, size: 0.31, turn: 110, tilt: 24, heel: 12, level: 0.4, wake: 0.65, cam: 0.3 },              // the camera starts to crane up over the stern
+                { at: '#work:center@0.25', x: c.boatX + 0.15, y: c.boatY - 0.21, size: 0.24, turn: 92, tilt: 50, heel: 12, level: 0.75, wake: 0.85, cam: 0.5 },             // three-quarters over, sliding into the column
+                { at: 'stage-pin', ...work(1, c.shipWorkY - 0.06), x: -0.03, tilt: c.shipWorkTilt - 4, heel: 9, cam: 0.8 },                                                 // arrives in the column still finishing the turn
+                { at: 'stage@0.06', ...work(1) },                                                                                                                             // overhead view complete just after the pin
+                { at: 'stage@0.14', ...work(1) },                                                                                                                             // rests while card 1 fronts
+                { at: 'stage@0.3', ...work(2) },                                                                                                                              // schooner: morphed in transit, done before card 2 fronts
                 { at: 'stage@0.47', ...work(2) },
-                { at: 'stage@0.63', ...work(3) },                                                                                              // tall ship, done before card 3 fronts
+                { at: 'stage@0.63', ...work(3) },                                                                                                                             // tall ship, done before card 3 fronts
                 { at: 'stage@0.8', ...work(3) },
-                { at: 'stage@0.92', ...work(3), x: 0.03, y: c.shipWorkY + 0.03, heading: c.shipWorkHeading + 12, tilt: c.shipWorkTilt - 5, turn: 4, heel: 13 },   // weighs anchor before the stage lets go: no dead stop at the release
-                { at: 'stage-release', x: 0.1, y: -0.58, size: 0.12, heading: -58, turn: 9, tilt: 54, heel: 12, level: 3, wake: 0.95 },        // mid-turn as the stage unpins
-                { at: '#read:top@0.82', x: 0.25, y: -0.45, size: 0.14, heading: -38, turn: 17, tilt: 38, heel: 8, level: 3, wake: 1 },        // the view comes back down to the water
-                { at: '#read:top@0.5', x: 0.5, y: -0.18, size: 0.16, heading: -15, turn: 28, tilt: 12, heel: 7, level: 3, wake: 1 },          // open water at the right margin: hardest heel, full sail
-                { at: '#read:bottom@1.0', x: 0.7, y: -0.25, size: 0.15, heading: -5, turn: 32, tilt: 4, heel: 6, level: 3, wake: 0.9 },       // (bottom@0.6 was the same scroll as the horizon key: read's bottom is scalability's top, and it popped)
-                { at: '#scalability:top@0.6', x: 0.72, y: 0.55, size: 0.08, heading: 0, turn: -40, tilt: 8, heel: 4, level: 3, wake: 0.3 },    // horizon: stern quarter, hull-down, beside the heading
+                { at: 'stage@0.92', ...work(3), x: 0.03, y: c.shipWorkY + 0.02, turn: 84, tilt: c.shipWorkTilt - 5, heel: 11, cam: 0.8 },                                  // weighs anchor before the stage lets go
+                { at: 'stage-release', x: 0.12, y: -0.36, size: 0.12, turn: 70, tilt: 50, heel: 12, level: 3, wake: 0.95, cam: 0.6 },                                       // the camera comes back down
+                { at: '#read:top@0.82', x: 0.27, y: -0.3, size: 0.14, turn: 45, tilt: 36, heel: 10, level: 3, wake: 1, cam: 0.5 },
+                { at: '#read:top@0.5', x: 0.5, y: -0.18, size: 0.16, turn: 30, tilt: 12, heel: 7, level: 3, wake: 1, cam: 0.3 },                                             // open water at the right margin: full sail
+                { at: '#read:bottom@1.0', x: 0.7, y: -0.25, size: 0.15, turn: 32, tilt: 4, heel: 6, level: 3, wake: 0.9, cam: 0.3 },
+                { at: '#scalability:top@0.6', x: 0.72, y: 0.55, size: 0.08, turn: -40, tilt: 8, heel: 4, level: 3, wake: 0.3, cam: 0 },                                     // horizon: stern quarter, hull-down, beside the heading
                 ...(translucent ? [
-                    { at: '.testimonials-wrapper:top@0.5', x: -0.62, y: -0.45, size: 0.2, heading: -20, turn: 42, tilt: 6, heel: -8, level: 3, wake: 0.6 },    // back around from the left, a readable stern quarter, left of the quotes
-                    { at: '.tools:top@0.85', x: -0.2, y: -0.66, size: 0.16, heading: 0, turn: 38, tilt: 3, heel: 4, level: 3, wake: 0.3 },                     // along the quay (the tools band)
-                    { at: 'end', x: -0.62, y: -0.8, size: 0.13, heading: 0, turn: 35, tilt: 3, heel: 0, level: 3, wake: 0 },                                   // landfall: moored beside the Los Angeles pin, in the footer
+                    { at: '.testimonials-wrapper:top@0.5', x: -0.62, y: -0.45, size: 0.2, turn: 42, tilt: 6, heel: -8, level: 3, wake: 0.6, cam: 0.3 },                     // back around from the left, a stern quarter, left of the quotes
+                    { at: '.tools:top@0.85', x: -0.2, y: -0.66, size: 0.16, turn: 38, tilt: 3, heel: 4, level: 3, wake: 0.3, cam: 0.3 },                                    // along the quay (the tools band)
+                    { at: 'end', x: -0.62, y: -0.8, size: 0.13, turn: 35, tilt: 3, heel: 0, level: 3, wake: 0, cam: 0 },                                                    // landfall: moored beside the Los Angeles pin, in the footer
                 ] : [
-                    { at: '.testimonials-wrapper:center@0.5', x: 0.85, y: -0.28, size: 0.09, heading: 0, turn: 38, tilt: 0, heel: 5, level: 3, wake: 0.3 },  // small and far along the right edge, clear of the quotes
-                    { at: 'end', x: 0.85, y: -0.28, size: 0.09, heading: 0, turn: 40, tilt: 3, heel: 2, level: 3, wake: 0 },
+                    { at: '.testimonials-wrapper:center@0.5', x: 0.85, y: -0.28, size: 0.09, turn: 38, tilt: 0, heel: 5, level: 3, wake: 0.3, cam: 0.3 },                   // small and far along the right edge, clear of the quotes
+                    { at: 'end', x: 0.85, y: -0.28, size: 0.09, turn: 40, tilt: 3, heel: 2, level: 3, wake: 0, cam: 0 },
                 ]),
             ],
             portrait: [
-                { at: 'top', x: 0.55, y: 0.42, size: 0.36, heading: 0, turn: 145, tilt: 0, heel: 9, level: 0, wake: 0 },                       // beside the headline, bow left toward the flipped swell: a turn past the viewer, never a roll (sails in from the right)
-                { at: 'top+100', x: 0.55, y: 0.42, size: 0.36, heading: 0, turn: 145, tilt: 0, heel: 9, level: 0, wake: 0 },
-                { at: '#work:center@0.66', x: 0.5, y: 0.38, size: 0.35, heading: -8, turn: 138, tilt: 8, heel: 10, level: 0.15, wake: 0.35 },
-                { at: '#work:center@0.5', x: 0.15, y: -0.2, size: 0.32, heading: -40, turn: 90, tilt: 32, heel: 12, level: 0.5, wake: 0.7 },   // dives down-left toward the sea, behind the picker glass
-                { at: '#work:center@0.25', x: 0.05, y: -0.45, size: 0.3, heading: -68, turn: 40, tilt: 54, heel: 13, level: 0.8, wake: 0.85 },
-                { at: 'stage-pin', ...work(1), y: -0.64, size: 0.3, heading: c.shipWorkHeading + 6, tilt: c.shipWorkTilt - 6, turn: 4 },
-                { at: 'stage@0.06', ...work(1), y: -0.66, size: 0.3 },
-                { at: 'stage@0.14', ...work(1), y: -0.66, size: 0.3 },
-                { at: 'stage@0.3', ...work(2), y: -0.66, size: 0.24 },
-                { at: 'stage@0.47', ...work(2), y: -0.66, size: 0.24 },
-                { at: 'stage@0.63', ...work(3), y: -0.66, size: 0.2 },
-                { at: 'stage@0.8', ...work(3), y: -0.66, size: 0.2 },
-                { at: 'stage@0.92', ...work(3), x: 0.02, y: -0.64, size: 0.2, heading: c.shipWorkHeading + 12, tilt: c.shipWorkTilt - 5, turn: 4, heel: 13 },
-                { at: 'stage-release', x: 0.05, y: -0.62, size: 0.22, heading: -58, turn: 9, tilt: 54, heel: 12, level: 3, wake: 0.95 },
-                { at: '#read:top@0.82', x: 0.18, y: -0.62, size: 0.25, heading: -40, turn: 18, tilt: 34, heel: 9, level: 3, wake: 1 },
-                { at: '#read:top@0.5', x: 0.3, y: -0.62, size: 0.28, heading: -20, turn: 30, tilt: 10, heel: 11, level: 3, wake: 1 },          // below the manifesto text
-                { at: '#read:bottom@1.0', x: 0.45, y: -0.6, size: 0.26, heading: -5, turn: 32, tilt: 4, heel: 7, level: 3, wake: 0.9 },
-                { at: '#scalability:top@0.6', x: 0.6, y: 0.6, size: 0.12, heading: 0, turn: -40, tilt: 8, heel: 4, level: 3, wake: 0.3 },
+                { at: 'top', x: 0.4, y: -0.8, size: 0.3, turn: 35, tilt: 0, heel: 9, level: 0, wake: 0, cam: 0 },                                                            // resting on the swell at the bottom-left, bow right (rides in from the left)
+                { at: '#work:center@0.72', x: 0.32, y: -0.78, size: 0.3, turn: 55, tilt: 6, heel: 10, level: 0.1, wake: 0.35, cam: 0.2 },
+                { at: '#work:center@0.5', x: 0.15, y: -0.7, size: 0.3, turn: 80, tilt: 24, heel: 12, level: 0.4, wake: 0.65, cam: 0.3 },                                      // turns toward the viewer and dives down the page
+                { at: '#work:center@0.25', x: 0.05, y: -0.6, size: 0.28, turn: 90, tilt: 50, heel: 12, level: 0.75, wake: 0.85, cam: 0.5 },
+                { at: 'stage-pin', ...work(1, -0.55), size: 0.3, tilt: c.shipWorkTilt - 4, cam: 0.8 },
+                { at: 'stage@0.06', ...work(1, -0.5), size: 0.3 },
+                { at: 'stage@0.14', ...work(1, -0.5), size: 0.3 },
+                { at: 'stage@0.3', ...work(2, -0.5), size: 0.24 },
+                { at: 'stage@0.47', ...work(2, -0.5), size: 0.24 },
+                { at: 'stage@0.63', ...work(3, -0.5), size: 0.2 },
+                { at: 'stage@0.8', ...work(3, -0.5), size: 0.2 },
+                { at: 'stage@0.92', ...work(3, -0.48), x: 0.02, size: 0.2, turn: 84, tilt: c.shipWorkTilt - 5, cam: 0.8 },
+                { at: 'stage-release', x: 0.05, y: -0.55, size: 0.22, turn: 70, tilt: 50, heel: 12, level: 3, wake: 0.95, cam: 0.6 },
+                { at: '#read:top@0.82', x: 0.18, y: -0.6, size: 0.25, turn: 45, tilt: 34, heel: 9, level: 3, wake: 1, cam: 0.5 },
+                { at: '#read:top@0.5', x: 0.3, y: -0.62, size: 0.28, turn: 30, tilt: 10, heel: 11, level: 3, wake: 1, cam: 0.3 },                                            // below the manifesto text
+                { at: '#read:bottom@1.0', x: 0.45, y: -0.6, size: 0.26, turn: 32, tilt: 4, heel: 7, level: 3, wake: 0.9, cam: 0.3 },
+                { at: '#scalability:top@0.6', x: 0.6, y: 0.6, size: 0.12, turn: -40, tilt: 8, heel: 4, level: 3, wake: 0.3, cam: 0 },
                 ...(translucent ? [
-                    { at: '.testimonials-wrapper:top@0.5', x: -0.3, y: -0.55, size: 0.26, heading: -30, turn: 70, tilt: 6, heel: -8, level: 3, wake: 0.6 },
-                    { at: 'end', x: -0.3, y: -0.7, size: 0.2, heading: 0, turn: 35, tilt: 3, heel: 0, level: 3, wake: 0 },
+                    { at: '.testimonials-wrapper:top@0.5', x: -0.3, y: -0.55, size: 0.26, turn: 42, tilt: 6, heel: -8, level: 3, wake: 0.6, cam: 0.3 },
+                    { at: 'end', x: -0.3, y: -0.7, size: 0.2, turn: 35, tilt: 3, heel: 0, level: 3, wake: 0, cam: 0 },
                 ] : [
-                    { at: '.testimonials-wrapper:center@0.5', x: 0.7, y: -0.6, size: 0.14, heading: 0, turn: 38, tilt: 0, heel: 5, level: 3, wake: 0.3 },
-                    { at: 'end', x: 0.7, y: -0.6, size: 0.14, heading: 0, turn: 40, tilt: 3, heel: 2, level: 3, wake: 0 },
+                    { at: '.testimonials-wrapper:center@0.5', x: 0.7, y: -0.6, size: 0.14, turn: 38, tilt: 0, heel: 5, level: 3, wake: 0.3, cam: 0.3 },
+                    { at: 'end', x: 0.7, y: -0.6, size: 0.14, turn: 40, tilt: 3, heel: 2, level: 3, wake: 0, cam: 0 },
                 ]),
             ],
         };
+    }
+    /* The ride-in on load: a time-driven curve that ends exactly at the first waypoint. On desktop the hero's Lottie swell sits top-right
+       and the layer is drawn above it while the hero is on screen, so the ship comes in from the right along the foot of the wave,
+       lifts over the crest line and settles at its foot; the crossing is placed from the swell's real rectangle. On phones the swell is
+       flipped to the bottom-left and the ship rests on it, so it rides in from the left. Any other layout: a plain entry from the side. */
+    function entryPoints(w0) {
+        const el = document.querySelector('.hero-wrapper dotlottie-player'), r = el && el.getBoundingClientRect();
+        const toN = (fx, fy) => ({ x: ((r.left + fx * r.width) / innerWidth) * 2 - 1, y: 1 - ((r.top - scrollY + fy * r.height) / innerHeight) * 2 });   // rect fractions -> NDC at scroll 0
+        const rest = { x: w0.x, y: w0.y };
+        if (r && r.width > 0 && innerWidth > 1200 && innerWidth >= innerHeight) {   // the unflipped swell, top-right
+            const foot = toN(0.78, 0.74), crest = toN(0.46, 0.63);
+            return [{ at: 0, x: 1.18, y: foot.y - 0.02 }, { at: 380, x: foot.x, y: foot.y }, { at: 700, x: crest.x, y: crest.y + 0.02 }, { at: 1000, ...rest }];
+        }
+        if (innerHeight > innerWidth) return [{ at: 0, x: -1.2, y: rest.y + 0.02 }, { at: 450, x: -0.5, y: rest.y + 0.05 }, { at: 760, x: 0.05, y: rest.y - 0.02 }, { at: 1000, ...rest }];
+        const fromRight = Math.abs(w0.turn) > 90;
+        return [{ at: 0, x: fromRight ? 1.2 : -1.2, y: rest.y }, { at: 500, x: rest.x + (fromRight ? 0.35 : -0.35), y: rest.y + 0.03 }, { at: 1000, ...rest }];
     }
     function resolveAt(at) {
         const vh = innerHeight, maxY = Math.max(0, document.documentElement.scrollHeight - vh);
@@ -543,7 +563,10 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         }
         return M.clamp(y + off, 0, maxY);
     }
-    const ship = { sy: scrollY, keys: [], resolvedAt: -1e9, t0: -1, ripple: 0, flow: 0, wind: 0, way: 0, gust: 0, heel: null, heelVel: 0, phiE: 0, phiR: 0, flutPh: 0, flick: 0, churnPh: 0, lambda: 0.3, lastScroll: scrollY, lo: -1, pose: {}, follow: null, overlay: false, overlayY: Infinity, flipping: false };
+    const lottieEl = document.querySelector('.hero-wrapper dotlottie-player');
+    function lottiePhase() { try { const l = lottieEl && lottieEl.getLottie && lottieEl.getLottie(); return l && l.totalFrames ? (l.currentFrame % l.totalFrames) / l.totalFrames : -1; } catch (e) { return -1; } }
+    function lottieParallax() { if (!lottieEl || !(pcfg.shipLottie > 0)) return; const h = lottieEl.parentElement ? lottieEl.parentElement.offsetHeight : innerHeight; lottieEl.style.setProperty('--ws-lottie-y', (-pcfg.shipLottie * Math.min(scrollY, h)).toFixed(1) + 'px'); }
+    const ship = { sy: scrollY, keys: [], resolvedAt: -1e9, t0: -1, ripple: 0, flow: 0, wind: 0, way: 0, gust: 0, heel: null, heelVel: 0, phiE: 0, phiR: 0, flutPh: 0, flick: 0, churnPh: 0, lambda: 0.3, lastScroll: scrollY, lo: -1, pose: {}, follow: null, route: null, entryRoute: null, entryEnd: null, heroY: -1, overlay: false, overlayY: Infinity, flipping: false };
     /* Pose evaluation. Scroll -> target pose: a monotone cubic (Fritsch-Butland tangents) through the keyframes. A value only moves
        inside segments whose two keys differ, so holds stay perfectly flat and nothing overshoots, yet velocity is continuous through
        every keyframe: positions travel on arcs and the angles never stop dead at a key. Tangents are prepared once per resolve. */
@@ -568,12 +591,123 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         for (const key of POSE_KEYS) out[key] = h00 * a.k[key] + h10 * a.m[key] + (1 - h00) * b.k[key] + h11 * b.m[key];
         return out;
     }
-    function trackDir(s) {   // direction of the track on screen at scroll s (deg, heading convention: 0 right, -90 down the page); NaN where the track rests
-        const keys = ship.keys, i = segAt(s), a = keys[i], b = keys[Math.min(i + 1, keys.length - 1)], h = b.y - a.y;
-        if (!(h > 0)) return NaN;
-        const u = M.clamp((s - a.y) / h, 0, 1), u2 = u * u, d00 = 6 * u2 - 6 * u, d10 = (3 * u2 - 4 * u + 1) * h, d11 = (3 * u2 - 2 * u) * h;
-        const tx = (d00 * (a.k.x - b.k.x) + d10 * a.m.x + d11 * b.m.x) * visW, ty = (d00 * (a.k.y - b.k.y) + d10 * a.m.y + d11 * b.m.y) * visH;   // aspect-correct
-        return tx * tx + ty * ty > 1e-10 ? Math.atan2(ty, tx) * 180 / Math.PI : NaN;
+    // route.mjs — scroll-driven route for the particle ship (pure ES2020, no DOM).
+    // The position travels along ONE spatial curve through the waypoints (centripetal
+    // Catmull-Rom, arc-length tabulated); scroll is mapped to distance along it by a
+    // separate monotone cubic. Everything lives inside buildRoute (no top-level state),
+    // so it can be pasted as a plain inner function — just drop the `export`.
+    //
+    //   buildRoute(points, aspect, { softStart = 0.3, samplesPerSegment = 24, alpha = 0.5 })
+    //     points: [{ at, x, y, ... }] sorted by `at` (may repeat); x,y in NDC, aspect = w / h.
+    //     -> { sample(scroll, out), length, distAt(i) }
+    //     sample writes out.x/out.y (NDC), out.tx/out.ty (unit on-screen direction of travel,
+    //     (0,0) where the curve is stationary), out.dist, out.vel (d dist / d scroll, >= 0).
+    function buildRoute(points, aspect, opts = {}) {
+      const { softStart = 0.3, samplesPerSegment = 24, alpha = 0.5 } = opts;
+      const n = points.length, segs = n - 1, S = Math.max(1, samplesPerSegment | 0);
+    
+      // 1. Control points in screen-true space (x * aspect), so distances and directions are
+      //    what the eye sees. Ends are duplicated as phantom neighbours.
+      const px = new Float64Array(n + 2), py = new Float64Array(n + 2);
+      for (let i = 0; i < n; i++) { px[i + 1] = points[i].x * aspect; py[i + 1] = points[i].y; }
+      px[0] = px[1]; py[0] = py[1]; px[n + 1] = px[n]; py[n + 1] = py[n];
+      const gap = (a, b) => Math.pow((px[b] - px[a]) ** 2 + (py[b] - py[a]) ** 2, alpha / 2);
+    
+      // 2. Catmull-Rom in cubic-Hermite form: per segment, end tangents m1/m2 (d/du, u in [0,1]).
+      //    Why Hermite: the usual Barry-Goldman recursion divides by knot gaps, which vanish on
+      //    coincident points. Here a zero *neighbour* gap is replaced by the segment's own gap —
+      //    that is what turns the duplicated phantom end into the classic half-chord end tangent —
+      //    and a zero *own* gap is a hold: the segment collapses to its point with zero tangents.
+      //    Adjacent segments share the same tangent expression at their common waypoint, so the
+      //    direction of travel is continuous there (only its d/du scale differs).
+      const m1x = new Float64Array(segs), m1y = new Float64Array(segs);
+      const m2x = new Float64Array(segs), m2y = new Float64Array(segs);
+      for (let j = 0; j < segs; j++) {
+        const a = j, b = j + 1, c = j + 2, d = j + 3, g1 = gap(b, c);
+        if (g1 < 1e-12) continue;                                       // hold: tangents stay 0
+        let g0 = gap(a, b), g2 = gap(c, d);
+        if (g0 < 1e-12) g0 = g1;
+        if (g2 < 1e-12) g2 = g1;
+        m1x[j] = g1 * ((px[b] - px[a]) / g0 - (px[c] - px[a]) / (g0 + g1) + (px[c] - px[b]) / g1);
+        m1y[j] = g1 * ((py[b] - py[a]) / g0 - (py[c] - py[a]) / (g0 + g1) + (py[c] - py[b]) / g1);
+        m2x[j] = g1 * ((px[c] - px[b]) / g1 - (px[d] - px[b]) / (g1 + g2) + (px[d] - px[c]) / g2);
+        m2y[j] = g1 * ((py[c] - py[b]) / g1 - (py[d] - py[b]) / (g1 + g2) + (py[d] - py[c]) / g2);
+      }
+      const ev = (j, u, o) => {                       // segment j at u -> o.x, o.y, o.dx, o.dy (aspect space)
+        const uu = u * u, uuu = uu * u, x1 = px[j + 1], y1 = py[j + 1], x2 = px[j + 2], y2 = py[j + 2];
+        const h00 = 2 * uuu - 3 * uu + 1, h10 = uuu - 2 * uu + u, h01 = 3 * uu - 2 * uuu, h11 = uuu - uu;
+        const k00 = 6 * uu - 6 * u, k10 = 3 * uu - 4 * u + 1, k01 = 6 * u - 6 * uu, k11 = 3 * uu - 2 * u;
+        o.x = h00 * x1 + h10 * m1x[j] + h01 * x2 + h11 * m2x[j];
+        o.y = h00 * y1 + h10 * m1y[j] + h01 * y2 + h11 * m2y[j];
+        o.dx = k00 * x1 + k10 * m1x[j] + k01 * x2 + k11 * m2x[j];
+        o.dy = k00 * y1 + k10 * m1y[j] + k01 * y2 + k11 * m2y[j];
+      };
+    
+      // 3. Arc-length table: cumulative distance `cum`, with the curve parameter (= segment + u)
+      //    at which it is first reached (`pa`) and last reached (`pb`); they differ only where a
+      //    hold follows. Interpolating from pb[k] to pa[k+1] keeps every interval on moving curve,
+      //    so a hold resolves to the start of its departing segment (and that direction) while the
+      //    arrival stays exact, and every span is strictly positive — no zero divisions later.
+      //    Hold segments are skipped outright (rounding would otherwise give them a 1e-16 length).
+      const T = segs * S + 1, cum = new Float64Array(T), pa = new Float64Array(T), pb = new Float64Array(T), dAt = new Float64Array(n);
+      const tmp = { x: 0, y: 0, dx: 0, dy: 0 };
+      let len = 1, lx = px[1], ly = py[1];
+      for (let j = 0; j < segs; j++) {
+        if (gap(j + 1, j + 2) < 1e-12) { pb[len - 1] = j + 1; dAt[j + 1] = cum[len - 1]; continue; }
+        for (let k = 1; k <= S; k++) {
+          ev(j, k / S, tmp);
+          const step = Math.hypot(tmp.x - lx, tmp.y - ly), p = j + k / S;
+          lx = tmp.x; ly = tmp.y;
+          if (step > 0) { cum[len] = cum[len - 1] + step; pa[len] = pb[len] = p; len++; }
+          else pb[len - 1] = p;
+        }
+        dAt[j + 1] = cum[len - 1];
+      }
+    
+      // 4. Scroll -> distance: monotone cubic through (at_i, dAt_i) with Fritsch-Butland
+      //    (weighted harmonic mean) tangents; those never exceed 3x either neighbouring slope, so
+      //    the cubic is non-decreasing and C1. Slopes are >= 0, hence a zero slope on either side
+      //    (a hold, or equal `at`) forces a zero tangent — what monotone cubics require. The ends
+      //    get softStart x the adjacent mean slope: not zero, so the ship moves on the very first
+      //    pixel, but gently, and it eases into the final mooring the same way.
+      const at = new Float64Array(n), h = new Float64Array(segs), del = new Float64Array(segs), m = new Float64Array(n);
+      for (let i = 0; i < n; i++) at[i] = points[i].at;
+      for (let j = 0; j < segs; j++) { h[j] = at[j + 1] - at[j]; del[j] = h[j] > 0 ? (dAt[j + 1] - dAt[j]) / h[j] : 0; }
+      m[0] = softStart * del[0]; m[n - 1] = softStart * del[segs - 1];
+      for (let i = 1; i < segs; i++) {
+        const a = del[i - 1], b = del[i];
+        if (a > 0 && b > 0) { const w1 = 2 * h[i] + h[i - 1], w2 = h[i] + 2 * h[i - 1]; m[i] = (w1 + w2) / (w1 / a + w2 / b); }
+      }
+    
+      const upper = (arr, hi, v) => {                 // largest k <= hi with arr[k] <= v (arr[0] <= v holds)
+        let lo = 0;
+        while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (arr[mid] <= v) lo = mid; else hi = mid - 1; }
+        return lo;
+      };
+      function sample(scroll, out) {
+        if (!out) out = {};
+        const s = scroll > at[0] ? (scroll < at[n - 1] ? scroll : at[n - 1]) : at[0];   // clamp; NaN -> start
+        const i = upper(at, segs - 1, s), hs = h[i];   // del[i] > 0 implies hs > 0
+        let dist, vel = 0;
+        if (del[i] > 0) {                              // Hermite cubic and its analytic derivative
+          const t = (s - at[i]) / hs, tt = t * t, ttt = tt * t;
+          dist = (2 * ttt - 3 * tt + 1) * dAt[i] + (ttt - 2 * tt + t) * hs * m[i] + (3 * tt - 2 * ttt) * dAt[i + 1] + (ttt - tt) * hs * m[i + 1];
+          vel = del[i] * (6 * t - 6 * tt) + m[i] * (3 * tt - 4 * t + 1) + m[i + 1] * (3 * tt - 2 * t);
+        } else dist = dAt[i + 1];                     // hold or equal `at`: exact, no rounding drift off the table entry
+        const k = upper(cum, len > 1 ? len - 2 : 0, dist), span = cum[k + 1] - cum[k];
+        let f = span > 0 ? (dist - cum[k]) / span : 0; f = f > 1 ? 1 : f > 0 ? f : 0;
+        const g = pb[k] + f * (pa[k + 1] - pb[k]);
+        let j = Math.floor(g); j = j > segs - 1 ? segs - 1 : j > 0 ? j : 0;
+        const u = g - j;
+        ev(j, u, tmp);
+        let L = Math.hypot(tmp.dx, tmp.dy);
+        if (L < 1e-12 && u === 0 && j > 0) { ev(j - 1, 1, tmp); L = Math.hypot(tmp.dx, tmp.dy); }  // moored at the end of a run: keep the arrival heading
+        out.x = tmp.x / aspect; out.y = tmp.y;
+        out.tx = L > 1e-12 ? tmp.dx / L : 0; out.ty = L > 1e-12 ? tmp.dy / L : 0;
+        out.dist = dist; out.vel = vel > 0 ? vel : 0;
+        return out;
+      }
+      return { sample, length: dAt[n - 1], distAt: (i) => dAt[i] };
     }
     /* Target -> drawn pose: a critically damped follower per channel. It closes 95% of a jump in `lag` seconds, trails a moving
        target by about 0.4 lag, and is clamped so it can never pass the mark. Angles are followed on their plain continuous values
@@ -585,11 +719,14 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         if ((d < 0) === (out > target)) { out = target; v = 0; }   // never past the mark
         f.v[key] = v; f.p[key] = out;
     }
-    const LAG_OF = { x: 'shipLagPos', y: 'shipLagPos', wake: 'shipLagPos', size: 'shipLagSize', level: 'shipLagSize', heading: 'shipLag', turn: 'shipLag', tilt: 'shipLag', heel: 'shipLag' };
-    const _tgt = {};
+    const LAG_OF = { x: 'shipLagPos', y: 'shipLagPos', wake: 'shipLagPos', cam: 'shipLagPos', size: 'shipLagSize', level: 'shipLagSize', turn: 'shipLag', tilt: 'shipLag', heel: 'shipLag' };
+    const _tgt = {}, _rs = {}, _er = {};
     const isLight = () => document.body.classList.contains('default-light') || document.body.classList.contains('default-light-colorblind');
     // the principles, testimonials, tools and footer paint an opaque ground over the layer; there the canvas moves above the page with a screen
     // blend (multiply in the light theme) behind a quick dip to black, so the voyage can end at the harbour instead of behind a wall
+    function layerZ() {   // -1 behind the page; 1 above the hero's Lottie and grid but under its text and picker (only while the hero is on screen); 12 in overlay mode at the bottom
+        if (ship.overlay) return; canvas.style.zIndex = scrollY < ship.heroY ? '1' : '-1';
+    }
     function setOverlay(on) {
         if (on === ship.overlay || ship.flipping) return;
         ship.flipping = true; canvas.style.transition = 'opacity 0.22s ease'; canvas.style.opacity = '0';
@@ -603,27 +740,45 @@ function startParticleLayer(THREE, GPUC, BOAT) {
             const src = innerHeight > innerWidth ? keyframes().portrait : keyframes().landscape;
             ship.keys = src.map(k => ({ y: resolveAt(k.at), k })).filter(e => e.y !== null).sort((a, b) => a.y - b.y);
             prepKeys(ship.keys);
+            if (ship.keys.length > 1) {
+                ship.route = buildRoute(ship.keys.map(k => ({ at: k.y, x: k.k.x, y: k.k.y })), visW / visH, { softStart: pcfg.shipSoftStart });
+                const w0 = ship.keys[0].k; ship.entryEnd = { x: w0.x, y: w0.y }; ship.entryRoute = buildRoute(entryPoints(w0), visW / visH, { softStart: 1 });
+            }
             const oy = pcfg.shipGrounds === 'overlay' ? resolveAt('#scalability:top@0.55') : null; ship.overlayY = oy === null ? Infinity : oy;   // from the principles down: their grounds are opaque
+            const hy = resolveAt('.hero-wrapper:bottom@0.6'); ship.heroY = hy === null ? -1 : hy;
         }
-        setOverlay(scrollY > ship.overlayY);
-        if (!ship.keys.length) return;
+        setOverlay(scrollY > ship.overlayY); layerZ(); lottieParallax();
+        if (!ship.keys.length || !ship.route) return;
         ship.sy = scrollY;   // scroll is the timeline; the follower below supplies all of the time smoothing
-        const T = poseAt(ship.sy, _tgt), F = ship.follow || (ship.follow = { p: { ...T }, v: Object.fromEntries(POSE_KEYS.map(k => [k, 0])), yaw: 0 });   // first frame: snap
-        // motion-led heading: the bow leans toward the direction the track takes a little further on (a lead), by a share that grows
-        // with the ship's actual screen speed. The tangent end nearest the authored heading is used, so scrolling up is a plain reversal.
-        const dir = trackDir(ship.sy + pcfg.shipLead);
-        if (dir === dir) { let dv = ((dir - T.heading) % 360 + 540) % 360 - 180; if (dv > 90) dv -= 180; else if (dv < -90) dv += 180; F.yaw = dv; }   // deg in (-90, 90]; kept while the lead point rests
-        const speed = Math.hypot(F.v.x * visW, F.v.y * visH) / (2 * visH);   // viewport heights per second, from the follower's own velocity: exactly zero at rest, so no low-speed noise
-        T.heading += M.clamp(pcfg.shipYawMix * M.smoothstep(speed, 0.12 * pcfg.shipYawSpeed, pcfg.shipYawSpeed) * F.yaw, -pcfg.shipYaw, pcfg.shipYaw);
+        const T = poseAt(ship.sy, _tgt);
+        ship.route.sample(ship.sy, _rs); T.x = _rs.x; T.y = _rs.y;   // the position comes from the one curve through the waypoints; the rest from the property cubics
+        const F = ship.follow || (ship.follow = { p: { ...T }, v: Object.fromEntries(POSE_KEYS.map(k => [k, 0])) });   // first frame: snap
+        // the course: the authored turn, drawn toward the direction of travel on screen where the camera holds still (cam) and the ship
+        // is really moving. Down the screen at a low camera is toward the viewer, so the screen tangent is read through the tilt.
+        const speed = Math.hypot(F.v.x * visW, F.v.y * visH) / (2 * visH);   // viewport heights per second, from the follower's own velocity: exactly zero at rest
+        if (_rs.tx * _rs.tx + _rs.ty * _rs.ty > 1e-8) {
+            const sinT = Math.max(0.35, Math.sin(M.degToRad(Math.max(0, T.tilt)))), psi = Math.atan2(-_rs.ty, _rs.tx * sinT) * 180 / Math.PI;
+            const d = ((psi - T.turn) % 360 + 540) % 360 - 180;
+            T.turn += d * M.clamp(T.cam, 0, 1) * M.smoothstep(speed, 0.03, 0.25);
+        }
         for (const key of POSE_KEYS) follow(F, key, T[key], pcfg[LAG_OF[key]], dt);
-        const P = ship.pose; for (const key of POSE_KEYS) P[key] = F.p[key];
+        const P = ship.pose; for (const key of POSE_KEYS) P[key] = F.p[key]; P.heading = 0;
         // banking: heel with the rate of turn (positive leans out of the turn like a displacement hull), mostly once seen from above
-        P.heel += M.clamp(pcfg.shipLean * F.v.heading, -5, 5) * (0.35 + 0.65 * M.clamp(P.tilt / 60, 0, 1));
-        // sailing in: on load the ship is already formed off the left edge, under way, and eases into its first pose
+        P.heel += M.clamp(pcfg.shipLean * F.v.turn, -5, 5) * (0.35 + 0.65 * M.clamp(P.tilt / 60, 0, 1));
+        // the ride-in: on load the ship comes in along the entry curve (on the swell where there is one), under way, and its course
+        // follows that curve; the curve ends at the first waypoint, and scrolling during the ride simply adds the route's offset
         if (ship.t0 < 0) { ship.t0 = now; ship.entry = scrollY < 200; }   // a page that opens already scrolled shows the ship where it is
-        const e = ship.entry ? Math.min(1, (now - ship.t0) / 1000 / Math.max(0.1, pcfg.shipEntry)) : 1, entry = Math.pow(1 - e, 3);
-        if (Math.abs(P.heading) > 90 || Math.abs(P.turn) > 90) P.x += entry * (1 + P.size * 0.9 - P.x); else P.x -= entry * (P.x + 1 + P.size * 0.9);   // bow first, from whichever edge it points away from
-        P.wake = Math.max(P.wake, entry); P.heel += entry * 4;
+        const e = ship.entry ? Math.min(1, (now - ship.t0) / 1000 / Math.max(0.1, pcfg.shipEntry)) : 1, entry = 1 - e;
+        if (entry > 0 && ship.entryRoute) {
+            const k = 1 - Math.pow(1 - e, 2.2);   // eases off as it arrives
+            ship.entryRoute.sample(k * 1000, _er);
+            P.x += _er.x - ship.entryEnd.x; P.y += _er.y - ship.entryEnd.y;
+            if (_er.tx * _er.tx + _er.ty * _er.ty > 1e-8) { const psiE = Math.atan2(-_er.ty, _er.tx * 0.35) * 180 / Math.PI, dE = ((psiE - P.turn) % 360 + 540) % 360 - 180; P.turn += dE * Math.pow(entry, 0.7); }
+            const crest = Math.max(0, Math.sin(Math.PI * M.clamp((k - 0.52) / 0.32, 0, 1)));   // the lift over the crest line
+            P.y += 0.035 * crest; P.heel += 5 * crest;
+            P.wake = Math.max(P.wake, Math.min(1, entry * 1.6)); P.heel += entry * 3;
+            ship.crest = crest;
+        } else ship.crest = 0;
         // ---- the ship's dynamics (replaces everything from `// idle: bob, ...` to the uniform writes at the end of shipFrame). One speed
         //      scalar, ship.way, from the pose's wake and the scroll wind with hull inertia; every clock that depends on it is accumulated
         //      here (never sin(uTime * f(way)) in the shader) so a change of speed never snaps a phase. Units: hull lengths (L), seconds,
@@ -659,13 +814,14 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         // the sea the hull rides: a swell of 2.4 L (fundamental + a 1.83x harmonic so it is never a metronome) met at the encounter rate;
         // pitch and heave are the quasi-static response of a hull that averages the wave over its length (sinc), bigger on a smaller ship
         const omegaE = (0.9 + 1.5 * way) * (1.2 - 0.15 * lvl); ship.phiE = (ship.phiE + dt * omegaE) % 6283.185;
+        if (ship.crest > 0) { const lp = lottiePhase(); if (lp >= 0) ship.phiE = 6.2832 * lp * 12; }   // on the wave, the ship breathes with the swell's own animation
         const ks = 6.2832 / 2.4, sinc = Math.sin(ks / 2) / (ks / 2), A = (0.008 + 0.010 * Math.min(amp, 1)) / LS * pcfg.shipBob;
         const lift = 1 + 0.3 * M.smoothstep(P.tilt, 50, 60);   // from above the heave reads small: a little more of it there (pitch stays under 4 degrees)
         const thetaA = 1.4 * A * ks * sinc, hA = A * sinc * lift, ph = ship.phiE;
         const pitch = -thetaA * (Math.sin(ph) + 0.35 * Math.sin(1.83 * ph + 1.1)) / 1.35, heave = hA * (Math.cos(ph) + 0.35 * Math.cos(1.83 * ph + 1.1)) / 1.35;
         // where in the cycle the stem is deepest (plunge: spray and the bow wave) and the stern (squat: churn), from the bow's immersion in the fundamental
         const C = A * Math.cos(ks / 2) - hA, D = 0.5 * thetaA - A * Math.sin(ks / 2), psi = Math.atan2(D, C);
-        const plunge = Math.pow(0.5 + 0.5 * Math.cos(ph - psi), 3), squat = Math.pow(0.5 + 0.5 * Math.cos(ph + psi), 3);
+        const plunge = Math.max(Math.pow(0.5 + 0.5 * Math.cos(ph - psi), 3), ship.crest || 0), squat = Math.pow(0.5 + 0.5 * Math.cos(ph + psi), 3);
         // heel: the keyframe's heel plus the wind's, per level (sail area x height over stiffness: the schooner heels most, the deep tall ship less),
         // as a damped roll that over-swings on a gust and settles in a roll period; the sea adds a slow roll on top
         const side = P.heel < 0 ? -1 : 1;   // the wind heels the ship the way the pose was authored
@@ -684,7 +840,7 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         const flapAmp = 0.03 * pcfg.shipFlap * (0.15 + 0.6 * luff + 1.2 * gust), bellyMul = 0.6 + 0.6 * fill;
         ship.flutPh = (ship.flutPh + dt * (1.8 + 4.0 * Wa + 2.5 * gust)) % 6283.185;
         // the sea pose: heading, tilt, turn only. Heel, pitch and heave are applied per role in the shader about the waterline pivot, so the water stays level
-        _qa.setFromAxisAngle(Z, M.degToRad(P.heading)).multiply(_qb.setFromAxisAngle(X, M.degToRad(tilt))).multiply(_qb.setFromAxisAngle(Y, -M.degToRad(turn)));
+        _qa.setFromAxisAngle(X, M.degToRad(tilt)).multiply(_qb.setFromAxisAngle(Y, -M.degToRad(turn)));   // the sea pose: tilt and course; the ship's own roll, pitch and heave are applied per role in the shader
         shipRot.setFromMatrix4(_m4.makeRotationFromQuaternion(_qa));
         shipAt.set(P.x * visW / 2, P.y * visH / 2, 0);
         const snap = now - ship.t0 < 700 ? 0.02 : 0;
@@ -1408,12 +1564,12 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
             ['pCurl', 'particles: curl', 0, 5, 0.05], ['pReturn', 'particles: home spring', 0, 5, 0.05], ['pPull', 'particles: cursor pull', 0, 30, 0.5], ['pDamp', 'particles: damping', 0.7, 0.99, 0.005],
             ['pSize', 'particles: size (px)', 0.3, 6, 0.05], ['pGlow', 'particles: glow', 0, 3, 0.05], ['pRadius', 'particles: light radius', 0.3, 6, 0.05], ['pParallax', 'particles: scroll parallax', 0, 0.012, 0.0002],
             ['boatX', 'ship: hero x (ndc)', -1, 1, 0.01], ['boatY', 'ship: hero y (ndc)', -1, 1, 0.01], ['boatSize', 'ship: hero size', 0.05, 0.6, 0.005],
-            ['shipWorkSize', 'ship: size in work', 0.06, 0.5, 0.005], ['shipWorkY', 'ship: y in work (ndc)', -1, 1, 0.01], ['shipWorkTilt', 'ship: tilt in work (deg)', 0, 90, 1], ['shipWorkHeading', 'ship: heading in work', -180, 180, 5],
+            ['shipWorkSize', 'ship: size in work', 0.06, 0.5, 0.005], ['shipWorkY', 'ship: y in work (ndc)', -1, 1, 0.01], ['shipWorkTilt', 'ship: tilt in work (deg)', 0, 90, 1],
             ['shipEntry', 'ship: sail-in (s)', 0.5, 8, 0.1], ['shipFlap', 'ship: sail flutter', 0, 3, 0.05], ['shipRipple', 'ship: rest rings', 0, 3, 0.05], ['shipBob', 'ship: motion (swell/pitch/roll)', 0, 3, 0.05],
             ['shipHeelWind', 'ship: wind heel (deg)', 0, 25, 0.5], ['shipWave', 'ship: wave height', 0, 3, 0.05], ['shipSpray', 'ship: spray', 0, 3, 0.05], ['shipFoam', 'ship: foam', 0, 3, 0.05],
             ['shipSettle', 'ship: settle speed (/s)', 1, 20, 0.5], ['shipWay', 'ship: water flow', 0, 3, 0.05],
             ['shipLag', 'ship: lag angles (s)', 0.1, 2.5, 0.05], ['shipLagPos', 'ship: lag position (s)', 0.1, 2.5, 0.05], ['shipLagSize', 'ship: lag framing (s)', 0.1, 2.5, 0.05],
-            ['shipLead', 'ship: bow lead (px)', 0, 400, 10], ['shipYaw', 'ship: yaw cap (deg)', 0, 60, 1], ['shipYawMix', 'ship: yaw mix', 0, 1, 0.05], ['shipYawSpeed', 'ship: yaw full at (vh/s)', 0.05, 1, 0.01], ['shipLean', 'ship: lean (deg per deg/s)', -0.2, 0.2, 0.005],
+            ['shipLean', 'ship: lean (deg per deg/s)', -0.2, 0.2, 0.005], ['shipSoftStart', 'ship: soft start', 0.05, 1, 0.05], ['shipLottie', 'ship: swell parallax', 0, 0.6, 0.05],
             ['spineScale', 'spine scale', 0.4, 1.8, 0.02], ['spineSpacing', 'vertebra gap', 0.3, 1.2, 0.01], ['spineTwist', 'vertebra twist', 0, 1, 0.01],
         ];
         const el = document.createElement('div');
