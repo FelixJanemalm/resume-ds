@@ -12,7 +12,7 @@
  * scroll position each `at` resolves to. "Go" scrolls the page to a waypoint so you see the ship there. */
 export function mountRouteEditor(api) {
     const FIELDS = [
-        ['x', -1.3, 1.3, 0.005], ['y', -1.1, 1.1, 0.005], ['size', 0.03, 0.7, 0.005], ['turn', -180, 180, 1], ['tilt', 0, 90, 1],
+        ['x', -1.3, 1.3, 0.005], ['y', -1.1, 1.1, 0.005], ['size', 0.03, 0.7, 0.005], ['turn', -720, 720, 1], ['tilt', 0, 90, 1],   // turn: any angle; the box beside the slider takes what the slider cannot
         ['heel', -25, 25, 0.5], ['level', 0, 3, 0.05], ['wake', 0, 1, 0.02], ['cam', 0, 1, 0.05],
     ];
     const esc = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -54,7 +54,7 @@ export function mountRouteEditor(api) {
                 <div style="display:flex;gap:6px;align-items:center"><span style="width:18px;color:#9aa4b2">${i}</span>
                     <input data-at value="${esc(w.at)}" style="flex:1;font:inherit;background:rgba(0,0,0,.35);color:inherit;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:2px 6px">
                     <span data-px style="color:#9aa4b2;width:52px;text-align:right"></span><button type="button" data-go style="${B};padding:2px 7px">Go</button></div>
-                ${sel ? FIELDS.map(([k, min, max, st]) => `<label style="display:grid;grid-template-columns:44px 1fr 46px;gap:6px;align-items:center;margin:2px 0"><span>${k}</span><input type="range" data-k="${k}" min="${min}" max="${max}" step="${st}" value="${esc(w[k])}"><output style="text-align:right">${esc(w[k])}</output></label>`).join('') : ''}
+                ${sel ? FIELDS.map(([k, min, max, st]) => `<label style="display:grid;grid-template-columns:44px 1fr 64px;gap:6px;align-items:center;margin:2px 0"><span>${k}</span><input type="range" data-k="${k}" min="${min}" max="${max}" step="${st}" value="${esc(w[k])}"><input type="number" data-n="${k}" step="${st}" value="${esc(w[k])}" style="width:64px;box-sizing:border-box;font:inherit;background:rgba(0,0,0,.35);color:inherit;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:1px 4px;text-align:right"></label>`).join('') : ''}
             </div>`;
         }).join('');
         updateMarks();
@@ -69,6 +69,7 @@ export function mountRouteEditor(api) {
         if (e.target.dataset.p) { api.setParam(e.target.dataset.p, +e.target.value); e.target.nextElementSibling.value = e.target.value; return; }   // a lever: applied live, kept for this page load; copy them out as attributes to keep
         const row = e.target.closest('[data-i]'); if (!row) return; const i = +row.dataset.i, w = list[i];
         if (e.target.dataset.k) { w[e.target.dataset.k] = +e.target.value; e.target.nextElementSibling.value = e.target.value; }
+        else if (e.target.dataset.n) { const v = Number(e.target.value); if (!Number.isFinite(v)) return; w[e.target.dataset.n] = v; e.target.previousElementSibling.value = v; }   // the box: any value, the slider follows where it can
         else if (e.target.hasAttribute('data-at')) w.at = e.target.value;
         save();
     });
@@ -122,7 +123,7 @@ export function mountRouteEditor(api) {
         positionHandles();
     }
     function positionHandles() { [...handles.children].forEach((g, i) => { const w = list[i]; if (!w) return; const [px, py] = api.toPx(w.x, w.y); g.setAttribute('transform', `translate(${px.toFixed(1)} ${py.toFixed(1)})`); }); }
-    function syncSliders() { for (const inp of rowsEl.querySelectorAll('[data-i="' + selected + '"] input[type=range]')) { inp.value = list[selected][inp.dataset.k]; inp.nextElementSibling.value = inp.value; } }
+    function syncSliders() { for (const inp of rowsEl.querySelectorAll('[data-i="' + selected + '"] input[type=range]')) { inp.value = list[selected][inp.dataset.k]; inp.nextElementSibling.value = list[selected][inp.dataset.k]; } }
     let lastResolved = -1;
     function tick() {
         const st = api.state(), p = api.pose();
