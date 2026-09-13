@@ -27,13 +27,14 @@
    role[i]: the particle's role at every level where it exists (a particle never changes role). */
 
 export const WATERLINE = -0.37;
-export const LEVELS = ['skiff', 'sloop', 'ketch', 'schooner', 'barque', 'clipper'];
-export const LEVEL_SCALE = [0.7, 0.85, 1.0, 1.15, 1.32, 1.5];              // on-screen size multiplier per level
-export const LEVEL_HEEL = [0.62, 1.0, 1.12, 1.3, 1.05, 0.95];               // wind-heel gain: sail area x CE height / (beam^2 x depth), the sloop = 1
-export const LEVEL_PIVOT = [0.0, -0.02, -0.03, -0.04, -0.05, -0.06];         // pitch pivot x (the centre of flotation drifts aft with the finer, longer hulls)
+export const LEVELS = ['skiff', 'sloop', 'ketch', 'schooner', 'barque', 'clipper', 'rocket'];   // the rocket is the voyage's last form (see rocketLevel), not a ship
+export const LEVEL_SCALE = [0.7, 0.85, 1.0, 1.15, 1.32, 1.5, 1.0];              // on-screen size multiplier per level
+export const LEVEL_HEEL = [0.62, 1.0, 1.12, 1.3, 1.05, 0.95, 0.2];               // wind-heel gain: sail area x CE height / (beam^2 x depth), the sloop = 1
+export const LEVEL_PIVOT = [0.0, -0.02, -0.03, -0.04, -0.05, -0.06, 0.0];
+export const ROCKET = 6;         // pitch pivot x (the centre of flotation drifts aft with the finer, longer hulls)
 export const ROLE = { HULL: 1, DECK: 2, SAIL: 3, SPAR: 4, RIGGING: 5, WATER: 6, WAKE: 7, REFLECTION: 8 };
 
-const NL = 6, WL = WATERLINE, PI = Math.PI;
+const NL = 6, WL = WATERLINE, PI = Math.PI;   // NL: the SHIP levels; the rocket is built apart, after them
 const LIGHT = [-0.45, 0.72, 0.53];
 const shadeN = n => { const l = Math.hypot(n[0], n[1], n[2]) || 1; const d = (n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2]) / l; return Math.min(1, 0.3 + 0.7 * Math.max(0, d)); };
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -357,6 +358,58 @@ function slots(count) {   // [{role, part, n}] whose n sum to count exactly
 }
 const pickWeighted = (W, r) => { const ks = Object.keys(W), tot = ks.reduce((s, k) => s + W[k], 0); let d = r * tot; for (const k of ks) { d -= W[k]; if (d <= 0) return k; } return ks[ks.length - 1]; };
 
+
+/* ---------------------------------------------------------------- the rocket (level 6): what the voyage ends as
+   Rocket space is boat space: the axis along x ON the waterline (nose at +0.5, nozzle at -0.5), so the layer's pose
+   turn -90 / tilt 90 stands it nose-up on the screen with its +y side (the porthole) toward the viewer, the foam
+   strip streaming aft from the measured "stern" becomes the exhaust plume, and the hull measurement (the radius at
+   the waterline) sizes that plume at the nozzle. HULL -> body and nose, DECK -> four swept fins, SPAR -> the nozzle
+   bell, the nose spike and the fins' bright edges, RIGGING -> four landing legs with pads, WAKE -> the plume (shared
+   with the ships); sails, water and the reflection are absent here, so those particles return to the field. */
+const RK = { R: 0.075, x0: -0.5, x1: 0.5, xc: 0.16, flare: 0.015, finR: 0.19, foot: [-0.56, 0.155] };
+const FIN_A = [45, 135, 225, 315].map(d => d * PI / 180), LEG_A = [0, 90, 180, 270].map(d => d * PI / 180);
+function rocketR(x) {   // the body's radius along x: a flared skirt, the cylinder, an ogive nose
+    if (x < -0.44) return RK.R + RK.flare * (-0.44 - x) / 0.06;
+    if (x <= RK.xc) return RK.R;
+    const t = Math.min(1, (x - RK.xc) / (RK.x1 - RK.xc)); return RK.R * Math.pow(Math.max(0, 1 - Math.pow(t, 1.8)), 0.7);
+}
+function rocketLevel(count, role, rand, wakePos, wakeMeta) {
+    const pos = new Float32Array(count * 4), meta = new Float32Array(count * 4);
+    const put = (i, p) => { const o = i * 4; pos[o] = p[0]; pos[o + 1] = p[1]; pos[o + 2] = p[2]; pos[o + 3] = Math.max(0.02, Math.min(1, p[3])); };
+    const j = () => (rand() - 0.5) * 0.003;
+    for (let i = 0; i < count; i++) {
+        const r = role[i]; meta[i * 4] = r;
+        if (r === ROLE.HULL) {
+            let x = 0, rr = 0;
+            for (let k = 0; k < 10; k++) { x = RK.x0 + rand() * (RK.x1 - RK.x0); rr = rocketR(x); if (rand() * (RK.R + RK.flare) < rr) break; }   // density follows the surface
+            const a = rand() * 2 * PI, ca = Math.cos(a), sa = Math.sin(a), dr = (rocketR(x + 0.005) - rocketR(x - 0.005)) / 0.01;
+            let sh = shadeN([-dr, ca, sa]);
+            if (Math.abs(x - 0.02) < 0.008 || Math.abs(x + 0.30) < 0.008) sh *= 0.45;                          // two dark bands
+            const aa = a > PI ? a - 2 * PI : a;
+            if (Math.hypot((x - 0.10) / 0.022, aa / 0.32) < 1) sh = 1;                                            // the porthole, on the side that faces the viewer
+            put(i, [x, WL + rr * ca, rr * sa, sh]);
+        } else if (r === ROLE.DECK) {   // fins: root chord -0.47..-0.18 on the body, tip chord -0.50..-0.40 at finR (swept back), two faces
+            const a = FIN_A[Math.floor(rand() * 4)], s = rand(), t = Math.pow(rand(), 0.8), side = rand() < 0.5 ? -1 : 1;
+            const x = lerp(lerp(-0.47, -0.18, s), lerp(-0.50, -0.40, s), t), rad = lerp(RK.R - 0.004, RK.finR, t), ny = -Math.sin(a), nz = Math.cos(a);
+            put(i, [x, WL + rad * Math.cos(a) + side * 0.004 * ny, rad * Math.sin(a) + side * 0.004 * nz, shadeN([0, side * ny, side * nz]) * (0.85 + 0.15 * t)]);
+        } else if (r === ROLE.SPAR) {
+            const q = rand();
+            if (q < 0.5) { const t = rand(), a = rand() * 2 * PI, rad = lerp(0.05, 0.08, t); put(i, [lerp(-0.5, -0.57, t), WL + rad * Math.cos(a), rad * Math.sin(a), 0.3 + 0.4 * shadeN([0.4, Math.cos(a), Math.sin(a)])]); }   // the nozzle bell
+            else if (q < 0.62) { put(i, [lerp(0.5, 0.575, rand()), WL + j(), j(), 0.95]); }                                                                                                       // the nose spike
+            else { const a = FIN_A[Math.floor(rand() * 4)], t = rand(), lead = rand() < 0.6, x = lead ? lerp(-0.18, -0.40, t) : lerp(-0.40, -0.50, t), rad = lead ? lerp(RK.R, RK.finR, t) : RK.finR;
+                put(i, [x + j(), WL + rad * Math.cos(a), rad * Math.sin(a), 0.95]); }                                                                                                              // the fins' bright edges
+        } else if (r === ROLE.RIGGING) {   // landing legs: two struts to each pad
+            const a = LEG_A[Math.floor(rand() * 4)], q = rand(), t = rand(), ca = Math.cos(a), sa = Math.sin(a); let x, rad;
+            if (q < 0.42) { x = lerp(-0.30, RK.foot[0], t); rad = lerp(RK.R, RK.foot[1], t); }
+            else if (q < 0.8) { x = lerp(-0.45, RK.foot[0], t); rad = lerp(RK.R, RK.foot[1], t); }
+            else { x = lerp(RK.foot[0] - 0.012, RK.foot[0] + 0.012, t); rad = RK.foot[1] + (rand() - 0.5) * 0.02; }
+            put(i, [x + j(), WL + rad * ca + j(), rad * sa + j(), 0.7]);
+        } else if (r === ROLE.WAKE) { const o = i * 4; for (let k = 0; k < 4; k++) { pos[o + k] = wakePos[o + k]; meta[o + k] = wakeMeta[o + k]; } }
+        // sails, water, reflection: absent (shade 0)
+    }
+    return { pos, meta };
+}
+
 export function buildBoatLevels(count, seed = 1) {
     count = Math.max(0, Math.floor(count)) || 0;
     const rand = mulberry32(seed);
@@ -409,5 +462,6 @@ export function buildBoatLevels(count, seed = 1) {
             for (let L = 0; L < NL; L++) { const p = g(L); if (p) put(L, i, p, r, r === ROLE.SAIL ? p[4] : 0, r === ROLE.SAIL ? p[6] : 0, r === ROLE.SAIL ? p[5] : 0); }
         }
     }
+    const rk = rocketLevel(count, role, rand, pos[NL - 1], meta[NL - 1]); pos.push(rk.pos); meta.push(rk.meta);   // level 6
     return { count, pos, meta, role };
 }

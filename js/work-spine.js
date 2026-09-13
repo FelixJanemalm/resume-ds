@@ -52,6 +52,7 @@ const pcfg = section ? {
     shipSoftStart: numAttr(section.dataset.shipSoftStart, 0.3),          // the route's velocity at the very first pixel of scroll, relative to the first leg's mean: motion begins at once, gently
     shipCurrent: numAttr(section.dataset.shipCurrent, 1),                // the field as the sea: how much of the water's speed the whole field streams past at while the camera holds the ship (x the route's cam)
     shipFieldDim: numAttr(section.dataset.shipFieldDim, 0.35),           // how much the field dims under way while the camera holds the ship (0 = not at all)
+    shipOverlayAt: section.dataset.shipOverlayAt !== undefined ? section.dataset.shipOverlayAt : 'footer:top@1.05',   // with opaque grounds: the scroll mark from which the canvas is drawn ABOVE the page (the rocket over the footer); '' = never
     shipLottie: numAttr(section.dataset.shipLottie, 0.25),               // parallax on the hero Lottie while the hero is on screen: fraction of the scroll the swell moves ahead of the page (0 = none)
     shipWay: numAttr(section.dataset.shipWay, 1),           // how fast the water streams past the hull under way (hull lengths per second at full wake)
     shipGrounds: section.dataset.shipGrounds || 'opaque',   // the bottom sections paint their own ground over the layer: 'opaque' (the ship stays at the quote and the sections below cover it) | 'translucent' (work-spine.css thins those grounds so the ship shows through, the concept's pick) | 'overlay' (the canvas flips above the page there with a screen blend) | 'none'
@@ -491,7 +492,8 @@ function startParticleLayer(THREE, GPUC, BOAT) {
     function keyframeTables() {
         const c = pcfg, LS = (BOAT && BOAT.LEVEL_SCALE) || [1, 1, 1, 1], NL = LS.length;
         // the evolution marks along the route: a level per case study, the finale in open water (with a four-level module the last two coincide)
-        const L1 = Math.min(1, NL - 1), L2 = Math.min(2, NL - 1), L3 = Math.min(3, NL - 1), L4 = Math.min(4, NL - 1), L5 = NL - 1;
+        const L1 = Math.min(1, NL - 1), L2 = Math.min(2, NL - 1), L3 = Math.min(3, NL - 1), L4 = Math.min(4, NL - 1), L5 = Math.min(5, NL - 1);
+        const RK = BOAT && BOAT.ROCKET !== undefined && BOAT.ROCKET < NL ? BOAT.ROCKET : -1;   // the rocket level, when the module has one
         // the work stage: seen from above in the column, bow down the page; the hull keeps one on-screen length while the ship evolves
         const work = (L, y) => ({ x: 0, y: y === undefined ? c.shipWorkY : y, size: c.shipWorkSize / LS[Math.min(NL - 1, Math.round(L))], turn: 90, tilt: c.shipWorkTilt, heel: 9, level: L, wake: L > 1.5 ? 1 : 0.9, cam: 1 });
         const translucent = c.shipGrounds === 'translucent';
@@ -511,6 +513,14 @@ function startParticleLayer(THREE, GPUC, BOAT) {
                 { at: '#read:top@0+180', x: -0.08, y: -0.66, size: 0.18, turn: 0, tilt: 0, heel: 3, level: L3, wake: 0.9, cam: 1 },
                 { at: '#read:top@0+360', x: -0.08, y: -0.66, size: 0.18, turn: 0, tilt: 0, heel: 3, level: L4, wake: 0.95, cam: 1 },
                 { at: '#read:top@0+540', x: -0.08, y: -0.66, size: 0.18, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1 },                       // the clipper as the last word lands
+                // the launch: the clipper holds until the principles have covered it, becomes the rocket out of sight, and the rocket rises with the
+                // footer (the canvas flips above the page at shipOverlayAt), standing over the footer's edge nose-up (turn -90 / tilt 90), plume down
+                ...(RK < 0 ? [] : [
+                    { at: '#scalability:top@0.55', x: -0.08, y: -0.66, size: 0.18, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1 },
+                    { at: '#scalability:top@0.25', x: -0.45, y: -0.84, size: 0.12, turn: -90, tilt: 90, heel: 0, level: RK, wake: 0.7, cam: 1 },
+                    { at: 'footer:top@1', x: -0.45, y: -0.84, size: 0.12, turn: -90, tilt: 90, heel: 0, level: RK, wake: 0.85, cam: 1 },
+                    { at: 'end', x: -0.45, y: -0.57, size: 0.12, turn: -90, tilt: 90, heel: 0, level: RK, wake: 0.85, cam: 1 },
+                ]),
             ],
             portrait: [
                 { at: 'top', x: 0.4, y: -0.8, size: 0.3, turn: 35, tilt: 0, heel: 9, level: 0, wake: 0, cam: 0 },                                                            // resting on the swell at the bottom-left, bow right (rides in from the left)
@@ -765,7 +775,7 @@ function startParticleLayer(THREE, GPUC, BOAT) {
             prepKeys(keys);
             ship.route = buildRoute(keys.map(k => ({ at: k.y, x: k.k.x, y: k.k.y })), visW / visH, { softStart: pcfg.shipSoftStart });
             ship.keys = keys;
-            const oy = pcfg.shipGrounds === 'overlay' ? resolveAt('#scalability:top@0.55') : null; ship.overlayY = oy === null ? Infinity : oy;   // from the principles down: their grounds are opaque
+            const oy = pcfg.shipGrounds === 'overlay' ? resolveAt('#scalability:top@0.55') : pcfg.shipGrounds === 'opaque' && pcfg.shipOverlayAt ? resolveAt(pcfg.shipOverlayAt) : null; ship.overlayY = oy === null ? Infinity : oy;   // 'overlay': from the principles down; 'opaque': from shipOverlayAt (the rocket over the footer)
             const hy = resolveAt('.hero-wrapper:bottom@0.6'); ship.heroY = hy === null ? -1 : hy;
         } catch (e) { console.warn('work-spine: route', e); }
     }
@@ -822,7 +832,7 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         if (lo !== ship.lo) { ship.lo = lo; for (const u of [velU, posU, U]) { u.tBoatA.value = levels[lo].pos; u.tMetaA.value = levels[lo].meta; u.tBoatB.value = levels[hi].pos; u.tMetaB.value = levels[hi].meta; } }
         const LS = levels[lo].scale + (levels[hi].scale - levels[lo].scale) * mix, scale = P.size * visW * LS;
         const NL = levels.length, lvl = M.clamp(P.level, 0, NL - 1), lvi = Math.min(NL - 2, Math.floor(lvl)), lvf = lvl - lvi, tbl = T => T[lvi] + (T[lvi + 1] - T[lvi]) * lvf;   // per-level tables, linear between whole levels
-        const lvn = lvl * 3 / Math.max(1, NL - 1);   // the level on the old 0..3 scale, for the size-dependent constants below
+        const lvn = Math.min(lvl, 5) * 3 / Math.max(1, Math.min(NL, 6) - 1);   // the level on the old 0..3 scale, for the size-dependent constants below (the rocket counts as the clipper)
         const hw = hullWL, hwA = hw && hw[lo], hwB = hw && hw[hi];
         // wind: the scroll speed (1 at 1500 px/s), quick to rise, slow to fall
         const wt = Math.min(1, dScroll / Math.max(dt, 1e-3) / 1500);
