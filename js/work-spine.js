@@ -38,7 +38,7 @@ const pcfg = section ? {
     pSize: numAttr(section.dataset.pSize, 1.7), pGlow: numAttr(section.dataset.pGlow, 1.0), pRadius: numAttr(section.dataset.pRadius, 1.6),
     pParallax: numAttr(section.dataset.pParallax, 0.004),    // units of field per scrolled pixel at mid depth; near particles move faster, far ones slower
     boat: section.dataset.boat || 'voyage',                  // the ship of particles: 'voyage' (sails in at the top and down the page with you) | 'off'
-    boatX: numAttr(section.dataset.boatX, -0.35), boatY: numAttr(section.dataset.boatY, -0.29), boatSize: numAttr(section.dataset.boatSize, 0.37),   // hero pose: waterline centre in NDC, hull length as a fraction of the visible width
+    boatX: numAttr(section.dataset.boatX, -0.235), boatY: numAttr(section.dataset.boatY, -0.41), boatSize: numAttr(section.dataset.boatSize, 0.37),   // hero pose: waterline centre in NDC, hull length as a fraction of the visible width
     shipShare: numAttr(section.dataset.shipShare, coarse ? 0.3 : 0.2),   // share of the particles that belong to the ship
     shipEntry: numAttr(section.dataset.shipEntry, 4.5),                  // seconds the ship takes to ride in on the swell on load
     shipWorkSize: numAttr(section.dataset.shipWorkSize, 0.15), shipWorkY: numAttr(section.dataset.shipWorkY, -0.38), shipWorkTilt: numAttr(section.dataset.shipWorkTilt, 68),   // pose in the work section: seen from above in the band under the cards, sailing down the axis, wake streaming up the column (size is the on-screen hull length; it does not grow with the level here)
@@ -488,32 +488,18 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         const work = (L, y) => ({ x: 0, y: y === undefined ? c.shipWorkY : y, size: c.shipWorkSize / LS[Math.min(NL - 1, Math.round(L))], turn: 90, tilt: c.shipWorkTilt, heel: 9, level: L, wake: L > 1.5 ? 1 : 0.9, cam: 1 });
         const translucent = c.shipGrounds === 'translucent';
         return {
-            landscape: [
-                { at: 'top', x: c.boatX, y: c.boatY, size: c.boatSize, turn: 145, tilt: 0, heel: 9, level: 0, wake: 0, cam: 0 },                         // at the foot of the swell, bow toward the headline
-                { at: '#work:center@0.72', x: c.boatX - 0.05, y: c.boatY - 0.06, size: c.boatSize - 0.01, turn: 135, tilt: 6, heel: 10, level: 0.1 * L1, wake: 0.35, cam: 0.2 },   // gathers way, bearing away toward the viewer
-                { at: '#work:center@0.5', x: c.boatX - 0.02, y: c.boatY - 0.18, size: 0.31, turn: 110, tilt: 24, heel: 12, level: 0.4 * L1, wake: 0.65, cam: 0.3 },              // the camera starts to crane up over the stern
-                { at: '#work:center@0.25', x: c.boatX + 0.15, y: c.boatY - 0.21, size: 0.24, turn: 92, tilt: 50, heel: 12, level: 0.75 * L1, wake: 0.85, cam: 0.5 },             // three-quarters over, sliding into the column
-                { at: 'stage-pin', ...work(L1, c.shipWorkY - 0.06), x: -0.03, tilt: c.shipWorkTilt - 4, heel: 9, cam: 0.8 },                                                 // arrives in the column still finishing the turn
-                { at: 'stage@0.06', ...work(L1) },                                                                                                                            // overhead view complete just after the pin
-                { at: 'stage@0.14', ...work(L1) },                                                                                                                            // rests while card 1 fronts
-                { at: 'stage@0.3', ...work(L2) },                                                                                                                             // a level up, morphed in transit, done before card 2 fronts
-                { at: 'stage@0.47', ...work(L2) },
-                { at: 'stage@0.63', ...work(L3) },                                                                                                                            // done before card 3 fronts
-                { at: 'stage@0.8', ...work(L3) },
-                { at: 'stage@0.92', ...work(L4), x: 0.03, y: c.shipWorkY + 0.02, turn: 84, tilt: c.shipWorkTilt - 5, heel: 11, cam: 0.8 },                                    // the fourth port                                  // weighs anchor before the stage lets go
-                { at: 'stage-release', x: 0.12, y: -0.36, size: 0.12, turn: 70, tilt: 50, heel: 12, level: L4, wake: 0.95, cam: 0.6 },                                       // the camera comes back down
-                { at: '#read:top@0.82', x: 0.27, y: -0.3, size: 0.14, turn: 45, tilt: 36, heel: 10, level: L4, wake: 1, cam: 0.5 },
-                { at: '#read:top@0.5', x: 0.5, y: -0.18, size: 0.16, turn: 30, tilt: 12, heel: 7, level: L5, wake: 1, cam: 0.3 },                                             // open water at the right margin: full sail
-                { at: '#read:bottom@1.0', x: 0.7, y: -0.25, size: 0.15, turn: 32, tilt: 4, heel: 6, level: L5, wake: 0.9, cam: 0.3 },
-                { at: '#scalability:top@0.6', x: 0.72, y: 0.55, size: 0.08, turn: -40, tilt: 8, heel: 4, level: L5, wake: 0.3, cam: 0 },                                     // horizon: stern quarter, hull-down, beside the heading
-                ...(translucent ? [
-                    { at: '.testimonials-wrapper:top@0.5', x: -0.62, y: -0.45, size: 0.2, turn: 42, tilt: 6, heel: -8, level: L5, wake: 0.6, cam: 0.3 },                     // back around from the left, a stern quarter, left of the quotes
-                    { at: '.tools:top@0.85', x: -0.2, y: -0.66, size: 0.16, turn: 38, tilt: 3, heel: 4, level: L5, wake: 0.3, cam: 0.3 },                                    // along the quay (the tools band)
-                    { at: 'end', x: -0.62, y: -0.8, size: 0.13, turn: 35, tilt: 3, heel: 0, level: L5, wake: 0, cam: 0 },                                                    // landfall: moored beside the Los Angeles pin, in the footer
-                ] : [
-                    { at: '.testimonials-wrapper:center@0.5', x: 0.85, y: -0.28, size: 0.09, turn: 38, tilt: 0, heel: 5, level: L5, wake: 0.3, cam: 0.3 },                   // small and far along the right edge, clear of the quotes
-                    { at: 'end', x: 0.85, y: -0.28, size: 0.09, turn: 40, tilt: 3, heel: 2, level: L5, wake: 0, cam: 0 },
-                ]),
+            landscape: [   // Felix's route (baked from the editor, 2026-09-12): the skiff at the foot of the swell, a wide sweep up and round into the column, and a mooring below the work section where the ship grows to a barque
+                { at: 'top', x: c.boatX, y: c.boatY, size: c.boatSize, turn: 145, tilt: 0, heel: 9, level: 0, wake: 0, cam: 0 },
+                { at: '#work:center@0.72', x: -0.35, y: -0.06, size: 0.315, turn: 135, tilt: 6, heel: 10, level: 0, wake: 0.35, cam: 0.2 },
+                { at: '#work:center@0.5', x: -0.3, y: 0.065, size: 0.35, turn: 110, tilt: 24, heel: 12, level: L1, wake: 0.65, cam: 0.3 },
+                { at: '#work:center@0.25', x: -0.2, y: -0.1, size: 0.35, turn: 92, tilt: 50, heel: 12, level: L1, wake: 0.85, cam: 0.5 },
+                { at: 'stage@0.14', x: 0, y: -0.38, size: 0.26, turn: 70, tilt: 37, heel: 9, level: L1, wake: 0.9, cam: 1 },
+                { at: 'stage@0.92', x: 0.03, y: -0.36, size: 0.1, turn: 84, tilt: 63, heel: 11, level: L2, wake: 1, cam: 0.8 },
+                { at: 'stage-release', x: -0.12, y: -0.36, size: 0.12, turn: 126, tilt: 44, heel: 25, level: L2, wake: 0.95, cam: 0.6 },
+                { at: 'stage-release+600', x: -0.235, y: -0.36, size: 0.12, turn: 70, tilt: 34, heel: 12, level: L2, wake: 0.95, cam: 0.6 },
+                { at: 'stage-release+1050', x: -0.08, y: -0.625, size: 0.2, turn: 0, tilt: 0, heel: 18.5, level: L2, wake: 0.5, cam: 1 },
+                { at: 'stage-release+1200', x: -0.08, y: -0.625, size: 0.2, turn: 0, tilt: 0, heel: 18.5, level: L3, wake: 1, cam: 1 },
+                { at: 'stage-release+1500', x: -0.08, y: -0.625, size: 0.2, turn: 0, tilt: 0, heel: 18.5, level: L4, wake: 1, cam: 1 },
             ],
             portrait: [
                 { at: 'top', x: 0.4, y: -0.8, size: 0.3, turn: 35, tilt: 0, heel: 9, level: 0, wake: 0, cam: 0 },                                                            // resting on the swell at the bottom-left, bow right (rides in from the left)
