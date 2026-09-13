@@ -146,7 +146,7 @@ const SIM_SHARED = `
       else if (water > 0.5) {
         float h1 = hash1(md.z * 5.3), h2 = hash1(md.z * 31.0), h3 = hash1(md.w * 77.0), h4 = hash1(md.z * 91.7), h5 = hash1(md.w * 13.7);
         float sgn = h5 < 0.5 ? -1.0 : 1.0, zl = sgn * 0.62 * pow(abs(h5 - 0.5) * 2.0, 1.4);          // the lane's cross section: denser at the hull (the baked disc is not used)
-        float x = 0.75 - mod(h1 * 2.6 + uFlow, 2.6); q.x = x;                                       // 0.25 L ahead of the stem .. 1.85 L astern, streaming aft
+        float xl = 0.75 - mod(h1 * 2.6 + uFlow, 2.6), x = xl + 0.55 * uSwell.z; q.x = x;             // the lane: 0.25 L ahead of the stem .. 1.85 L astern, streaming aft; at rest (uSwell.z) it slides forward to sit centred on the hull, as step 1's disc did
         float hb = hullBeam(x), s = uHull.x - x, az = abs(zl);
         // parted along the real waterline: a thin rim on the hull, thrown wider at the stem under way
         float inHull = step(az, hb + 0.008) * step(uHull.y, x) * step(x, uHull.x);
@@ -184,15 +184,17 @@ const SIM_SHARED = `
         float lit = 3.0 * spray + 1.6 * crest * uWave.x * uHull.z + 1.2 * divLit * uWave.x + 0.35 * max(0.0, trans) * uWave.x
                   + 0.7 * churnLit + 0.8 * clamp(rooster / 0.02, 0.0, 1.0) + swellLit;
         // the window: exactly zero at both lane ends (x = 0.75 and x = -1.85, where mod wraps), soft across, dithered per particle
-        float win = fall(0.45, 0.75, x) * smoothstep(-1.85, -1.45, x) * fall(0.38, 0.62, az) * (0.6 + 0.4 * h3);
+        float win = fall(0.45, 0.75, xl) * smoothstep(-1.85, -1.45, xl) * fall(0.38, 0.62, az) * (0.6 + 0.4 * h3);
+        win *= mix(1.0, fall(0.8, 1.2, length(vec2(x / 1.25, q.z / 0.72))), uSwell.z);                   // at rest the sheet is a disc round the hull, not a lane
         float r = length(vec2(x, q.z * 1.6));
-        float ring = uMisc.z * (0.5 - 0.5 * sin(r * 9.0 - uRipple * 0.6));                            // at anchor only: faint slow rings spreading from the hull
+        float rcrest = 0.5 + 0.5 * sin(r * 18.0 - uRipple * 1.2), ring = uMisc.z * (1.0 - rcrest);     // at anchor only: slow rings spreading from the hull (step 1: ~0.35 L apart, a ring every ~5 s), bright and lifted on the crests
+        q.y += 0.014 * uMisc.z * rcrest;
         // the calm sheet (still specks all round the hull) belongs to the ship at anchor; under way it would slide along as a loose
         // rectangle of dots, so it fades out with the way and the sea then shows only where the ship disturbs it: the lit features,
         // plus a faint body of broken water inside the wedge so the wake reads as a surface and not as a few bright arms
         float calm = fall(0.06, 0.45, uWay);
         float body = aft * fall(wedge - 0.08, wedge + 0.02, az) * exp(-s / 1.6) * (0.4 + 0.6 * h2);
-        fade = win * (0.5 * calm + (1.0 - calm) * (0.16 * body + 0.35 * min(lit, 2.2)) + calm * min(lit, 2.2)) * (1.0 - ring); }
+        fade = win * (0.6 * calm + (1.0 - calm) * (0.16 * body + 0.35 * min(lit, 2.2)) + calm * min(lit, 2.2)) * (1.0 - ring); }
       return q; }
     // The ship's target for one particle, and for the water and foam their lane fade. Sails fill and luff in boat space along their
     // belly normal; the solid roles (hull, deck, sails, spars, rigging, and the reflection with every motion mirrored) roll, pitch
@@ -894,7 +896,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         const omegaE = (0.9 + 1.5 * way) * (1.2 - 0.15 * lvn); ship.phiE = (ship.phiE + dt * omegaE) % 6283.185;
         if (ship.crest > 0) { const lp = lottiePhase(); if (lp >= 0) ship.phiE = 6.2832 * lp * 12; }   // on the wave, the ship breathes with the swell's own animation
         const ks = 6.2832 / 2.4, sinc = Math.sin(ks / 2) / (ks / 2), A = (0.008 + 0.010 * Math.min(amp, 1)) / LS * pcfg.shipSwell;   // the swell's height; the hull's answer to it scales with shipBob below
-        shipU.swell.set(Math.cos(M.degToRad(pcfg.shipSwellDir)), Math.sin(M.degToRad(pcfg.shipSwellDir)), 0, 0);
+        shipU.swell.set(Math.cos(M.degToRad(pcfg.shipSwellDir)), Math.sin(M.degToRad(pcfg.shipSwellDir)), 1 - M.smoothstep(way, 0.05, 0.4), 0);   // .z: at rest (1) .. under way (0): the water sheet sits as a disc round the hull
         const lift = 1 + 0.3 * M.smoothstep(P.tilt, 50, 60);   // from above the heave reads small: a little more of it there (pitch stays under 4 degrees)
         const thetaA = 1.4 * A * ks * sinc * pcfg.shipBob, hA = A * sinc * lift * pcfg.shipBob, ph = ship.phiE;
         const pitch = -thetaA * (Math.sin(ph) + 0.35 * Math.sin(1.83 * ph + 1.1)) / 1.35, heave = hA * (Math.cos(ph) + 0.35 * Math.cos(1.83 * ph + 1.1)) / 1.35;
@@ -942,7 +944,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         shipU.sail.set(bellyMul, flapAmp, ship.flutPh, fill);
         shipU.clock.set(ship.flick, ship.churnPh, sprayGain, churnGain);
         if (hw) { shipU.hull.set(hwA.stem + (hwB.stem - hwA.stem) * mix, hwA.stern + (hwB.stern - hwA.stern) * mix, entryGain, hwA.sternHalf + (hwB.sternHalf - hwA.sternHalf) * mix); for (let k = 0; k < 17; k++) shipU.beam[k] = hwA.beam[k] + (hwB.beam[k] - hwA.beam[k]) * mix; }
-        shipU.misc.set(tbl(LEVEL_PIVOT), 0.25 * way * (1 - M.smoothstep(tilt, 45, 65)), (1 - way) * 0.15 * pcfg.shipRipple, isLight() ? 1.3 : 1.6);
+        shipU.misc.set(tbl(LEVEL_PIVOT), 0.25 * way * (1 - M.smoothstep(tilt, 45, 65)), restW * 0.55 * pcfg.shipRipple, isLight() ? 1.3 : 1.6);   // .z: the rest rings' contrast (0.55: troughs at 45% of the crests, as step 1 drew them)
         for (const u of [velU, posU, U]) { u.uRocket.value = rocketMix; u.uMix.value = mix; u.uBoatScale.value = scale; u.uTime.value = t; u.uRipple.value = ship.ripple; u.uFlow.value = ship.flow; u.uWay.value = way; u.uSnapBoat.value = snap; }
         U.uWake.value = foamGain; U.uReflect.value = (1 - M.smoothstep(way, 0, 0.5)) * (1 - M.clamp((tilt - 10) / 30, 0, 1)); U.uBoatPx.value = 1 + (M.clamp(0.6 + 0.25 * scale, 1.0, 2.2) - 1) * (1 - restW * (1 - pcfg.shipDotsRest));   // a bigger ship is sparser: bigger dots; at rest most of that boost is dropped so the ship's dots read like the field's
     }
