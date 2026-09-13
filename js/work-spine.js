@@ -47,7 +47,7 @@ const pcfg = section ? {
     shipSwell: numAttr(section.dataset.shipSwell, 1), shipSwellDir: numAttr(section.dataset.shipSwellDir, 0),   // the sea's swell: height (1 = default) and the direction it runs relative to the hull (0 = along it, 90 = across it)
     shipWave: numAttr(section.dataset.shipWave, 1), shipSpray: numAttr(section.dataset.shipSpray, 1), shipFoam: numAttr(section.dataset.shipFoam, 1),   // wave heights and crest brightness | spray | foam
     shipSway: numAttr(section.dataset.shipSway, 1),                     // at anchor the WHOLE scene (ship and water) heels and yaws slowly on a long quiet swell, as step 1 did; 0 = the sea stays level
-    shipDotsRest: numAttr(section.dataset.shipDotsRest, 0.35),          // at rest the ship's dots keep this much of their size boost (0 = drawn like the field's specks, as step 1 read); under way the full boost
+    shipDotsRest: numAttr(section.dataset.shipDotsRest, 0.7),          // at rest the ship's dots keep this much of their size boost (0 = drawn like the field's specks, as step 1 read); under way the full boost
     shipSettle: numAttr(section.dataset.shipSettle, 7),     // how fast ship particles take their places (per second): 7 lands a recruit in about 0.4 s
     shipLag: numAttr(section.dataset.shipLag, 0.9), shipLagPos: numAttr(section.dataset.shipLagPos, 0.6), shipLagSize: numAttr(section.dataset.shipLagSize, 0.8),   // seconds the drawn pose takes to close 95% of a scroll jump: angles / position (x, y, wake) / framing (size and level share one lag so the hull length holds while the ship evolves)
     shipLean: numAttr(section.dataset.shipLean, 0.02),                   // banking: deg of heel per deg/s of turn, capped at 5 (negative carves into the turn instead)
