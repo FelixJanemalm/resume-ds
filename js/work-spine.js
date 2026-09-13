@@ -496,18 +496,21 @@ function startParticleLayer(THREE, GPUC, BOAT) {
         const work = (L, y) => ({ x: 0, y: y === undefined ? c.shipWorkY : y, size: c.shipWorkSize / LS[Math.min(NL - 1, Math.round(L))], turn: 90, tilt: c.shipWorkTilt, heel: 9, level: L, wake: L > 1.5 ? 1 : 0.9, cam: 1 });
         const translucent = c.shipGrounds === 'translucent';
         return {
-            landscape: [   // Felix's route (baked from the editor, 2026-09-12): the skiff at the foot of the swell, a wide sweep up and round into the column, and a mooring below the work section where the ship grows to a barque
-                { at: 'top', x: c.boatX, y: c.boatY, size: c.boatSize, turn: 145, tilt: 0, heel: 9, level: 0, wake: 0, cam: 0 },
-                { at: '#work:center@0.72', x: -0.35, y: -0.06, size: 0.315, turn: 135, tilt: 6, heel: 10, level: 0, wake: 0.35, cam: 0.2 },
-                { at: '#work:center@0.5', x: -0.3, y: 0.065, size: 0.35, turn: 110, tilt: 24, heel: 12, level: L1, wake: 0.65, cam: 0.3 },
-                { at: '#work:center@0.25', x: -0.2, y: -0.1, size: 0.35, turn: 92, tilt: 50, heel: 12, level: L1, wake: 0.85, cam: 0.5 },
-                { at: 'stage@0.14', x: 0, y: -0.38, size: 0.26, turn: 70, tilt: 37, heel: 9, level: L1, wake: 0.9, cam: 1 },
-                { at: 'stage@0.92', x: 0.03, y: -0.36, size: 0.1, turn: 84, tilt: 63, heel: 11, level: L2, wake: 1, cam: 0.8 },
-                { at: 'stage-release', x: -0.12, y: -0.36, size: 0.12, turn: 126, tilt: 44, heel: 25, level: L2, wake: 0.95, cam: 0.6 },
-                { at: 'stage-release+600', x: -0.235, y: -0.36, size: 0.12, turn: 70, tilt: 34, heel: 12, level: L2, wake: 0.95, cam: 0.6 },
-                { at: 'stage-release+1050', x: -0.08, y: -0.625, size: 0.2, turn: 0, tilt: 0, heel: 18.5, level: L2, wake: 0.5, cam: 1 },
-                { at: 'stage-release+1200', x: -0.08, y: -0.625, size: 0.2, turn: 0, tilt: 0, heel: 18.5, level: L3, wake: 1, cam: 1 },
-                { at: 'stage-release+1500', x: -0.08, y: -0.625, size: 0.2, turn: 0, tilt: 0, heel: 18.5, level: L4, wake: 1, cam: 1 },
+            landscape: [   // Felix's route (baked from the editor, 2026-09-12) with the exit reworked the same night: the skiff at the foot of the swell, a wide
+                           // sweep up and round into the column, one arc out of the column down to a side shot beside the quote, where the ship levels up
+                           // ketch -> schooner -> barque -> clipper as the words are revealed (the reveal runs from #read's top over ~5 px per character)
+                { at: 'top', x: c.boatX, y: c.boatY, size: c.boatSize, turn: 145, tilt: 0, heel: 2, level: 0, wake: 0, cam: 0 },                       // at anchor a boat sits upright: the swell rolls it
+                { at: '#work:center@0.72', x: -0.35, y: -0.06, size: 0.315, turn: 135, tilt: 6, heel: 5, level: 0, wake: 0.35, cam: 0.2 },
+                { at: '#work:center@0.5', x: -0.3, y: 0.065, size: 0.35, turn: 110, tilt: 24, heel: 5, level: L1, wake: 0.65, cam: 0.3 },
+                { at: '#work:center@0.25', x: -0.2, y: -0.1, size: 0.35, turn: 92, tilt: 50, heel: 5, level: L1, wake: 0.85, cam: 0.5 },                 // authored heel stays small: the wind adds its own (~12 deg at this speed) and the sum is soft-limited at 18
+                { at: 'stage@0.14', x: 0, y: -0.38, size: 0.26, turn: 70, tilt: 54, heel: 4, level: L1, wake: 0.9, cam: 1 },                            // the crane keeps rising into the top view (was 37: a dip)
+                { at: 'stage@0.92', x: 0.03, y: -0.36, size: 0.1, turn: 84, tilt: 63, heel: 4, level: L2, wake: 1, cam: 0.8 },
+                { at: 'stage-release', x: -0.06, y: -0.38, size: 0.12, turn: 78, tilt: 56, heel: 7, level: L2, wake: 0.95, cam: 0.8 },                  // one left-hand arc out of the column (was 126 then 70: a wag)
+                { at: 'stage-release+450', x: -0.17, y: -0.5, size: 0.14, turn: 45, tilt: 26, heel: 7, level: L2, wake: 0.9, cam: 0.8 },
+                { at: '#read:top@0', x: -0.08, y: -0.66, size: 0.18, turn: 0, tilt: 0, heel: 3, level: L2, wake: 0.85, cam: 1 },                        // the side shot below the quote, holding course; the sea streams past
+                { at: '#read:top@0+180', x: -0.08, y: -0.66, size: 0.18, turn: 0, tilt: 0, heel: 3, level: L3, wake: 0.9, cam: 1 },
+                { at: '#read:top@0+360', x: -0.08, y: -0.66, size: 0.18, turn: 0, tilt: 0, heel: 3, level: L4, wake: 0.95, cam: 1 },
+                { at: '#read:top@0+540', x: -0.08, y: -0.66, size: 0.18, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1 },                       // the clipper as the last word lands
             ],
             portrait: [
                 { at: 'top', x: 0.4, y: -0.8, size: 0.3, turn: 35, tilt: 0, heel: 9, level: 0, wake: 0, cam: 0 },                                                            // resting on the swell at the bottom-left, bow right (rides in from the left)
