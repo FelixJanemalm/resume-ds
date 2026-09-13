@@ -145,7 +145,7 @@ const SIM_SHARED = `
         return q; }
       else if (water > 0.5) {
         float h1 = hash1(md.z * 5.3), h2 = hash1(md.z * 31.0), h3 = hash1(md.w * 77.0), h4 = hash1(md.z * 91.7), h5 = hash1(md.w * 13.7);
-        float sgn = h5 < 0.5 ? -1.0 : 1.0, zl = sgn * 0.62 * pow(abs(h5 - 0.5) * 2.0, 1.4);          // the lane's cross section: denser at the hull (the baked disc is not used)
+        float qz = abs(h5 - 0.5) * 2.0, sgn = h5 < 0.5 ? -1.0 : 1.0, zl = sgn * mix(0.62 * pow(qz, 1.4), 0.78 * pow(qz, 0.75), uSwell.z);   // the lane's cross section: denser at the hull under way; at rest (uSwell.z) the Sept-10 disc, 1.5 L wide and even
         float xl = 0.75 - mod(h1 * 2.6 + uFlow, 2.6), x = xl + 0.55 * uSwell.z; q.x = x;             // the lane: 0.25 L ahead of the stem .. 1.85 L astern, streaming aft; at rest (uSwell.z) it slides forward to sit centred on the hull, as step 1's disc did
         float hb = hullBeam(x), s = uHull.x - x, az = abs(zl);
         // parted along the real waterline: a thin rim on the hull, thrown wider at the stem under way
@@ -184,8 +184,8 @@ const SIM_SHARED = `
         float lit = 3.0 * spray + 1.6 * crest * uWave.x * uHull.z + 1.2 * divLit * uWave.x + 0.35 * max(0.0, trans) * uWave.x
                   + 0.7 * churnLit + 0.8 * clamp(rooster / 0.02, 0.0, 1.0) + swellLit;
         // the window: exactly zero at both lane ends (x = 0.75 and x = -1.85, where mod wraps), soft across, dithered per particle
-        float win = fall(0.45, 0.75, xl) * smoothstep(-1.85, -1.45, xl) * fall(0.38, 0.62, az) * (0.6 + 0.4 * h3);
-        win *= mix(1.0, fall(0.8, 1.2, length(vec2(x / 1.25, q.z / 0.72))), uSwell.z);                   // at rest the sheet is a disc round the hull, not a lane
+        float win = fall(0.45, 0.75, xl) * smoothstep(-1.85, -1.45, xl) * fall(mix(0.38, 0.7, uSwell.z), mix(0.62, 0.9, uSwell.z), az) * (0.6 + 0.4 * h3);
+        win *= mix(1.0, fall(0.85, 1.15, length(vec2(x / 1.25, q.z / 0.78))), uSwell.z);                 // at rest the sheet is the Sept-10 disc round the hull (2.5 x 1.5 L), not a lane
         float r = length(vec2(x, q.z * 1.6));
         float rcrest = 0.5 + 0.5 * sin(r * 20.8 - 2.0 * atan(q.z * 1.6, x) - uRipple), ring = uMisc.z * (1.0 - rcrest);   // at anchor only: the Sept-10 speckle disc, a two-armed spiral of brighter, lifted crests, drifting only as slowly as shipRipple says
         q.y += 0.014 * uMisc.z * rcrest;
@@ -194,7 +194,7 @@ const SIM_SHARED = `
         // plus a faint body of broken water inside the wedge so the wake reads as a surface and not as a few bright arms
         float calm = fall(0.06, 0.45, uWay);
         float body = aft * fall(wedge - 0.08, wedge + 0.02, az) * exp(-s / 1.6) * (0.4 + 0.6 * h2);
-        fade = win * (0.6 * calm + (1.0 - calm) * (0.16 * body + 0.35 * min(lit, 2.2)) + calm * min(lit, 2.2)) * (1.0 - ring); }
+        fade = win * (0.85 * calm + (1.0 - calm) * (0.16 * body + 0.35 * min(lit, 2.2)) + calm * min(lit, 2.2)) * (1.0 - ring); }   // at rest as bright as the hull's dots (Sept 10: shade 0.35 .. 0.7)
       return q; }
     // The ship's target for one particle, and for the water and foam their lane fade. Sails fill and luff in boat space along their
     // belly normal; the solid roles (hull, deck, sails, spars, rigging, and the reflection with every motion mirrored) roll, pitch
