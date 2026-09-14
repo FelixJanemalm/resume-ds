@@ -35,7 +35,9 @@ export const LEVEL_PIVOT = [0.0, -0.02, -0.04, -0.06, -0.03, -0.02, 0.0, 0.0];  
 export const ROCKET = 7;
 export const SMOKE = [0, 0, 0, 0, 1, 1, 0, 0];                                        // funnel smoke per level (a share of the WAKE particles rises from the funnels in the shader)
 export const FUNNELS = [[0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1], [-0.005, -0.047, 0, 1], [0.128, -0.008, -0.18, 3], [0, 0, 0, 1], [0, 0, 0, 1]];   // per level: the first funnel's top (x, y), the spacing to the next (x), the count
-export const PADDLE_R = 18.2 / (2 * Math.PI * 32);   // the paddle wheels' radius: 32 turns per wrap of the layer's flow clock (18.2 L), so the wrap never jumps a spoke
+export const PADDLE_R = 18.2 / (2 * Math.PI * 32);
+export const LINES = [0, 0, 0.3, 1, 1, 1, 1, 1], SOLID = [0, 0, 0, 0.15, 0.35, 0.5, 0.7, 1];   // dots -> lines -> solid: how much of the wireframe (edges, see buildBoatLevels) and of the surfaces (the hull and sail meshes) each level shows
+export const GRID = { hullU: 24, hullV: 5, sailA: 7, sailUp: 6 };   // the mesh grids: the hull per side (u x v), a sail (across x up)   // the paddle wheels' radius: 32 turns per wrap of the layer's flow clock (18.2 L), so the wrap never jumps a spoke
 export const THEME = { id: 'atlantic', name: 'Atlantic', title: 'Skiff to foiler' };
 export const SQUARE_NORMAL = [0.970, 0, 0.242];   // the square sails' belly normal: the yards braced -14 deg
 export const ROLE = { HULL: 1, DECK: 2, SAIL: 3, SPAR: 4, RIGGING: 5, WATER: 6, WAKE: 7, REFLECTION: 8, FLAG: 9 };   // FLAG: the burgee at the masthead (cloth like a sail in the shader, drawn in its own colour)
@@ -355,10 +357,10 @@ function fittings(L) {
     };
     const rail = (x0, x1, h, n) => (u, w) => {
         const s = w < 0 ? -1 : 1;
-        if (!n || face(u) < 0.6) { const x = lerp(x0, x1, u); return [x, dk(x) + h, s * hb(x), 0.62]; }
+        if (!n || face(u) < 0.6) { const x = lerp(x0, x1, u); return [x, dk(x) + h, s * hb(x), 0.62, 0, 0, 0, 'dk:' + x0 + ':' + h + ':' + s, u]; }   // (a line feature: the wireframe draws it)
         const xs = lerp(x0, x1, Math.round(u * n) / n); return [xs, dk(xs) + h * Math.abs(w), s * hb(xs), 0.55];
     };
-    const railT = (x0, x1, yOff, hwf) => (u, w) => { const x = lerp(x0, x1, u), s = w < 0 ? -1 : 1; return [x, dk(x) + yOff, s * hwf * hb(x), 0.62]; };   // a tier's deck edge: the liner's long horizontal lines
+    const railT = (x0, x1, yOff, hwf) => (u, w) => { const x = lerp(x0, x1, u), s = w < 0 ? -1 : 1; return [x, dk(x) + yOff, s * hwf * hb(x), 0.62, 0, 0, 0, 'dk:' + x0 + ':' + yOff + ':' + s, u]; };   // a tier's deck edge: the liner's long horizontal lines
     const thwart = (x, wd) => (u, w) => [x + (u - 0.5) * wd, dk(x) - 0.012, w * hb(x) * 0.92, TOP * 0.85];
     const line = (P0, P1, sh) => (u, w) => { const P = lerp3(P0, P1, u); return [P[0], P[1], P[2] + w * 0.003, sh]; };
     const tiller = line([-0.48, dk(-0.48) + 0.012, 0], [-0.33, dk(-0.33) + 0.02, 0], 0.7);
@@ -471,16 +473,18 @@ function rocketR(x) {   // the body's radius along x: a flared skirt, the cylind
     if (x <= RK.xc) return RK.R;
     const t = Math.min(1, (x - RK.xc) / (RK.x1 - RK.xc)); return RK.R * Math.pow(Math.max(0, 1 - Math.pow(t, 1.8)), 0.7);
 }
-export function rocketLevel(count, role, rand, wakePos, wakeMeta) {
+export function rocketLevel(count, role, rand, wakePos, wakeMeta, hullGrid = null) {
     const pos = new Float32Array(count * 4), meta = new Float32Array(count * 4);
     const put = (i, p) => { const o = i * 4; pos[o] = p[0]; pos[o + 1] = p[1]; pos[o + 2] = p[2]; pos[o + 3] = Math.max(0.02, Math.min(1, p[3])); };
     const j = () => (rand() - 0.5) * 0.003;
     for (let i = 0; i < count; i++) {
         const r = role[i]; meta[i * 4] = r;
         if (r === ROLE.HULL) {
-            let x = 0, rr = 0;
-            for (let k = 0; k < 10; k++) { x = RK.x0 + rand() * (RK.x1 - RK.x0); rr = rocketR(x); if (rand() * (RK.R + RK.flare) < rr) break; }   // density follows the surface
-            const a = rand() * 2 * PI, ca = Math.cos(a), sa = Math.sin(a), dr = (rocketR(x + 0.005) - rocketR(x - 0.005)) / 0.01;
+            let x = 0, rr = 0, a = 0;
+            const g = hullGrid && hullGrid.get(i);
+            if (g) { x = RK.x0 + g[0] * (RK.x1 - RK.x0); rr = rocketR(x); a = (g[1] > 0 ? 0 : PI) + g[2] * PI; }   // a grid particle: its hull (u, side, v) become the body's (x, angle), one closed revolution
+            else { for (let k = 0; k < 10; k++) { x = RK.x0 + rand() * (RK.x1 - RK.x0); rr = rocketR(x); if (rand() * (RK.R + RK.flare) < rr) break; } a = rand() * 2 * PI; }   // density follows the surface
+            const ca = Math.cos(a), sa = Math.sin(a), dr = (rocketR(x + 0.005) - rocketR(x - 0.005)) / 0.01;
             let sh = shadeN([-dr, ca, sa]);
             if (Math.abs(x - 0.02) < 0.008 || Math.abs(x + 0.30) < 0.008) sh *= 0.45;                          // two dark bands
             const aa = a > PI ? a - 2 * PI : a;
@@ -519,55 +523,98 @@ export function buildBoatLevels(count, seed = 1) {
         meta[L][o] = r; meta[L][o + 1] = flap; meta[L][o + 2] = phase; meta[L][o + 3] = aux;
     };
     const setMeta0 = (i, r) => { for (let L = 0; L < NL; L++) meta[L][i * 4] = r; };   // role readable even where absent
-    const pickSeg = (list, q) => list[Math.min(list.length - 1, Math.floor(q * list.length))];
+    const segIdx = (list, q) => Math.min(list.length - 1, Math.floor(q * list.length)), pickSeg = (list, q) => list[segIdx(list, q)];
+    // a generator's point may carry a line feature (p[7]: a key naming the 1-D feature it lies on at that level, p[8]: its parameter along
+    // it); the wireframe below is the edges between neighbours on the same feature. A grid sample (the hull and sail meshes) is placed by
+    // fixed surface coordinates instead of random ones, so the same particle is the same mesh vertex at every level
+    const fk = [], ft = []; for (let L = 0; L < NL; L++) { fk.push(new Array(count).fill(null)); ft.push(new Float32Array(count)); }
+    const hullGrid = new Map();
 
     // generators: sample a particle's surface coordinates once, then place it at every level
-    const genHull = () => {
-        const q = rand(), kind = rand(), s = rand() < 0.5 ? -1 : 1, v = rand(), w = rand() * 2 - 1;
-        let u = rand(); if (kind < 0.07) u = kind < 0.035 ? 1 - 0.03 * rand() : 0.03 * rand();   // extra samples on the stem and stern post
-        const gun = kind >= 0.07 && kind < 0.32, transom = kind >= 0.32 && kind < 0.36, plank = rand() < 0.7;
+    const genHull = grid => {
+        const q = rand(), kind = grid ? 1 : rand(), s = grid ? grid.s : rand() < 0.5 ? -1 : 1, v = grid ? grid.v : rand(), w = grid ? 1 : rand() * 2 - 1;
+        let u = grid ? grid.u : rand(); if (!grid && kind < 0.07) u = kind < 0.035 ? 1 - 0.03 * rand() : 0.03 * rand();   // extra samples on the stem and stern post
+        const gun = !grid && kind >= 0.07 && kind < 0.32, transom = !grid && kind >= 0.32 && kind < 0.36, plank = rand() < 0.7;
         return L => {
             if (q >= HULL_PRES[L]) return null;
-            if (L === 6) return catPt(u, s, v, w, gun, transom);
-            if (transom) return transomPt(HULL[L], v, w);
-            const vv = L === 0 && plank && !gun ? Math.max(0.012, Math.floor(v * 5) / 5) : v;   // the skiff's lapstrake: plank lands as denser rows (the lowest at the waterline)
-            return hullPt(HULL[L], u, s, vv, gun);
+            let p;
+            if (L === 6) p = catPt(u, s, v, w, gun, transom);
+            else if (transom) return transomPt(HULL[L], v, w);
+            else { const vv = L === 0 && plank && !gun && !grid ? Math.max(0.012, Math.floor(v * 5) / 5) : v; p = hullPt(HULL[L], u, s, vv, gun); }   // the skiff's lapstrake: plank lands as denser rows (the lowest at the waterline)
+            if (gun) { p[7] = 'gun:' + s + (L === 6 ? (w < 0 ? 'i' : 'o') : ''); p[8] = u; }   // the gunwale: a line feature
+            return p;
         };
     };
-    const genSail = part => {
-        const edgeP = rand() < 0.22 ? rand() : null, a = rand(), r = rand();
-        const up = part === 'burgee' ? r : TRI_PARTS.has(part) ? 1 - Math.pow(r, 0.65) : SAILS[part].some(E => E && E.tack) ? 1 - Math.pow(r, 0.85) : r;   // fore-and-aft sails are fuller at the foot
+    const genSail = (part, grid) => {
+        const edgeP = grid ? null : rand() < 0.22 ? rand() : null, a = grid ? grid.a : rand(), r = rand();
+        const up = grid ? grid.up : part === 'burgee' ? r : TRI_PARTS.has(part) ? 1 - Math.pow(r, 0.65) : SAILS[part].some(E => E && E.tack) ? 1 - Math.pow(r, 0.85) : r;   // fore-and-aft sails are fuller at the foot
         const hq = rand(), sside = rand() < 0.5 ? -1 : 1;   // a sail the level lacks hosts its particles on the main (a third of them on the jib once there is one), so the cloth flows from sail to sail as the ship evolves; on the machine ships it becomes the superstructure
-        return L => sailAt(L, part, a, up, edgeP) || superPt(L, a, up, sside, hq) || (hq < 0.35 ? sailAt(L, 'jib', a, up, edgeP) : null) || sailAt(L, 'main', a, up, edgeP);
+        return L => {
+            let p = sailAt(L, part, a, up, edgeP), on = part;
+            if (!p) { p = superPt(L, a, up, sside, hq); on = null; }
+            if (!p && hq < 0.35) { p = sailAt(L, 'jib', a, up, edgeP); on = 'jib'; }
+            if (!p) { p = sailAt(L, 'main', a, up, edgeP); on = 'main'; }
+            if (p && edgeP != null && on && on !== 'burgee') { p[7] = 'se:' + on; p[8] = edgeP; }   // on a sail's perimeter: a line feature
+            return p;
+        };
     };
     const genDeck = () => { const u = rand(), w = rand() * 2 - 1, q = rand(), q2 = rand(); return L => q2 >= DECK_PRES[L] ? null : deckPt(L, u, w, q); };
     const genSpar = part => {
         const t = rand(), q = rand(), jx = (rand() - 0.5) * 0.01, jz = (rand() - 0.5) * 0.006, sh = SPAR_SHADE(part);
         return L => {   // a spar the level lacks hosts on that level's host segments (the machine ships), else on the fore mast
-            let S = SPAR[part][L];
-            if (!S && SPAR_HOST[L]) { const h = pickSeg(SPAR_HOST[L], q), P = lerp3(h.a, h.b, t); return h.spin ? [P[0] + jx * 0.3, P[1], P[2] + jz, h.sh, 1, h.spin[1], h.spin[0]] : [P[0] + jx, P[1], P[2] + jz, h.sh]; }
-            S = S || SPAR.mastA[L]; if (!S) return null; const P = lerp3(S[0], S[1], t); return [P[0] + jx, P[1], P[2] + jz, sh]; };
+            let S = SPAR[part][L], key = 'sp:' + part;
+            if (!S && SPAR_HOST[L]) { const k = segIdx(SPAR_HOST[L], q), h = SPAR_HOST[L][k], P = lerp3(h.a, h.b, t); return h.spin ? [P[0] + jx * 0.3, P[1], P[2] + jz, h.sh, 1, h.spin[1], h.spin[0], 'sph:' + k, t] : [P[0] + jx, P[1], P[2] + jz, h.sh, 0, 0, 0, 'sph:' + k, t]; }
+            if (!S) { S = SPAR.mastA[L]; key = 'sp:mastA'; } if (!S) return null; const P = lerp3(S[0], S[1], t); return [P[0] + jx, P[1], P[2] + jz, sh, 0, 0, 0, key, t]; };
     };
     const genRig = part => {
         const q = rand(), t = rand(), jx = (rand() - 0.5) * 0.005, jy = (rand() - 0.5) * 0.005, dq = rand(), dens = RIG_DENSITY[part], sh = RIG_SHADE(part);
-        const onHull = genHull();   // the skiff and the sloop carry no lines at all (the Sept-10 sailboat had none): their rigging particles thicken the hull, and fly to the lines when the schooner's appear
-        return L => { if (L <= 1) return onHull(L); let segs = RIG[part][L]; if (!segs || (dens && dq >= dens[L])) segs = RIG_HOST[L] || RIG.shroudsA[L] || (SPAR.mastA[L] && [SPAR.mastA[L]]); if (!segs) return null; const S = pickSeg(segs, q); if (!S) return null; const P = lerp3(S[0], S[1], t); return [P[0] + jx, P[1] + jy, P[2], sh]; };   // a line the level lacks hosts on the level's host lines, else on the fore shrouds
+        const onHull = genHull(null);   // the skiff and the sloop carry no lines at all (the Sept-10 sailboat had none): their rigging particles thicken the hull, and fly to the lines when the schooner's appear
+        return L => {
+            if (L <= 1) return onHull(L);
+            let segs = RIG[part][L], key = 'rg:' + part;
+            if (!segs || (dens && dq >= dens[L])) { if (RIG_HOST[L]) { segs = RIG_HOST[L]; key = 'rgh'; } else if (RIG.shroudsA[L]) { segs = RIG.shroudsA[L]; key = 'rg:shroudsA'; } else if (SPAR.mastA[L]) { segs = [SPAR.mastA[L]]; key = 'sp:mastA'; } }   // a line the level lacks hosts on the level's host lines, else on the fore shrouds
+            if (!segs) return null; const k = segIdx(segs, q), S = segs[k]; if (!S) return null; const P = lerp3(S[0], S[1], t); return [P[0] + jx, P[1] + jy, P[2], sh, 0, 0, 0, key + ':' + k, t]; };
     };
     const genRefl = () => {
         const src = rand() < 0.65 ? genSail(pickWeighted(REFL_SAILS, rand())) : genHull();
         return L => { const p = src(L); return p && [p[0] + 0.02 * Math.sin(p[1] * 32), 2 * WL - p[1], p[2], Math.max(0.05, p[3] * 0.3)]; };
     };
 
+    // the meshes: the first particles of the hull's budget sample it on a grid per side (u along, v up), the first of each sail part on an
+    // across x up grid; their indices in grid order, so the layer can index triangles between them (a sail's only at levels it exists)
+    const NU = GRID.hullU, NV = GRID.hullV, NA = GRID.sailA, NUP = GRID.sailUp, GH = 2 * NU * NV, GS = NA * NUP;
+    const mesh = { hull: null, sails: [] };
     let i = 0;
     for (const { role: r, part, n } of slots(count)) {
+        const gridH = r === ROLE.HULL && n >= GH, gridS = r === ROLE.SAIL && part !== 'burgee' && n >= GS;
+        if (gridH) mesh.hull = { idx: new Int32Array(GH), nu: NU, nv: NV };
+        if (gridS) mesh.sails.push({ part, idx: new Int32Array(GS), na: NA, nup: NUP, levels: SAILS[part].map(E => !!E) });
         for (let k = 0; k < n; k++, i++) {
             const rr = r === ROLE.SAIL && part === 'burgee' ? ROLE.FLAG : r;   // the burgee is cloth, allocated with the sails, with its own role for the shader's colour
             role[i] = rr; setMeta0(i, rr);
             if (r === ROLE.WATER || r === ROLE.WAKE) { const w = r === ROLE.WATER ? waterPt(rand) : wakePt(rand); for (let L = 0; L < NL; L++) put(L, i, w.p, r, w.flap, w.phase, w.aux); continue; }
-            const g = r === ROLE.HULL ? genHull() : r === ROLE.DECK ? genDeck() : r === ROLE.SAIL ? genSail(part) : r === ROLE.SPAR ? genSpar(part) : r === ROLE.RIGGING ? genRig(part) : genRefl();
-            for (let L = 0; L < NL; L++) { const p = g(L); if (p) put(L, i, p, rr, p[4] || 0, p[6] || 0, p[5] || 0); }   // cloth: flap, belly, across; a paddle wheel part: 1, axle x, axle y; others 0
+            let grid = null;
+            if (gridH && k < GH) { const s = k < NU * NV ? 1 : -1, gg = k % (NU * NV), iu = gg % NU, iv = Math.floor(gg / NU); grid = { u: 0.01 + 0.98 * iu / (NU - 1), s, v: 0.03 + 0.97 * iv / (NV - 1) }; mesh.hull.idx[k] = i; hullGrid.set(i, [grid.u, s, grid.v]); }
+            if (gridS && k < GS) { const ia = k % NA, iup = Math.floor(k / NA); grid = { a: ia / (NA - 1), up: iup / (NUP - 1) }; mesh.sails[mesh.sails.length - 1].idx[k] = i; }
+            const g = r === ROLE.HULL ? genHull(grid) : r === ROLE.DECK ? genDeck() : r === ROLE.SAIL ? genSail(part, grid) : r === ROLE.SPAR ? genSpar(part) : r === ROLE.RIGGING ? genRig(part) : genRefl();
+            for (let L = 0; L < NL; L++) { const p = g(L); if (p) { put(L, i, p, rr, p[4] || 0, p[6] || 0, p[5] || 0); if (p[7]) { fk[L][i] = p[7]; ft[L][i] = p[8]; } } }   // cloth: flap, belly, across; a paddle wheel part: 1, axle x, axle y; others 0
         }
     }
-    const rk = rocketLevel(count, role, rand, pos[NL - 1], meta[NL - 1]); pos.push(rk.pos); meta.push(rk.meta);   // level 7
-    return { count, pos, meta, role };
+    const rk = rocketLevel(count, role, rand, pos[NL - 1], meta[NL - 1], hullGrid); pos.push(rk.pos); meta.push(rk.meta);   // level 7
+    // the wireframe: per level, edges between neighbours (by parameter) on the same feature, with a weight per kind; a gap in the
+    // parameter longer than the feature allows is not bridged. The rocket has none (its solid body carries it)
+    const edges = [];
+    for (let L = 0; L < NL; L++) {
+        const groups = new Map();
+        for (let j = 0; j < count; j++) { const k = fk[L][j]; if (!k) continue; let g = groups.get(k); if (!g) groups.set(k, g = []); g.push([ft[L][j], j]); }
+        const idx = [], w = [];
+        for (const [k, g] of groups) {
+            if (g.length < 2) continue; g.sort((a, b) => a[0] - b[0]);
+            const wt = k.startsWith('gun') ? 1 : k.startsWith('se:') ? 0.7 : k.startsWith('sp') ? 0.85 : k.startsWith('dk') ? 0.7 : 0.45, maxGap = k.startsWith('gun') || k.startsWith('se:') ? 0.12 : 0.5;
+            for (let j = 1; j < g.length; j++) { if (g[j][0] - g[j - 1][0] > maxGap) continue; idx.push(g[j - 1][1], g[j][1]); w.push(wt); }
+        }
+        edges.push({ idx: new Uint32Array(idx), w: new Float32Array(w) });
+    }
+    edges.push({ idx: new Uint32Array(0), w: new Float32Array(0) });
+    return { count, pos, meta, role, edges, mesh };
 }

@@ -54,6 +54,7 @@ const pcfg = section ? {
     shipAnchor: numAttr(section.dataset.shipAnchor, 1.5), shipAnchorOut: numAttr(section.dataset.shipAnchorOut, 3),   // stopping is dropping anchor: seconds of no scrolling before the way starts to die (0 = the ship sails on while you read), and the seconds it takes to die after that; scrolling is the wind again
     shipCursorWind: numAttr(section.dataset.shipCursorWind, 1),       // at anchor the cursor is the wind: the sails fill away from it, the ship heels away from it (0 = off)
     shipBurgee: numAttr(section.dataset.shipBurgee, 1),               // the pennant at the masthead (0 = none)
+    shipLines: numAttr(section.dataset.shipLines, 1), shipSolid: numAttr(section.dataset.shipSolid, 1),   // dots -> lines -> solid: the wireframe's and the surfaces' strength (x the module's per-level tables)
     shipFleet: numAttr(section.dataset.shipFleet, 1), shipFleetSize: numAttr(section.dataset.shipFleetSize, 1),   // the fleet (the route's `fleet` key): field particles form three small copies of the ship in formation round it; strength (0 = none) and the copies' size (x)
     shipTrail: numAttr(section.dataset.shipTrail, 5),                   // the wake as a chart line: foam dropped at the transom stays in the sea and fades over this many seconds, so the ship draws its own dotted route (0 = the short foam strip behind the hull instead)
     shipStorm: numAttr(section.dataset.shipStorm, 1), shipRain: numAttr(section.dataset.shipRain, 1.6),   // the passage through weather (the route's `storm` key, 0..1): its strength, and how fast the field falls as rain at full storm (world units per second; 0 = none)
@@ -339,6 +340,19 @@ const PTS_FS = `
       vec3 col=mix(uColorA,uColorB,smoothstep(0.25,0.85,vRand)); col=mix(col,uColorLit,clamp(vLit*0.9+smoothstep(0.8,3.0,vSpeed)*0.15+0.7*vBoat*vShade+0.6*vStar,0.0,1.0)); col=mix(col,uColorFlag,vFlag);
       float a=disc*(0.24+0.5*vLit)*(1.0+vBoat*(0.1+1.4*vShade)+1.6*vStar+0.8*vFlag)*uGlow; gl_FragColor=vec4(col*(0.85+0.35*vLit+0.3*vBoat*vShade+0.3*vStar),a); }`;
 
+/* dots -> lines -> solid. The wireframe's vertices and the surfaces' vertices are ship particles: each samples the live position texture
+   at its particle's coordinates and rides the pose exactly as the dots do (carry), so the lines bend with the soft ship and follow every
+   motion; a vertex whose particle has not arrived (a recruit) fades its line. Alpha from the level (uAlpha, the crossfade included). */
+const WIRE_VS = SIM_SHARED + `
+    uniform sampler2D tPos; attribute vec2 aRef; attribute float aW; varying float vA, vShade;
+    void main(){ vec4 p = texture2D(tPos, aRef); vec4 bA = texture2D(tBoatA, aRef), bB = texture2D(tBoatB, aRef), mA = texture2D(tMetaA, aRef), mB = texture2D(tMetaB, aRef);
+      float bf = boatFlag(bA, bB, p.w) * uForm; vec3 pw = carry(p.xyz); float fd; vec3 bt = boatTarget(bA, bB, mA, mB, fd);
+      float near = 1.0 - smoothstep(0.04, 0.2, distance(pw, bt) / max(0.05, uBoatScale)); float m = boatMixT(bA, bB);
+      vShade = clamp(mix(bA.w, bB.w, m), 0.0, 1.0); vA = aW * near * bf * step(0.01, vShade);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(pw, 1.0); }`;
+const WIRE_FS = `uniform vec3 uColor; uniform float uAlpha; varying float vA, vShade; void main(){ gl_FragColor = vec4(uColor, uAlpha * vA * (0.55 + 0.45 * vShade)); }`;
+const MESH_FS = `uniform vec3 uColor; uniform float uAlpha; varying float vA, vShade; void main(){ gl_FragColor = vec4(uColor, uAlpha * vA * (0.35 + 0.65 * vShade)); }`;
+
 /* The picked colour, pushed to a vivid tint: the page's --button-color is derived from the picker with
    lightness tweaks that can leave it muted, and additive blending over a grey ground washes it out further. */
 function vividAccent(THREE, light, lightness) {
@@ -450,6 +464,38 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
     }
     const levels = [];
     let hullWL = null;
+    // dots -> lines -> solid: the wireframe (an edge list per level from the module) and the surfaces (the hull's grid, one mesh at every
+    // level since its vertices simply morph; a sail mesh per level, of the sails that level has). Empty for a module without them
+    const wire = { lines: [], sails: [], hull: null, empty: new THREE.BufferGeometry() };
+    const refOf = i => [(((STAR_N + i) % N) + 0.5) / N, (Math.floor((STAR_N + i) / N) + 0.5) / N];
+    function lineGeo(e) {
+        const n = e.idx.length, pos = new Float32Array(n * 3), ref = new Float32Array(n * 2), w = new Float32Array(n);
+        for (let k = 0; k < n; k++) { const r = refOf(e.idx[k]); ref[k * 2] = r[0]; ref[k * 2 + 1] = r[1]; w[k] = e.w[k >> 1]; }
+        const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aRef', new THREE.BufferAttribute(ref, 2)); g.setAttribute('aW', new THREE.BufferAttribute(w, 1)); return g;
+    }
+    function gridGeo(grids) {   // grids: [{ idx, nu, nv, sides }]: vertices in grid order per grid (sides x nu x nv), two triangles per cell
+        const verts = [], tris = []; let base = 0;
+        for (const gd of grids) {
+            const S = gd.sides || 1, per = gd.nu * gd.nv;
+            for (let k = 0; k < S * per; k++) verts.push(gd.idx[k]);
+            for (let s = 0; s < S; s++) for (let iv = 0; iv < gd.nv - 1; iv++) for (let iu = 0; iu < gd.nu - 1; iu++) { const a = base + s * per + iv * gd.nu + iu, b = a + 1, c = a + gd.nu, d = c + 1; tris.push(a, b, c, b, d, c); }
+            base += S * per;
+        }
+        const pos = new Float32Array(verts.length * 3), ref = new Float32Array(verts.length * 2), w = new Float32Array(verts.length).fill(1);
+        verts.forEach((i, k) => { const r = refOf(i); ref[k * 2] = r[0]; ref[k * 2 + 1] = r[1]; });
+        const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aRef', new THREE.BufferAttribute(ref, 2)); g.setAttribute('aW', new THREE.BufferAttribute(w, 1)); g.setIndex(tris); return g;
+    }
+    function buildWire(mod, built) {
+        for (const g of wire.lines) g.dispose(); for (const g of wire.sails) g.dispose(); if (wire.hull) wire.hull.dispose();
+        wire.lines = []; wire.sails = []; wire.hull = null;
+        const NLv = mod.LEVELS.length;
+        for (let L = 0; L < NLv; L++) {
+            wire.lines.push(built.edges && built.edges[L] && built.edges[L].idx.length ? lineGeo(built.edges[L]) : wire.empty);
+            const parts = built.mesh ? built.mesh.sails.filter(sd => sd.levels[L]) : [];
+            wire.sails.push(parts.length ? gridGeo(parts.map(sd => ({ idx: sd.idx, nu: sd.na, nv: sd.nup }))) : wire.empty);
+        }
+        if (built.mesh && built.mesh.hull) wire.hull = gridGeo([{ idx: built.mesh.hull.idx, nu: built.mesh.hull.nu, nv: built.mesh.hull.nv, sides: 2 }]);
+    }
     let LEVEL_HEEL = (shipOn && BOAT.LEVEL_HEEL) || [0.58, 1.0, 1.3, 1.1], LEVEL_PIVOT = (shipOn && BOAT.LEVEL_PIVOT) || [-0.03, -0.02, -0.01, -0.04];   // per level; the four-level module predates these exports
     // the level textures for a lineage module (a theme): built at init and again when the picker's icon row swaps the theme; the same
     // particle count and roles per slot are not guaranteed across themes, so the particles simply re-form (spring + settle) on a swap
@@ -458,6 +504,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         const built = mod.buildBoatLevels(boatCount, 1);
         if (!mod.LEVEL_HEEL) tagSailBellies(built, boatCount);   // the six-level module bakes the sail bellies itself
         hullWL = measureHull(built, boatCount);
+        buildWire(mod, built);
         const old = levels.splice(0, levels.length);
         for (let L = 0; L < mod.LEVELS.length; L++) {
             const pos = new Float32Array(COUNT * 4), meta = new Float32Array(COUNT * 4);
@@ -503,6 +550,12 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
     });
     const U = mat.uniforms;
     const points = new THREE.Points(geo, mat); points.frustumCulled = false; scene.add(points);
+    const wireMat = (fs, dbl) => new THREE.ShaderMaterial({ uniforms: Object.assign({ tPos: { value: null }, uColor: { value: new THREE.Color(0x4faad1) }, uAlpha: { value: 0 } }, boatU()), vertexShader: WIRE_VS, fragmentShader: fs, transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, side: dbl ? THREE.DoubleSide : THREE.FrontSide });
+    const wireLo = new THREE.LineSegments(wire.empty, wireMat(WIRE_FS)), wireHi = new THREE.LineSegments(wire.empty, wireMat(WIRE_FS));
+    const hullMesh = new THREE.Mesh(wire.hull || wire.empty, wireMat(MESH_FS, true)), sailLo = new THREE.Mesh(wire.empty, wireMat(MESH_FS, true)), sailHi = new THREE.Mesh(wire.empty, wireMat(MESH_FS, true));
+    const WIRES = [wireLo, wireHi, hullMesh, sailLo, sailHi];
+    for (const o of WIRES) { o.frustumCulled = false; scene.add(o); }
+    const ALLU = [velU, posU, U, ...WIRES.map(o => o.material.uniforms)];   // every material that reads the ship's uniforms
     let visW = 1, visH = 1;
     // constellation lines between recruited stars: vertices sample the live position texture, so the lines follow the particles
     // each line vertex knows both endpoints (position texture refs and star indices) so the segment only shows once both stars are near their targets
@@ -946,7 +999,8 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         const L = M.clamp(P.level, 0, levels.length - 1), lo = Math.min(levels.length - 1, Math.floor(L)), hi = Math.min(levels.length - 1, lo + 1), mix = L - lo;
         const mixRate = Math.abs(mix - ship.lastMix) / Math.max(dt, 1e-3); ship.lastMix = mix;   // wraps of mix at a level boundary count as a morph too, which is right
         ship.settleGain += (0.3 + 0.7 * Math.min(1, mixRate * 2) - ship.settleGain) * Math.min(1, dt / (mixRate > 0.1 ? 0.05 : 0.6));   // the settle holds at full rate through a morph and relaxes after it
-        if (lo !== ship.lo) { ship.lo = lo; for (const u of [velU, posU, U]) { u.tBoatA.value = levels[lo].pos; u.tMetaA.value = levels[lo].meta; u.tBoatB.value = levels[hi].pos; u.tMetaB.value = levels[hi].meta; } }
+        if (lo !== ship.lo) { ship.lo = lo; for (const u of ALLU) { u.tBoatA.value = levels[lo].pos; u.tMetaA.value = levels[lo].meta; u.tBoatB.value = levels[hi].pos; u.tMetaB.value = levels[hi].meta; }
+            wireLo.geometry = wire.lines[lo] || wire.empty; wireHi.geometry = wire.lines[hi] || wire.empty; sailLo.geometry = wire.sails[lo] || wire.empty; sailHi.geometry = wire.sails[hi] || wire.empty; hullMesh.geometry = wire.hull || wire.empty; }
         const LS = levels[lo].scale + (levels[hi].scale - levels[lo].scale) * mix, scale = P.size * visW * LS;
         const NL = levels.length, lvl = M.clamp(P.level, 0, NL - 1), lvi = Math.min(NL - 2, Math.floor(lvl)), lvf = lvl - lvi, tbl = T => T[lvi] + (T[lvi + 1] - T[lvi]) * lvf;   // per-level tables, linear between whole levels
         const lvn = 3 * M.clamp((LS - 0.7) / 0.8, 0, 1);   // the "size" on the old 0..3 scale (skiff 0 .. clipper 3), from the level's scale, for the inertia and the size-dependent constants below
@@ -1036,7 +1090,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         const turnSea = ship.turnSea + swayYaw;
         _qa.setFromAxisAngle(X, M.degToRad(tilt)).multiply(_qb.setFromAxisAngle(Y, -M.degToRad(turnSea)));
         shipRotSea.setFromMatrix4(_m4.makeRotationFromQuaternion(_qa));
-        const dSea = M.degToRad(turnSea - turn); for (const u of [velU, posU, U]) { u.uSeaD.value.set(Math.cos(dSea), Math.sin(dSea)); u.uSoftLane.value = pcfg.shipSoft * restW; }   // at rest the water is spring-held like the hull
+        const dSea = M.degToRad(turnSea - turn); for (const u of ALLU) { u.uSeaD.value.set(Math.cos(dSea), Math.sin(dSea)); u.uSoftLane.value = pcfg.shipSoft * restW; }   // at rest the water is spring-held like the hull
         shipAt.set(P.x * visW / 2, P.y * visH / 2 + restW * pcfg.shipBob * 0.04 * Math.sin(t * 0.8), 0);   // at rest the whole scene bobs (Sept 10: 0.04 units at 0.8 rad/s)
         const snap = now - ship.t0 < 700 ? 0.02 : 0;
         // the field is the sea: while the camera holds the ship (the route's cam), the whole field streams past astern at the water's speed,
@@ -1058,12 +1112,19 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         fleetU[1].set(-1.2 + 0.06 * Math.sin(t * 0.27 + 2.0), 0.55 + 0.015 * Math.sin(t * 0.21 + 2.5), 0.8 + 0.05 * Math.sin(t * 0.17 + 1.0), 0.24 * fsz);
         fleetU[2].set(0.9 + 0.06 * Math.sin(t * 0.29 + 4.0), 0.45 + 0.015 * Math.sin(t * 0.25 + 0.5), 0.9 + 0.05 * Math.sin(t * 0.23 + 2.0), 0.26 * fsz);
         const fleetForm = M.clamp(P.fleet, 0, 1) * M.clamp(pcfg.shipFleet, 0, 1) * (1 - rocketMix);
-        for (const u of [velU, posU, U]) u.uFleetForm.value = fleetForm;
+        for (const u of ALLU) u.uFleetForm.value = fleetForm;
         const smoke = BOAT && BOAT.SMOKE ? tbl(BOAT.SMOKE) * (1 - rocketMix) : 0, FN = BOAT && BOAT.FUNNELS;   // funnel smoke and the funnels' tops, mixed between the two levels
         if (FN) shipU.funnel.set(FN[lo][0] + (FN[hi][0] - FN[lo][0]) * mix, FN[lo][1] + (FN[hi][1] - FN[lo][1]) * mix, FN[lo][2] + (FN[hi][2] - FN[lo][2]) * mix, FN[lo][3] + (FN[hi][3] - FN[lo][3]) * mix);
-        for (const u of [velU, posU, U]) { u.uSmoke.value = smoke; u.uSmokeClk.value = ship.smokeClk; u.uPaddle.value = ship.paddle; }
+        for (const u of ALLU) { u.uSmoke.value = smoke; u.uSmokeClk.value = ship.smokeClk; u.uPaddle.value = ship.paddle; }
+        // dots -> lines -> solid: the wireframe and the surfaces fade in with the level (the module's tables), crossfaded through a morph
+        // (both levels' edges are gone in the middle of it and the dots carry the change); the hull's mesh simply morphs and stays
+        const linesG = BOAT && BOAT.LINES ? tbl(BOAT.LINES) * pcfg.shipLines : 0, solidG = BOAT && BOAT.SOLID ? tbl(BOAT.SOLID) * pcfg.shipSolid : 0;
+        const wLo = 1 - M.smoothstep(mix, 0.05, 0.4), wHi = M.smoothstep(mix, 0.6, 0.95), lit = isLight() ? 0.6 : 1;
+        wireLo.material.uniforms.uAlpha.value = 0.32 * linesG * wLo * lit; wireHi.material.uniforms.uAlpha.value = 0.32 * linesG * wHi * lit;
+        hullMesh.material.uniforms.uAlpha.value = 0.16 * solidG * lit; sailLo.material.uniforms.uAlpha.value = 0.12 * solidG * wLo * lit; sailHi.material.uniforms.uAlpha.value = 0.12 * solidG * wHi * lit;
+        for (const o of WIRES) o.visible = o.material.uniforms.uAlpha.value > 0.002;
         const trailOn = pcfg.shipTrail > 0 && rocketMix < 0.5 ? 1 : 0;   // the rocket's plume is the strip
-        for (const u of [velU, posU, U]) { u.uTrail.value = trailOn; u.uTrailClk.value = ship.trail; }
+        for (const u of ALLU) { u.uTrail.value = trailOn; u.uTrailClk.value = ship.trail; }
         const fieldGone = Number.isFinite(ship.overlayY) ? M.smoothstep(scrollY, ship.overlayY - 0.8 * innerHeight, ship.overlayY) : 0;   // the field is gone by the overlay mark (the footer): the rocket stands alone
         U.uFieldDim.value = fieldTheme * (1 - fieldGone) * (1 - pcfg.shipFieldDim * M.clamp(P.cam, 0, 1) * M.smoothstep(way, 0.1, 0.5)) * (1 + 3 * ship.flash);
         U.uGlow.value = glowBase * (1 + 1.2 * ship.flash);
@@ -1076,7 +1137,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         if (hw) { shipU.hull.set(hwA.stem + (hwB.stem - hwA.stem) * mix, hwA.stern + (hwB.stern - hwA.stern) * mix, entryGain, hwA.sternHalf + (hwB.sternHalf - hwA.sternHalf) * mix); for (let k = 0; k < 17; k++) shipU.beam[k] = hwA.beam[k] + (hwB.beam[k] - hwA.beam[k]) * mix; }
         shipU.misc.set(tbl(LEVEL_PIVOT), 0.25 * way * (1 - M.smoothstep(tilt, 45, 65)), restW * 0.5, isLight() ? 1.3 : 1.6);   // .z: the rest disc's shading contrast (Sept 10: crests at twice the troughs)
         const soft = pcfg.shipSoft * (1 - M.smoothstep(lvl, pcfg.shipSoftUntil - 1, pcfg.shipSoftUntil)) * (0.3 + 0.7 * restW);   // soft at anchor, a lean toward soft while moving through the first levels, solid by shipSoftUntil
-        for (const u of [velU, posU, U]) { u.uSoft.value = soft; u.uLoose.value = 0.15 * soft; u.uRocket.value = rocketMix; u.uMix.value = mix; u.uBoatScale.value = scale; u.uTime.value = t; u.uRipple.value = ship.ripple; u.uFlow.value = ship.flow; u.uWay.value = way; u.uSnapBoat.value = snap; }   // uLoose: the spring a touch weaker while soft
+        for (const u of ALLU) { u.uSoft.value = soft; u.uLoose.value = 0.15 * soft; u.uRocket.value = rocketMix; u.uMix.value = mix; u.uBoatScale.value = scale; u.uTime.value = t; u.uRipple.value = ship.ripple; u.uFlow.value = ship.flow; u.uWay.value = way; u.uSnapBoat.value = snap; }   // uLoose: the spring a touch weaker while soft
         U.uWake.value = foamGain; U.uReflect.value = (1 - M.smoothstep(way, 0, 0.5)) * (1 - M.clamp((tilt - 10) / 30, 0, 1)); U.uBoatPx.value = M.lerp(M.clamp(0.6 + 0.25 * scale, 1.0, 2.2), pcfg.shipDotsRest, restW);   // a bigger ship is sparser: bigger dots; at rest a fixed small factor so the ship's dots read like the field's
     }
     resize();
@@ -1093,6 +1154,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         U.uColorB.value.copy(v).lerp(new THREE.Color(0xffffff), 0.2 * (1 - pale)).lerp(new THREE.Color(0x000000), 0.25 * pale);
         U.uColorLit.value.copy(v).lerp(new THREE.Color(0xffffff), 0.55 * (1 - pale)).lerp(new THREE.Color(0x000000), 0.15 * pale);
         U.uColorFlag.value.copy(v).lerp(new THREE.Color(0xffffff), 0.85 * (1 - pale)).lerp(new THREE.Color(0x000000), 0.6 * pale);   // the burgee: near white on a dark ground, near black on a pale one
+        for (const o of WIRES) { o.material.uniforms.uColor.value.copy(v).lerp(new THREE.Color(0xffffff), (o.material.fragmentShader === WIRE_FS ? 0.35 : 0.1) * (1 - pale)).lerp(new THREE.Color(0x000000), 0.3 * pale); o.material.blending = pale > 0.3 ? THREE.NormalBlending : THREE.AdditiveBlending; o.material.needsUpdate = true; }
         U.uGlow.value = glowBase = pcfg.pGlow * (1 + 1.3 * pale);
         U.uSize.value = pcfg.pSize * (1 + 0.3 * pale);
         fieldTheme = 1 - 0.45 * pale;   // the boost is for the ship: the field keeps about its dark-ground weight (applied through uFieldDim in shipFrame)
@@ -1126,8 +1188,9 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         starsFrame(t, dt);
         qual.simDt += dt;
         if (!qual.half || (qual.tick++ % 2 === 0)) { velU.uDelta.value = qual.simDt; posU.uDelta.value = qual.simDt; posU.uSettle.value = shipOn ? 1 - Math.exp(-qual.simDt * pcfg.shipSettle * ship.settleGain) : 0; qual.simDt = 0; gpu.compute();
-            shipRot0.copy(shipRot); shipAt0.copy(shipAt); for (const u of [velU, posU, U]) u.uScale0.value = U.uBoatScale.value; posU.uTrailClk0.value = posU.uTrailClk.value; }   // solids were just written against this pose; the trail's clock as this step saw it
+            shipRot0.copy(shipRot); shipAt0.copy(shipAt); for (const u of ALLU) u.uScale0.value = U.uBoatScale.value; posU.uTrailClk0.value = posU.uTrailClk.value; }   // solids were just written against this pose; the trail's clock as this step saw it
         U.tPos.value = gpu.getCurrentRenderTarget(posVar).texture; U.tVel.value = gpu.getCurrentRenderTarget(velVar).texture;
+        for (const o of WIRES) o.material.uniforms.tPos.value = U.tPos.value;
         U.uIntro.value = Math.min(1, U.uIntro.value + dt * 0.5);
         gl.render(scene, camera);
         if (!shown) { shown = true; canvas.style.opacity = '1'; }
@@ -1141,7 +1204,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         const mod = THEMES && THEMES[id]; if (!shipOn || !mod || id === themeId) return false;
         themeId = id;
         const old = buildLevels(mod), sq = mod.SQUARE_NORMAL || [0.970, 0, 0.242];
-        for (const u of [velU, posU, U]) u.uSqN.value.set(sq[0], sq[1], sq[2]);   // the lineage's square-sail belly normal
+        for (const u of ALLU) u.uSqN.value.set(sq[0], sq[1], sq[2]);   // the lineage's square-sail belly normal
         ship.lo = -1; ship.settleGain = 1;   // re-upload the level textures on the next frame; the particles re-form quickly
         resolveRoute(performance.now());
         setTimeout(() => { for (const t of old) { t.pos.dispose(); t.meta.dispose(); } }, 500);
