@@ -646,6 +646,10 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
        curve through the waypoints (buildRoute); everything else eases through a monotone cubic over scroll. */
     // ?route=1 mounts the path editor (js/voyage-editor.js): its edits live in localStorage and apply only with that parameter, until they are baked into the tables below
     const routeStore = 'ws-route-v1';
+    // ?at=<route mark> (dev aid, e.g. ?at=stage-release+450 or ?at=footer:top@1): the page opens scrolled to that mark. Re-applied for a few
+    // seconds while the layout settles (the work section only takes its scroll height once it has initialised), until you scroll yourself
+    const jumpTo = (() => { const a = new URLSearchParams(location.search).get('at'); return a ? { at: a.replace(/ /g, '+'), t0: performance.now(), touched: false } : null; })();   // a literal + in a query string arrives as a space
+    if (jumpTo) for (const ev of ['wheel', 'touchstart', 'keydown', 'pointerdown']) addEventListener(ev, () => { jumpTo.touched = true; }, { passive: true, once: true });
     let routeOverride = null;
     try { if (new URLSearchParams(location.search).get('route') === '1') routeOverride = JSON.parse(localStorage.getItem(routeStore) || 'null'); } catch (e) { routeOverride = null; }
     function keyframes() {
@@ -946,6 +950,10 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
     }
     function shipFrame(t, dt, now) {
         if (!shipOn) return;
+        if (jumpTo && !jumpTo.touched && now - jumpTo.t0 < 9000) {
+            const y = section.classList.contains('is-3d') ? resolveAt(jumpTo.at) : section.offsetTop;   // first to the work section so it initialises, then to the mark
+            if (y !== null && Math.abs(scrollY - y) > 2) { document.documentElement.style.scrollBehavior = 'auto'; window.scrollTo(0, y); ship.follow = null; ship.lastScroll = scrollY; ship.still = 0; ship.resolvedAt = -1e9; }
+        }
         if (now - ship.resolvedAt > 1000) resolveRoute(now);   // sections move as media loads and carousels initialise: re-resolve every second
         applyLayer(); lottieParallax();
         if (!ship.keys.length || !ship.route) return;
