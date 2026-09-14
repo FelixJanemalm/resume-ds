@@ -14,6 +14,7 @@ export function mountRouteEditor(api) {
     const FIELDS = [
         ['x', -1.3, 1.3, 0.005], ['y', -1.1, 1.1, 0.005], ['size', 0.03, 0.7, 0.005], ['turn', -720, 720, 1], ['tilt', 0, 90, 1],   // turn: any angle; the box beside the slider takes what the slider cannot
         ['heel', -25, 25, 0.5], ['level', 0, 3, 0.05], ['wake', 0, 1, 0.02], ['cam', 0, 1, 0.05],
+        ['storm', 0, 1, 0.05], ['fleet', 0, 1, 0.05],   // the passage through weather; the small copies of the ship in formation
     ];
     const esc = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -21,7 +22,7 @@ export function mountRouteEditor(api) {
     const NLEV = Math.max(1, (api.levels && api.levels()) || 4) - 1; FIELDS[6][2] = NLEV;   // the level slider spans the module's levels
     // the levers: the dynamics and camera settings the layer reads every frame (data-ship-* / data-boat-* attributes on the section)
     const LEVERS = [
-        ['sea', [['shipSwell', 'swell height', 0, 4, 0.05], ['shipSwellDir', 'swell direction (deg)', 0, 180, 5], ['shipWave', 'bow wave height', 0, 3, 0.05], ['shipSpray', 'spray', 0, 3, 0.05], ['shipFoam', 'foam', 0, 3, 0.05], ['shipWay', 'water flow', 0, 3, 0.05], ['shipRipple', 'rest ripple drift', 0, 3, 0.05], ['shipRings', 'rest ripple rings (rad/s)', 0, 4, 0.05], ['shipCurrent', 'field drift (x cam)', 0, 3, 0.05], ['shipFieldDim', 'field dim under way', 0, 1, 0.05]]],
+        ['sea', [['shipSwell', 'swell height', 0, 4, 0.05], ['shipSwellDir', 'swell direction (deg)', 0, 180, 5], ['shipWave', 'bow wave height', 0, 3, 0.05], ['shipSpray', 'spray', 0, 3, 0.05], ['shipFoam', 'foam', 0, 3, 0.05], ['shipWay', 'water flow', 0, 3, 0.05], ['shipRipple', 'rest ripple drift', 0, 3, 0.05], ['shipRings', 'rest ripple rings (rad/s)', 0, 4, 0.05], ['shipCurrent', 'field drift (x cam)', 0, 3, 0.05], ['shipFieldDim', 'field dim under way', 0, 1, 0.05], ['shipStorm', 'storm strength (x route)', 0, 2, 0.05], ['shipRain', 'storm: rain (units/s)', 0, 4, 0.1]]],
         ['ship', [['shipHeelWind', 'wind heel (deg)', 0, 25, 0.5], ['shipBob', 'motion (pitch/heave/roll)', 0, 3, 0.05], ['shipSway', 'scene sway at anchor', 0, 3, 0.05], ['shipSoft', 'soft ship (barely existing)', 0, 1, 0.05], ['shipSoftUntil', 'solid by level', 1, 6, 0.1], ['shipDotsRest', 'dot size at rest (x field)', 1, 2.2, 0.05], ['shipFlap', 'sail flutter', 0, 3, 0.05], ['shipSettle', 'settle speed (/s)', 1, 20, 0.5], ['shipLean', 'banking (deg per deg/s)', -0.2, 0.2, 0.005],
             ['shipAnchor', 'anchor after (s of no scroll; 0 = never)', 0, 10, 0.1], ['shipAnchorOut', 'anchor: way dies over (s)', 0.2, 10, 0.1], ['shipCursorWind', 'cursor is the wind (at anchor)', 0, 2, 0.05], ['shipBurgee', 'burgee', 0, 1, 1]]],
         ['camera', [['shipLag', 'lag angles (s)', 0.1, 2.5, 0.05], ['shipLagPos', 'lag position (s)', 0.1, 2.5, 0.05], ['shipLagSize', 'lag framing (s)', 0.1, 2.5, 0.05], ['shipSoftStart', 'soft start', 0.05, 1, 0.05], ['shipEntry', 'ride-in (s)', 0.5, 8, 0.1], ['shipLottie', 'swell parallax', 0, 0.6, 0.05]]],
