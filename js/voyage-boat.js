@@ -34,7 +34,7 @@ export const LEVEL_PIVOT = [0.0, -0.02, -0.03, -0.04, -0.05, -0.06, 0.0];
 export const ROCKET = 6;
 export const THEME = { id: 'atlantic', name: 'Atlantic', title: 'Skiff to clipper' };
 export const SQUARE_NORMAL = [0.970, 0, 0.242];   // the square sails' belly normal: the yards braced -14 deg         // pitch pivot x (the centre of flotation drifts aft with the finer, longer hulls)
-export const ROLE = { HULL: 1, DECK: 2, SAIL: 3, SPAR: 4, RIGGING: 5, WATER: 6, WAKE: 7, REFLECTION: 8 };
+export const ROLE = { HULL: 1, DECK: 2, SAIL: 3, SPAR: 4, RIGGING: 5, WATER: 6, WAKE: 7, REFLECTION: 8, FLAG: 9 };   // FLAG: the burgee at the masthead (cloth like a sail in the shader, drawn in its own colour)
 
 const NL = 6, WL = WATERLINE, PI = Math.PI;   // NL: the SHIP levels; the rocket is built apart, after them
 const LIGHT = [-0.45, 0.72, 0.53];
@@ -173,8 +173,17 @@ function sqSail(S, a, up, edgeP) {
     return [x, y, z, shade, flap, a, -(bul + 1e-3)];
 }
 function sailAt(L, part, a, up, edgeP) {
+    if (part === 'burgee') return burgeePt(L, a, up);
     const E = SAILS[part][L];
     return !E ? null : E.mx !== undefined ? sqSail(E, a, up, edgeP) : faSail(E, a, up, edgeP);
+}
+/* the burgee: a pennant at the head of the tallest mast, flying aft (-x), hoist 0.045, tapering to a point 0.13 aft; a = 0 at the
+   hoist .. 1 at the fly (where it flutters most), up across the hoist. Cloth like a sail: flap and belly meta, normal +z */
+const TALLEST = ['A', 'A', 'A', 'B', 'C', 'C'];
+function burgeePt(L, a, up) {
+    const m = MAST[TALLEST[L]][L] || MAST.A[L], top = m[2] + 0.004, h = 0.03 + 0.02 * (L / 5), len = 0.09 + 0.05 * (L / 5);
+    const P = [m[0] - a * len, top - up * h * (1 - a) - 0.4 * h * a, 0.006 * Math.sin(PI * a)];
+    return [P[0], P[1], P[2], 1, 2.2 * (0.35 + 0.65 * a), a, 1e-3];
 }
 
 /* ---------------------------------------------------------------- spars: line segments per level */
@@ -343,11 +352,12 @@ export function wakePt(rand) {
 }
 
 /* ---------------------------------------------------------------- allocation */
-const SAIL_W = { main: 520, mizzen: 330, jib: 260, stay: 220, flying: 180, jib4: 120, topA: 380, topB: 150, foreG: 260, foreR: 170, mainC: 560, mainT: 400, mainG: 280, mainR: 180, mainSky: 100, mizG: 200, mizR: 130 };
+const SAIL_W = { burgee: 40, main: 520, mizzen: 330, jib: 260, stay: 220, flying: 180, jib4: 120, topA: 380, topB: 150, foreG: 260, foreR: 170, mainC: 560, mainT: 400, mainG: 280, mainR: 180, mainSky: 100, mizG: 200, mizR: 130 };
 const SPAR_W = { mastA: 120, mastB: 110, mastC: 120, boomA: 45, gaffA: 40, boomB: 35, gaffB: 30, bowsprit: 55, yard_foreG: 32, yard_mainC: 40, yard_mainT: 36, yard_mainG: 32, yard_foreR: 24, yard_mainR: 26, yard_mainSky: 18, yard_mizT: 32, yard_mizG: 26, yard_mizR: 20 };
 const RIG_W = { shroudsA: 130, shroudsB: 110, shroudsC: 130, ratA: 190, ratB: 150, ratC: 200, foreStay: 60, jibStay: 50, flyingStay: 45, jib4Stay: 35, stays: 80, backstay: 50, backstays: 90, running: 100, braces: 170, footropes: 110 };
 const ROLE_W = [[ROLE.HULL, 0.17], [ROLE.DECK, 0.04], [ROLE.SAIL, 0.28], [ROLE.SPAR, 0.05], [ROLE.RIGGING, 0.05], [ROLE.WATER, 0.22], [ROLE.WAKE, 0.07], [ROLE.REFLECTION, 0.12]];   // the Sept-10 sailboat's mix: sails 39, hull 18, water 18, reflection 16 (with the rigging on the hull at the first two levels)
 const PARTS = { [ROLE.SAIL]: SAIL_W, [ROLE.SPAR]: SPAR_W, [ROLE.RIGGING]: RIG_W };
+const REFL_SAILS = Object.fromEntries(Object.entries(SAIL_W).filter(([k]) => k !== 'burgee'));
 
 function slots(count) {   // [{role, part, n}] whose n sum to count exactly
     const out = []; let cum = 0, prev = 0;
@@ -439,7 +449,7 @@ export function buildBoatLevels(count, seed = 1) {
     };
     const genSail = part => {
         const edgeP = rand() < 0.22 ? rand() : null, a = rand(), r = rand();
-        const up = TRI_PARTS.has(part) ? 1 - Math.pow(r, 0.65) : SAILS[part].some(E => E && E.tack) ? 1 - Math.pow(r, 0.85) : r;   // fore-and-aft sails are fuller at the foot
+        const up = part === 'burgee' ? r : TRI_PARTS.has(part) ? 1 - Math.pow(r, 0.65) : SAILS[part].some(E => E && E.tack) ? 1 - Math.pow(r, 0.85) : r;   // fore-and-aft sails are fuller at the foot
         const hq = rand();   // a sail the level lacks hosts its particles on the main (a third of them on the jib once there is one), so the cloth flows from sail to sail as the ship evolves
         return L => sailAt(L, part, a, up, edgeP) || (hq < 0.35 ? sailAt(L, 'jib', a, up, edgeP) : null) || sailAt(L, 'main', a, up, edgeP);
     };
@@ -454,17 +464,18 @@ export function buildBoatLevels(count, seed = 1) {
         return L => { if (L <= 1) return onHull(L); let segs = RIG[part][L]; if (!segs || (dens && dq >= dens[L])) segs = RIG.shroudsA[L] || (SPAR.mastA[L] && [SPAR.mastA[L]]); if (!segs) return null; const S = segs[Math.min(segs.length - 1, Math.floor(q * segs.length))]; if (!S) return null; const P = lerp3(S[0], S[1], t); return [P[0] + jx, P[1] + jy, P[2], sh]; };   // a line the level lacks hosts on the fore shrouds
     };
     const genRefl = () => {
-        const src = rand() < 0.65 ? genSail(pickWeighted(SAIL_W, rand())) : genHull();
+        const src = rand() < 0.65 ? genSail(pickWeighted(REFL_SAILS, rand())) : genHull();
         return L => { const p = src(L); return p && [p[0] + 0.02 * Math.sin(p[1] * 32), 2 * WL - p[1], p[2], Math.max(0.05, p[3] * 0.3)]; };
     };
 
     let i = 0;
     for (const { role: r, part, n } of slots(count)) {
         for (let k = 0; k < n; k++, i++) {
-            role[i] = r; setMeta0(i, r);
+            const rr = r === ROLE.SAIL && part === 'burgee' ? ROLE.FLAG : r;   // the burgee is cloth, allocated with the sails, with its own role for the shader's colour
+            role[i] = rr; setMeta0(i, rr);
             if (r === ROLE.WATER || r === ROLE.WAKE) { const w = r === ROLE.WATER ? waterPt(rand) : wakePt(rand); for (let L = 0; L < NL; L++) put(L, i, w.p, r, w.flap, w.phase, w.aux); continue; }
             const g = r === ROLE.HULL ? genHull() : r === ROLE.DECK ? genDeck() : r === ROLE.SAIL ? genSail(part) : r === ROLE.SPAR ? genSpar(part) : r === ROLE.RIGGING ? genRig(part) : genRefl();
-            for (let L = 0; L < NL; L++) { const p = g(L); if (p) put(L, i, p, r, r === ROLE.SAIL ? p[4] : 0, r === ROLE.SAIL ? p[6] : 0, r === ROLE.SAIL ? p[5] : 0); }
+            for (let L = 0; L < NL; L++) { const p = g(L); if (p) put(L, i, p, rr, r === ROLE.SAIL ? p[4] : 0, r === ROLE.SAIL ? p[6] : 0, r === ROLE.SAIL ? p[5] : 0); }
         }
     }
     const rk = rocketLevel(count, role, rand, pos[NL - 1], meta[NL - 1]); pos.push(rk.pos); meta.push(rk.meta);   // level 6
