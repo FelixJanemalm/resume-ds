@@ -77,13 +77,14 @@ const pcfg = section ? {
     foldSway: numAttr(section.dataset.foldSway, 0.3),                      // the share of the scene's slow sway (at anchor) the hero sea takes; the ship always takes all of it
     silk: numAttr(section.dataset.silk, 0),                                // 1 = the fold's silk lines stay as the sea the ship sails on down the page (streaming past it with its way); 0 = they fade out into the work section (Felix, 2026-09-15)
     silkGoneAt: section.dataset.silkGoneAt || 'stage-pin',                 // the scroll mark by which the silk lines have faded out (from foldFadeAt), as the work section pins
+    silkArmada: section.dataset.silkArmada || 'wake',                      // silk in the armada's ending (a test): 'wake' (every ship trails a silk wake) | 'weave' (the armada rides one band of silk into the distance) | 'off'
     silkBg: numAttr(section.dataset.silkBg, 1),                            // the animated silk ground of the principles section (#scalability): its strength (1 = full); 0 = none
     silkBgStyle: section.dataset.silkBgStyle || 'ribbon',                  // that ground: 'ribbon' (the Stripe-style silk ribbon) | 'beach' (the silk sea seen from the shore)
 } : null;
 if (pcfg) for (const [k, v] of new URLSearchParams(location.search)) if (k in pcfg && v !== '') pcfg[k] = Number.isNaN(+v) ? v : +v;   // dev aid: ?shipWorkTilt=45&boat=off
 let layer = null;
 const THEME_ROW = false;   // the ship-style icon row under the colour picker (and the stored choice it writes): off for now
-const MOD_V = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '?t=' + Date.now() : '?v=2026-09-15f';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache): never cached on a local server, versioned elsewhere (bump when they change)
+const MOD_V = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '?t=' + Date.now() : '?v=2026-09-15g';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache): never cached on a local server, versioned elsewhere (bump when they change)
 import('./ink-cursor.js' + MOD_V).catch(e => console.warn('ink cursor', e));   // the pointer as a trail of ink in the picked colour (it checks for a real mouse and reduced motion itself)
 
 const SIM_NOISE = `
@@ -658,6 +659,8 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
     const ALLU = [velU, posU, U, ...WIRES.map(o => o.material.uniforms)];   // every material that reads the ship's uniforms
     // the hero's sea (js/voyage-fold.js): drawn before the particles; its risen sheet hides the field's stars behind it
     const fold = FOLD && shipOn ? FOLD.createFold(THREE, { scene, pixelRatio: Math.min(devicePixelRatio || 1, 2), light: coarse }) : null;
+    // silk in the armada's ending: the ships' wakes, or the band of silk they ride (reads the fleet's uniforms by reference)
+    const armadaSilk = FOLD && FOLD.createArmadaSilk && shipOn && pcfg.silkArmada !== 'off' ? FOLD.createArmadaSilk(THREE, { scene, style: pcfg.silkArmada, count: ARMADA_K, copies: fleetU, rot: fleetRot, at: fleetAt, lift: U.uFleetLift.value, light: coarse }) : null;
     const lottieHost = document.querySelector('.hero-wrapper dotlottie-player');
     let visW = 1, visH = 1;
     // constellation lines between recruited stars: vertices sample the live position texture, so the lines follow the particles
@@ -1361,6 +1364,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         let clipTop = 1e9;   // above the page the canvas draws only from the block's top edge down (below it the block's own ground; above it the page covers the canvas anyway)
         if (ship.overlay) { const sel = /^(.+):(top|center|bottom)@/.exec(pcfg.shipOverlayAt || ''), el = sel ? document.querySelector(sel[1]) : null; if (el) { const cTop = canvas.getBoundingClientRect().top, eTop = el.getBoundingClientRect().top, cssH = VH + pinnedExtra; clipTop = Math.max(0, cssH - (eTop - cTop)) * (canvas.height / Math.max(1, cssH)); } }   // the block's top edge in the canvas's own coordinates (both rects from the same layout, so it holds still while scrolling)
         U.uClipTop.value = clipTop; for (const o of WIRES) o.material.uniforms.uClipTop.value = clipTop;
+        if (armadaSilk) armadaSilk.update({ visible: launch, t, scale: U.uFleetScale.value, clipTop, run0: RUN0, runLen: RUNLEN, zMin: -5.8 * unit, zMax: 3.2 * unit });   // the ARMADA scatter's reach across the course
         const fleetForm = M.clamp(P.fleet, 0, 4) * M.clamp(pcfg.shipFleet, 0, 1);
         for (const u of ALLU) u.uFleetForm.value = fleetForm;
         const smoke = BOAT && BOAT.SMOKE ? tbl(BOAT.SMOKE) * (1 - rocketMix) : 0, FN = BOAT && BOAT.FUNNELS;   // funnel smoke and the funnels' tops, mixed between the two levels
@@ -1416,7 +1420,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         mat.blending = pale > 0.3 ? THREE.NormalBlending : THREE.AdditiveBlending; mat.needsUpdate = true;
         if (ship.overlay) canvas.style.mixBlendMode = light ? 'multiply' : 'screen';
         if (fold) {   // the hero sea: the picked colour's hue at the lab's saturation and lightness; the page's ground, which the wall's edges fade into
-            const c = new THREE.Color(), hsl = { h: 0, s: 0, l: 0 }; try { c.setStyle(foldColorKey() || '#1466B8'); } catch (e) { c.set(0x1466b8); } c.getHSL(hsl, THREE.SRGBColorSpace); fold.setHue(hsl.h);
+            const c = new THREE.Color(), hsl = { h: 0, s: 0, l: 0 }; try { c.setStyle(foldColorKey() || '#1466B8'); } catch (e) { c.set(0x1466b8); } c.getHSL(hsl, THREE.SRGBColorSpace); fold.setHue(hsl.h); if (armadaSilk) armadaSilk.setHue(hsl.h);
             let m = null; try { m = /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/.exec(getComputedStyle(document.body).backgroundColor || ''); } catch (e) {}
             if (m) fold.setGround(+m[1] / 255, +m[2] / 255, +m[3] / 255);
         }
@@ -1494,6 +1498,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
     layer = section.wsLayer = {
         theme: () => themeId, setTheme, themes: () => THEMES ? Object.keys(THEMES) : [],
         fold,   // the hero's sea (its uniforms are live: a dev aid for tuning in the console)
+        armadaSilk,   // the armada's silk (uniforms live, the same dev aid)
         // the path editor's window on the route (js/voyage-editor.js, ?route=1)
         routeApi: {
             orientation: () => VH > innerWidth ? 'portrait' : 'landscape',
