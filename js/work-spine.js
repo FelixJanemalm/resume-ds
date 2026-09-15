@@ -69,6 +69,11 @@ const pcfg = section ? {
     shipOverlayAt: section.dataset.shipOverlayAt !== undefined ? section.dataset.shipOverlayAt : '.testimonials-wrapper:top@1',   // with opaque grounds: the scroll mark from which the canvas is drawn ABOVE the page, clipped to that element's top edge downward (the armada is the background of the testimonials-to-footer block: it scrolls in with the block, no fade); '' = never
     shipWay: numAttr(section.dataset.shipWay, 1),           // how fast the water streams past the hull under way (hull lengths per second at full wake)
     shipGrounds: section.dataset.shipGrounds || 'opaque',   // the bottom sections paint their own ground over the layer: 'opaque' (the ship stays at the quote and the sections below cover it) | 'translucent' (work-spine.css thins those grounds so the ship shows through, the concept's pick) | 'overlay' (the canvas flips above the page there with a screen blend) | 'none'
+    fold: numAttr(section.dataset.fold, 1),                                // the hero's sea (js/voyage-fold.js): the Lottie's swell remade in the layer, the ship riding it; 0 = the Lottie as before (wide screens only for now: phones keep the Lottie)
+    foldFlatAt: section.dataset.foldFlatAt || '#work:center@0.25',          // the scroll mark by which the fold has laid down flat into the sea
+    foldFadeAt: section.dataset.foldFadeAt || '#work:center@0.5', foldGoneAt: section.dataset.foldGoneAt || '.hero-wrapper:bottom@0',   // the fold's sea fades out between these marks as the ship gets under way (its own water and the field take over)
+    foldScale: numAttr(section.dataset.foldScale, 1),                      // the fold's sea relative to the ship (1 = as tuned in the look-dev lab)
+    foldRide: numAttr(section.dataset.foldRide, 1),                        // how much the hull answers the fold's swell (heave, pitch, roll); 0 = only the layer's own swell
 } : null;
 if (pcfg) for (const [k, v] of new URLSearchParams(location.search)) if (k in pcfg && v !== '') pcfg[k] = Number.isNaN(+v) ? v : +v;   // dev aid: ?shipWorkTilt=45&boat=off
 let layer = null;
@@ -417,7 +422,7 @@ const FIGURES = [
 /* Page-wide particle layer: a fixed canvas behind everything (z-index -1, no pointer events), the same
    simulation as the lab, with the field wrapping vertically so it follows the page scroll with a little parallax. */
 const STAR_N = 12;
-function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
+function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
     if (!GPUC) return;
     const canvas = document.createElement('canvas');
     canvas.id = 'ws-particles'; canvas.setAttribute('aria-hidden', 'true');
@@ -645,6 +650,9 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
     const WIRES = [wireLo, wireHi, hullMesh, sailLo, sailHi];
     for (const o of WIRES) { o.frustumCulled = false; scene.add(o); }
     const ALLU = [velU, posU, U, ...WIRES.map(o => o.material.uniforms)];   // every material that reads the ship's uniforms
+    // the hero's sea (js/voyage-fold.js): drawn before the particles; its risen sheet hides the field's stars behind it
+    const fold = FOLD && shipOn ? FOLD.createFold(THREE, { scene, pixelRatio: Math.min(devicePixelRatio || 1, 2), light: coarse }) : null;
+    const lottieHost = document.querySelector('.hero-wrapper dotlottie-player');
     let visW = 1, visH = 1;
     // constellation lines between recruited stars: vertices sample the live position texture, so the lines follow the particles
     // each line vertex knows both endpoints (position texture refs and star indices) so the segment only shows once both stars are near their targets
@@ -798,19 +806,19 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
                 { at: '#work:center@0.72', x: 0.22, y: -0.45, size: 0.56, turn: 60, tilt: 8, heel: 5, level: 0, wake: 0.35, cam: 0.2 },
                 { at: '#work:center@0.5', x: 0.05, y: -0.1, size: 0.54, turn: 85, tilt: 24, heel: 5, level: L1, wake: 0.65, cam: 0.3 },
                 { at: '#work:center@0.25', x: -0.05, y: 0.12, size: 0.5, turn: 92, tilt: 50, heel: 5, level: L1, wake: 0.85, cam: 0.5 },
-                { at: 'stage@0.14', x: 0, y: 0.22, size: 0.42, turn: 70, tilt: 54, heel: 4, level: L1, wake: 0.9, cam: 1 },                                             // the column: in the gap below the cards
-                { at: 'stage@0.92', x: 0, y: 0.22, size: 0.34, turn: 84, tilt: 63, heel: 4, level: L2, wake: 1, cam: 0.8 },
-                { at: 'stage-release', x: 0, y: 0.1, size: 0.36, turn: 78, tilt: 56, heel: 7, level: L2, wake: 0.95, cam: 0.8 },
+                { at: 'stage@0.14', x: 0, y: 0.18, size: 0.42, turn: 70, tilt: 54, heel: 4, level: L1, wake: 0.9, cam: 1 },                                             // the column: in the gap below the cards
+                { at: 'stage@0.92', x: 0, y: -0.47, size: 0.34,   /* the column: high as it pins (0.18), sinking steadily behind the cards to the old low position by the release */ turn: 84, tilt: 63, heel: 4, level: L2, wake: 1, cam: 0.8 },
+                { at: 'stage-release', x: 0, y: -0.54, size: 0.36, turn: 78, tilt: 56, heel: 7, level: L2, wake: 0.95, cam: 0.8 },
                 { at: 'stage-release+450', x: -0.1, y: -0.66, size: 0.38, turn: 45, tilt: 26, heel: 7, level: L2, wake: 0.9, cam: 0.8 },
-                { at: '#read:top@0', x: -0.02, y: -0.76, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L2, wake: 0.85, cam: 1 },                                           // the side shot below the sticky quote
-                { at: '#read:top@0+180', x: -0.02, y: -0.76, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L3, wake: 0.9, cam: 1 },
-                { at: '#read:top@0+360', x: -0.02, y: -0.76, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L4, wake: 0.95, cam: 1 },
-                { at: '#read:top@0+540', x: -0.02, y: -0.76, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 0 },
-                { at: '#read:top@0+590', x: -0.02, y: -0.76, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 1 },
-                { at: '#read:top@0+655', x: -0.02, y: -0.76, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 2 },
-                { at: '#read:top@0+720', x: -0.02, y: -0.76, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 3 },
+                { at: '#read:top@0', x: -0.02, y: -0.72, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L2, wake: 0.85, cam: 1 },                                           // the side shot below the sticky quote
+                { at: '#read:top@0+180', x: -0.02, y: -0.72, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L3, wake: 0.9, cam: 1 },
+                { at: '#read:top@0+360', x: -0.02, y: -0.72, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L4, wake: 0.95, cam: 1 },
+                { at: '#read:top@0+540', x: -0.02, y: -0.72, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 0 },
+                { at: '#read:top@0+590', x: -0.02, y: -0.72, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 1 },
+                { at: '#read:top@0+655', x: -0.02, y: -0.72, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 2 },
+                { at: '#read:top@0+720', x: -0.02, y: -0.72, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 3 },
                 ...(RK < 0 ? [] : [
-                    { at: '#scalability:top@0.6', x: -0.02, y: -0.76, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 3 },
+                    { at: '#scalability:top@0.6', x: -0.02, y: -0.72, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 3 },
                     { at: '.testimonials-wrapper:top@1', x: 0.5, y: -0.95, size: 0.3, turn: -90, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1, fleet: 4 },
                     { at: 'footer:top@1', x: 0.5, y: -0.95, size: 0.3, turn: -90, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1, fleet: 4 },
                     { at: 'end', x: 0.5, y: -0.6, size: 0.3, turn: -90, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1, fleet: 4 },
@@ -1045,6 +1053,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
             ship.fleetLevel = sail.length ? Math.round(Math.max(...sail)) : 0;   // the fleet is the ship the route ends on (its last level before the launch)
             const oy = pcfg.shipGrounds === 'overlay' ? resolveAt('#scalability:top@0.55') : pcfg.shipGrounds === 'opaque' && pcfg.shipOverlayAt ? resolveAt(pcfg.shipOverlayAt) : null; ship.overlayY = oy === null ? Infinity : oy;   // 'overlay': from the principles down; 'opaque': from shipOverlayAt (the rocket over the footer)
             const hy = Math.max(resolveAt('.hero-wrapper:bottom@0') ?? -1, resolveAt('.hero-wrapper dotlottie-player:bottom@0') ?? -1); ship.heroY = hy;   // the layer goes behind the page once the hero and its swell (which overhangs the hero's bottom) have left the screen: nothing it could change is visible then, so the switch needs no dip (the dip was the ship's blink)
+            if (fold) { const fy = resolveAt(pcfg.foldFlatAt), f0 = resolveAt(pcfg.foldFadeAt), f1 = resolveAt(pcfg.foldGoneAt); ship.foldFlatY = fy ?? 700; ship.foldFadeY = f0 ?? 480; ship.foldGoneY = Math.max((f1 ?? 790), ship.foldFadeY + 1); }   // the hero sea's scroll marks
         } catch (e) { console.warn('work-spine: route', e); }
     }
     function shipFrame(t, dt, now) {
@@ -1124,6 +1133,23 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         const wayT = M.clamp(0.72 * P.wake * (1 - anchor) + 0.55 * ship.wind, 0, 1.2), tauW = wayT > ship.way ? 0.35 + 0.15 * lvn : 1.3 + 0.5 * lvn;
         ship.way += (wayT - ship.way) * (1 - Math.exp(-dt / tauW));
         const way = ship.way, amp = way * way, sea = 0.3 + 0.7 * way, restW = 1 - M.smoothstep(way, 0.05, 0.4);   // restW: 1 at anchor .. 0 under way
+        // the hero's sea (js/voyage-fold.js): laid down flat by the scroll (foldAmt 1 -> 0) and faded out as the ship gets under way (foldW), wide
+        // screens only. The lab's sea is placed in the ship's sea frame so it sits on screen where it sat in the lab, seen from the same place:
+        // k (world units per lab unit) from the camera's distance to the hero's spot, growing and shrinking with the ship as the route zooms
+        let foldW = 0, foldAmt = 1, foldK = 1, foldTheta = 0;
+        if (fold) {
+            const on = VH <= innerWidth, h0 = ship.keys[0].k;
+            const scaleHero = Math.max(1e-4, h0.size * visW * levels[M.clamp(Math.round(h0.level), 0, levels.length - 1)].scale);
+            foldK = Math.hypot(camera.position.x - h0.x * visW / 2, camera.position.y - h0.y * visH / 2, camera.position.z) / FOLD.LAB.camDist * (scale / scaleHero) * pcfg.foldScale;
+            foldTheta = h0.turn - FOLD.LAB.yaw;
+            foldAmt = 1 - M.smoothstep(scrollY, 0, Math.max(1, ship.foldFlatY || 700));
+            foldW = on ? 1 - M.smoothstep(scrollY, ship.foldFadeY || 480, ship.foldGoneY || 790) : 0;
+            const hideLottie = on && shown;   // the fold replaces the Lottie (it fades out as the layer fades in); phones keep it
+            if (lottieHost && hideLottie !== ship.lottieHidden) {
+                ship.lottieHidden = hideLottie; lottieHost.style.transition = 'opacity 1.6s ease'; lottieHost.style.opacity = hideLottie ? '0' : '';
+                try { if (hideLottie) setTimeout(() => ship.lottieHidden && lottieHost.pause && lottieHost.pause(), 1700); else if (lottieHost.play) lottieHost.play(); } catch (e) {}
+            }
+        }
         // gust: wind the sails feel before the hull has answered it (sails shake, the ship luffs and heels), smoothed and floored so a one-notch wheel does not twitch the sails
         const squall = storm * 0.6 * (0.5 + 0.5 * Math.sin(t * 1.1 + 0.6 * Math.sin(t * 0.37)));   // the storm's gusts: the sails shake, the ship luffs and heels, in squalls
         ship.gust += (M.clamp(ship.wind - 0.6 * way + squall, 0, 1) - ship.gust) * Math.min(1, dt / 0.08);
@@ -1147,6 +1173,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
             if (ship.arriving) { ship.arriving = false; }   // under way again mid-crossfade: carry on from where the specks are
             ship.depart = Math.min(6, (ship.depart || 0) + dt * Vflow); if (ship.depart >= 5.3) ship.depOn = 0;
         }
+        waterFade *= 1 - 0.85 * foldW * restW;   // at rest on the fold's sea the ship's own calm disc steps back (its specks would double the new water); under way its wake shows as before
         for (const u of ALLU) { u.uDepart.value = ship.depart || 0; u.uFlowDep.value = ship.flowDep || 0; u.uDepOn.value = ship.depOn || 0; u.uWaterFade.value = waterFade; }
         ship.flick = (ship.flick + dt * (1.5 + 3.5 * way)) % 1000;
         ship.churnPh = (ship.churnPh + dt * (3 + 3 * way)) % 6.2832;
@@ -1163,7 +1190,11 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         shipU.swell.set(Math.cos(M.degToRad(pcfg.shipSwellDir)), Math.sin(M.degToRad(pcfg.shipSwellDir)), 1 - M.smoothstep(way, 0.05, 0.4), ship.rings);   // .z: at rest (1) .. under way (0): the water sheet sits as a disc round the hull; .w: the rest rings' clock
         const lift = 1 + 0.3 * M.smoothstep(P.tilt, 50, 60);   // from above the heave reads small: a little more of it there (pitch stays under 4 degrees)
         const thetaA = 1.4 * A * ks * sinc * pcfg.shipBob, hA = A * sinc * lift * pcfg.shipBob, ph = ship.phiE;
-        const pitch = -thetaA * (Math.sin(ph) + 0.35 * Math.sin(1.83 * ph + 1.1)) / 1.35, heave = hA * (Math.cos(ph) + 0.35 * Math.cos(1.83 * ph + 1.1)) / 1.35;
+        let pitch = -thetaA * (Math.sin(ph) + 0.35 * Math.sin(1.83 * ph + 1.1)) / 1.35, heave = hA * (Math.cos(ph) + 0.35 * Math.cos(1.83 * ph + 1.1)) / 1.35, foldRoll = 0;
+        if (fold && foldW > 0) {   // on the fold's sea the hull rides its swell: the water under the bow, the stern and both sides (the course against the sea's from the last frame)
+            const dS = ship.dSea || 0, r = fold.ride([Math.cos(dS), -Math.sin(dS)], foldTheta, foldK, scale, t, dt), g = foldW * pcfg.foldRide;
+            pitch += g * r.pitch; heave += g * r.heave; foldRoll = g * r.roll;
+        }
         // where in the cycle the stem is deepest (plunge: spray and the bow wave) and the stern (squat: churn), from the bow's immersion in the fundamental
         const C = A * Math.cos(ks / 2) - hA, D = 0.5 * thetaA - A * Math.sin(ks / 2), psi = Math.atan2(D, C);
         const plunge = Math.max(Math.pow(0.5 + 0.5 * Math.cos(ph - psi), 3), ship.crest || 0), squat = Math.pow(0.5 + 0.5 * Math.cos(ph + psi), 3);
@@ -1188,7 +1219,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         const sway = pcfg.shipSway * pcfg.shipBob * restW;   // at anchor: the long quiet swell rocks the whole scene (step 1's idle), gone under way where the sea must stay level
         const sceneTilt = sway * 3.44 * Math.sin(t * 0.6);   // at rest the whole scene sways on the long swell, as the Sept-10 build did: 0.06 rad at 0.6 rad/s on its roll (today's tilt) and 0.09 rad at 0.21 on its yaw (today's turn)
         const swayYaw = (1.5 + 3.7 * sway) * Math.sin(t * 0.21);
-        const heel = 24 * Math.tanh((ship.heel + rollSea) / 24), turn = P.turn + swayYaw + 1.2 * gust, tilt = P.tilt + 0.8 * Math.sin(t * 0.47) * (1 - restW) + sceneTilt;
+        const heel = 24 * Math.tanh((ship.heel + rollSea + foldRoll) / 24), turn = P.turn + swayYaw + 1.2 * gust, tilt = P.tilt + 0.8 * Math.sin(t * 0.47) * (1 - restW) + sceneTilt;
         // the sails: apparent wind from the weather (the pose's wake), the gust and the ship's own speed; a sail with wind fills, one with wind but not
         // drawing luffs (flogs), one with no wind hangs still; a gust shakes it. The flutter phase accumulates at a rate that follows the apparent wind.
         const Wt = 0.09 + 0.6 * P.wake * (1 - anchor) + 0.5 * ship.wind, Wa = Math.min(1, Math.sqrt(Wt * Wt + 0.45 * Wt * way + 0.2 * way * way) / 1.28);   // a light air at anchor: the sails stir, they do not flog
@@ -1211,8 +1242,9 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         const turnSea = ship.turnSea + swayYaw;
         _qa.setFromAxisAngle(X, M.degToRad(tilt)).multiply(_qb.setFromAxisAngle(Y, -M.degToRad(turnSea)));
         shipRotSea.setFromMatrix4(_m4.makeRotationFromQuaternion(_qa));
-        const dSea = M.degToRad(turnSea - turn); for (const u of ALLU) { u.uSeaD.value.set(Math.cos(dSea), Math.sin(dSea)); u.uSoftLane.value = pcfg.shipSoft * restW; }   // at rest the water is spring-held like the hull
+        const dSea = M.degToRad(turnSea - turn); ship.dSea = dSea; for (const u of ALLU) { u.uSeaD.value.set(Math.cos(dSea), Math.sin(dSea)); u.uSoftLane.value = pcfg.shipSoft * restW; }   // at rest the water is spring-held like the hull
         shipAt.set(P.x * visW / 2, P.y * visH / 2 + restW * pcfg.shipBob * 0.04 * Math.sin(t * 0.8), 0);   // at rest the whole scene bobs (Sept 10: 0.04 units at 0.8 rad/s)
+        if (fold) fold.place(shipAt, shipRotSea, foldTheta, foldK, camera.position, foldAmt, foldW, t);   // the hero's sea: in the sea's frame, so it sways and bobs with the scene and the ship floats on it
         const snap = now - ship.t0 < 700 ? 0.02 : 0;
         // the field is the sea: while the camera holds the ship (the route's cam), the whole field streams past astern at the water's speed,
         // along the hull's x axis as it projects on the screen (so from above the sea runs along the course, from the side it runs along the
@@ -1434,7 +1466,9 @@ async function boot() {
         if (THEMES && (THEME_ROW || want === 'norse')) { try { THEMES.norse = await import('./voyage-norse.js' + MOD_V); } catch (e) { console.warn('work-spine: the Norse lineage failed to load', e); } }   // only when it can be chosen (the icon row) or is asked for: it would otherwise cost a request (and a second, unversioned copy of voyage-boat.js)
         if (THEMES && THEMES[want || pcfg.shipTheme]) BOAT = THEMES[want || pcfg.shipTheme];
     }
-    if (pcfg.mode === 'page') startParticleLayer(THREE, GPUC, BOAT, THEMES);
+    let FOLD = null;
+    if (pcfg.fold && BOAT) { try { FOLD = await import('./voyage-fold.js' + MOD_V); } catch (e) { console.warn('work-spine: the hero sea failed to load (the Lottie stays)', e); } }
+    if (pcfg.mode === 'page') startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD);
     if (layer && new URLSearchParams(location.search).get('route') === '1') import('./voyage-editor.js' + MOD_V).then(m => m.mountRouteEditor(layer.routeApi)).catch(e => console.warn('work-spine: route editor', e));
     if (cards.length < 2) return;
     // the work section itself waits until it is within 1.5 viewports
