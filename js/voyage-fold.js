@@ -243,27 +243,94 @@ const MOTES_VS = `
       gl_PointSize = uPR * (1.6 + 2.2 * aMote.w) * 10.0 / max(1.0, -mv.z);
       gl_Position = projectionMatrix * mv; }`;
 
-/* The silk sea as the animated ground of a page section (host): its own small canvas behind the section's content, seen as if standing on a beach
-   looking out to sea. Straight crests roll in toward the viewer below a horizon near the top (horizon: its height in the canvas, -1 bottom .. 1 top;
-   eye: the eye's height over the water in lab units), a low sun ahead catches the lines and the dots where the swell mirrors it (sun: [across, up] toward it;
-   glint: how strongly), the dots twinkle and a few motes drift over the water. The picked colour is polled like the particle layer's; it draws only
-   while the section is on screen. */
-export function mountSilk(THREE, host, { colorVar = '--primary-color', horizon = 0.62, eye = 2.6, scale = 0.45, sun = [0.28, 0.07], glint = 1, twinkle = 1, motes = 900, strength = 1, pixelRatio = Math.min(devicePixelRatio || 1, 1.5), light = false } = {}) {   // scale: world units per lab unit (smaller = finer lines)
-    if (!host || host.querySelector('.ws-silk')) return null;
-    const canvas = document.createElement('canvas');
-    canvas.className = 'ws-silk'; canvas.setAttribute('aria-hidden', 'true');
-    host.classList.add('ws-silk-host'); host.insertBefore(canvas, host.firstChild);
-    let gl;
-    try { gl = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'low-power' }); } catch (e) { canvas.remove(); host.classList.remove('ws-silk-host'); return null; }
-    gl.setPixelRatio(pixelRatio); gl.setClearColor(0x000000, 0);
-    const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(35, 1, 0.5, 60); camera.position.set(0, 0, 12);
-    // the beach: crests straight (no crescent) and running in toward the camera (the swell's run points away from it, down -z), the dots spread over
-    // the sea in front of the viewer (the camera stands ~27 lab units up the lab's z axis from the lab ship's spot)
+/* 2D simplex noise (Ashima Arts / Stefan Gustavson, MIT licence), for the ribbon's breathing and its threads */
+const SNOISE2 = `
+    vec3 mod289(vec3 x){ return x - floor(x * (1.0 / 289.0)) * 289.0; } vec2 mod289(vec2 x){ return x - floor(x * (1.0 / 289.0)) * 289.0; }
+    vec3 permute(vec3 x){ return mod289(((x * 34.0) + 1.0) * x); }
+    float snoise(vec2 v){ const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
+      vec2 i = floor(v + dot(v, C.yy)); vec2 x0 = v - i + dot(i, C.xx); vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+      vec4 x12 = x0.xyxy + C.xxzz; x12.xy -= i1; i = mod289(i);
+      vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
+      vec3 m = max(0.5 - vec3(dot(x0, x0), dot(x12.xy, x12.xy), dot(x12.zw, x12.zw)), 0.0); m = m * m; m = m * m;
+      vec3 x = 2.0 * fract(p * C.www) - 1.0; vec3 h = abs(x) - 0.5; vec3 ox = floor(x + 0.5); vec3 a0 = x - ox;
+      m *= 1.79284291400159 - 0.85373472095314 * (a0 * a0 + h * h);
+      vec3 g; g.x = a0.x * x0.x + h.x * x0.y; g.yz = a0.yz * x12.xz + h.yz * x12.yw; return 130.0 * dot(m, g); }`;
+
+/* The Stripe-style silk ribbon (after stripe.com's hero): one wide sheet of fine silk threads sweeping across the section. Its shape is made in
+   the vertex shader from the plane's uv alone: a centre line (a diagonal with a bow, breathing on slow simplex noise) and a cross direction that
+   turns about the line from rollA (1.57: edge-on to the viewer) to rollB (0: facing it) around `twistAt`, so the sheet opens out of a thin bright
+   fold into its full face. Its light comes from its own geometry (it glows toward white where it turns edge-on, silk catching light at a fold), threads run along
+   it, its edges are soft, grain on top. */
+const RIBBON_VS = SNOISE2 + `
+    uniform float uTime, uLength, uSlope, uLift, uArcY, uArcZ, uWidth, uTaper, uRollA, uRollB, uTwistAt, uTwistSpan, uAmp, uFreq, uSpeed, uRipple;
+    varying vec2 vUv; varying vec3 vW;
+    vec3 centre(float u){
+      float x = (u - 0.5) * uLength, bow = sin(3.14159265 * u), t = uTime * uSpeed;
+      return vec3(x, uLift - uSlope * x + uArcY * bow + uAmp * snoise(vec2(u * uFreq, t)), uArcZ * bow + uAmp * 0.8 * snoise(vec2(u * uFreq + 17.0, t * 0.8))); }
+    void main(){
+      vUv = uv; float u = uv.x, v = uv.y - 0.5;
+      vec3 c = centre(u), T = normalize(centre(u + 0.002) - centre(u - 0.002));
+      vec3 B0 = normalize(cross(T, vec3(0.0, 0.0, 1.0)));   /* across the sheet, in the view's plane: facing the viewer */
+      float th = mix(uRollA, uRollB, smoothstep(uTwistAt - uTwistSpan, uTwistAt + uTwistSpan, u)) + 0.3 * snoise(vec2(u * 1.3 + 5.0, uTime * uSpeed * 0.6));
+      vec3 B = B0 * cos(th) + cross(T, B0) * sin(th);        /* turned about the centre line */
+      vec3 p = c + B * v * uWidth * mix(1.0, uTaper, u) + cross(T, B) * uRipple * sin(v * 6.0 + u * 9.0 + uTime * 0.3);
+      vec4 w = modelMatrix * vec4(p, 1.0); vW = w.xyz;
+      gl_Position = projectionMatrix * viewMatrix * w; }`;
+const RIBBON_FS = SNOISE2 + `
+    uniform vec3 uColA, uColB, uColC; uniform float uTime, uThreads, uThreadFreq, uSheen, uEdge, uGrain, uShade, uAlpha;
+    varying vec2 vUv; varying vec3 vW;
+    float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+    void main(){
+      /* the colour: a gradient across the sheet, fanned out from the picked hue, deepening toward the calm end */
+      vec3 col = mix(mix(uColA, uColB, smoothstep(0.0, 0.55, vUv.y)), uColC, smoothstep(0.45, 1.0, vUv.y));
+      col *= mix(1.0, 0.55, smoothstep(0.35, 1.0, vUv.x) * uShade);
+      /* silk threads along the sheet: fine noise stripes across it, their spacing wandering slowly, eased to their mean where they would alias */
+      float n0 = snoise(vec2(vUv.x * 0.8 + uTime * 0.01, vUv.y * 0.5));
+      vec2 sc = vec2(vUv.y * uThreadFreq * (1.0 + 0.35 * n0), vUv.x * 3.0);
+      float th = 0.5 + 0.5 * snoise(sc), aa = 1.0 - smoothstep(0.3, 0.9, fwidth(sc.x));
+      col *= 1.0 + uThreads * (mix(0.5, th, aa) - 0.5) * 1.6;
+      /* light from its own shape: toward white where the sheet turns edge-on to the eye */
+      vec3 N = normalize(cross(dFdx(vW), dFdy(vW))), V = normalize(cameraPosition - vW);
+      col = mix(col, mix(col, vec3(1.0), 0.65), clamp(uSheen * pow(1.0 - abs(dot(N, V)), 3.0), 0.0, 1.0));
+      col += (hash12(gl_FragCoord.xy + fract(uTime * 7.0) * 100.0) - 0.5) * uGrain * 0.04;
+      /* soft along both long edges and at both ends, so it floats on the section's ground */
+      float a = smoothstep(0.0, uEdge, vUv.y) * smoothstep(0.0, uEdge, 1.0 - vUv.y) * smoothstep(0.0, 0.1, vUv.x) * smoothstep(0.0, 0.1, 1.0 - vUv.x) * uAlpha;
+      gl_FragColor = vec4(col, a); }`;
+
+export const RIBBON = {   // world units of the section's camera (z = 12, fov 35: about 13 x 7.6 units across the section at z = 0); angles in radians; hues as fractions of the wheel
+    length: 22, slope: -0.42, lift: -1.3, arcY: -0.6, arcZ: -2.5, width: 4.6, taper: 0.9, rollA: 0.1, rollB: 1.45, twistAt: 0.62, twistSpan: 0.35, amp: 0.5, freq: 1.2, speed: 0.08, ripple: 0.08,
+    threads: 0.55, threadFreq: 90, sheen: 1.2, edge: 0.05, grain: 1, shade: 0.5, hueA: -0.07, hueC: 0.09,
+};
+
+function ribbonView(THREE, scene, o) {
+    const U = { uTime: { value: 0 }, uColA: { value: new THREE.Color() }, uColB: { value: new THREE.Color() }, uColC: { value: new THREE.Color() }, uAlpha: { value: Math.min(1, o.strength) } };
+    for (const k of ['length', 'slope', 'lift', 'arcY', 'arcZ', 'width', 'taper', 'rollA', 'rollB', 'twistAt', 'twistSpan', 'amp', 'freq', 'speed', 'ripple', 'threads', 'threadFreq', 'sheen', 'edge', 'grain', 'shade']) U['u' + k[0].toUpperCase() + k.slice(1)] = { value: o[k] };
+    const geo = new THREE.PlaneGeometry(1, 1, o.light ? 220 : 440, o.light ? 24 : 48);   // only its uv is used: u along the sheet, v across it
+    const mesh = new THREE.Mesh(geo, new THREE.ShaderMaterial({ uniforms: U, vertexShader: RIBBON_VS, fragmentShader: RIBBON_FS, side: THREE.DoubleSide, transparent: true, depthWrite: true }));
+    mesh.frustumCulled = false; scene.add(mesh);
+    let hue = 0.58;
+    const view = {
+        uniforms: U, mesh, opts: o,
+        setHue(h) { hue = h; U.uColA.value.setHSL((h + o.hueA + 1) % 1, 0.95, 0.66); U.uColB.value.setHSL(h, 0.95, 0.52); U.uColC.value.setHSL((h + o.hueC + 1) % 1, 0.9, 0.4); },
+        // a dev aid: retune live (the keys of RIBBON)
+        set(p) { Object.assign(o, p); for (const k in p) { const u = U['u' + k[0].toUpperCase() + k.slice(1)]; if (u) u.value = p[k]; } view.setHue(hue); },
+        frame(t) { U.uTime.value = t; },
+        resize() {},
+    };
+    return view;
+}
+
+/* the beach: the silk sea seen from the shore. Straight crests roll in toward the viewer below a horizon near the top (horizon: its height in the
+   canvas, -1 bottom .. 1 top; eye: the eye's height over the water in lab units; scale: world units per lab unit), a low sun ahead catches the lines
+   and the dots where the swell mirrors it (sun: [across, up] toward it; glint: how strongly), the dots twinkle and a few motes drift over the water */
+function beachView(THREE, scene, { horizon = 0.62, eye = 2.6, scale = 0.45, sun = [0.28, 0.07], glint = 1, twinkle = 1, motes = 900, strength = 1, pixelRatio = 1, light = false }) {
+    // straight crests (no crescent) running in toward the camera (the swell's run points away from it, down -z); the dots spread over the sea in
+    // front of the viewer (the camera stands ~27 lab units up the lab's z axis from the lab ship's spot)
     const sea = createFold(THREE, { scene, pixelRatio, light, dotsAt: [LAB.S[0], LAB.S[1] - 18], dotsRadius: 46, opts: { lineGain: DEFAULTS.lineGain * strength, bend: 0, axis: -90, dotGain: DEFAULTS.dotGain * strength } });
     sea.uniforms.uGlint.value = glint; sea.uniforms.uTwinkle.value = twinkle; sea.uniforms.uSun.value.set(sun[0], sun[1], -1).normalize();
     // the view: tilted so the horizon sits at `horizon`, the water `eye` lab units below the eye
     const tilt = Math.atan(horizon * Math.tan(17.5 * Math.PI / 180)), planeY = (12 * Math.sin(tilt) - eye * scale) / Math.cos(tilt);
-    const rot = new THREE.Matrix3(), q = new THREE.Quaternion(), m4 = new THREE.Matrix4(), at = new THREE.Vector3(0, planeY, 0);
+    const rot = new THREE.Matrix3(), q = new THREE.Quaternion(), m4 = new THREE.Matrix4(), at = new THREE.Vector3(0, planeY, 0), cam = new THREE.Vector3(0, 0, 12);
     q.setFromAxisAngle(new THREE.Vector3(1, 0, 0), tilt); rot.setFromMatrix4(m4.makeRotationFromQuaternion(q));
     let moteMat = null;
     if (motes > 0) {
@@ -275,25 +342,43 @@ export function mountSilk(THREE, host, { colorVar = '--primary-color', horizon =
             blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneFactor, blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor });
         const pts = new THREE.Points(g, moteMat); pts.frustumCulled = false; scene.add(pts);
     }
-    let key = '', visible = false, raf = 0, t0 = performance.now(), last = t0, polled = 0;
+    return {
+        sea,
+        setHue(h) { sea.setHue(h); },
+        frame(t) { sea.place({ at, rotSea: rot, theta: 0, k: scale, cam, fold: 0, vis: 0, lines: 1, dots: 1, t }); if (moteMat) moteMat.uniforms.uTime.value = t; },   // the lab's own line fade: the lines thin out before they pack into the horizon
+        resize(w, h) { if (moteMat) moteMat.uniforms.uAspect.value = w / h; },
+    };
+}
+
+/* A section's animated ground (host): its own small canvas behind the section's content (style: 'ribbon', the Stripe-style silk ribbon, or 'beach',
+   the silk sea seen from the shore). The picked colour is polled like the particle layer's; it draws only while the section is on screen. */
+export function mountSilk(THREE, host, { style = 'ribbon', colorVar = '--primary-color', strength = 1, pixelRatio = Math.min(devicePixelRatio || 1, 1.5), light = false, ...rest } = {}) {
+    if (!host || host.querySelector('.ws-silk')) return null;
+    const canvas = document.createElement('canvas');
+    canvas.className = 'ws-silk'; canvas.setAttribute('aria-hidden', 'true');
+    host.classList.add('ws-silk-host'); host.insertBefore(canvas, host.firstChild);
+    let gl;
+    try { gl = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'low-power' }); } catch (e) { canvas.remove(); host.classList.remove('ws-silk-host'); return null; }
+    gl.setPixelRatio(pixelRatio); gl.setClearColor(0x000000, 0);
+    const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(35, 1, 0.5, 60); camera.position.set(0, 0, 12);
+    const view = style === 'beach' ? beachView(THREE, scene, { pixelRatio, light, strength, ...rest }) : ribbonView(THREE, scene, { ...RIBBON, light, strength, ...rest });
+    let key = '', visible = false, raf = 0, t0 = performance.now(), polled = 0;
     function color() {
         let c = ''; try { c = getComputedStyle(document.documentElement).getPropertyValue(colorVar).trim(); } catch (e) {}
         if (c === key) return; key = c;
-        const col = new THREE.Color(), hsl = { h: 0, s: 0, l: 0 }; try { col.setStyle(c || '#1466B8'); } catch (e) { col.set(0x1466b8); } col.getHSL(hsl, THREE.SRGBColorSpace); sea.setHue(hsl.h);
+        const col = new THREE.Color(), hsl = { h: 0, s: 0, l: 0 }; try { col.setStyle(c || '#1466B8'); } catch (e) { col.set(0x1466b8); } col.getHSL(hsl, THREE.SRGBColorSpace); view.setHue(hsl.h);
     }
-    function size() { const w = host.clientWidth, h = host.clientHeight; if (!w || !h) return; gl.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); if (moteMat) moteMat.uniforms.uAspect.value = w / h; }
+    function size() { const w = host.clientWidth, h = host.clientHeight; if (!w || !h) return; gl.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); view.resize(w, h); }
     function frame(now) {
         raf = 0; if (!visible) return;
-        last = now;
         if (now - polled > 600) { polled = now; color(); }
-        const t = (now - t0) / 1000;
-        sea.place({ at, rotSea: rot, theta: 0, k: scale, cam: camera.position, fold: 0, vis: 0, lines: 1, dots: 1, t });   // the lab's own line fade: the lines thin out before they pack into the horizon
-        if (moteMat) moteMat.uniforms.uTime.value = t;
+        view.frame((now - t0) / 1000);
         gl.render(scene, camera);
         raf = requestAnimationFrame(frame);
     }
     size(); color();
     new ResizeObserver(size).observe(host);
-    new IntersectionObserver(entries => { visible = entries.some(e => e.isIntersecting); if (visible && !raf) { last = performance.now(); raf = requestAnimationFrame(frame); } }, { rootMargin: '10% 0px' }).observe(host);
-    return { canvas, sea };
+    new IntersectionObserver(entries => { visible = entries.some(e => e.isIntersecting); if (visible && !raf) raf = requestAnimationFrame(frame); }, { rootMargin: '10% 0px' }).observe(host);
+    host.wsSilk = view;   // a dev aid: the view's uniforms (and the ribbon's set()) are live for tuning in the console
+    return { canvas, view };
 }

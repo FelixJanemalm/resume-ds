@@ -76,12 +76,13 @@ const pcfg = section ? {
     foldRide: numAttr(section.dataset.foldRide, 1),                        // how much the hull answers the fold's swell (heave, pitch, roll); 0 = only the layer's own swell
     foldSway: numAttr(section.dataset.foldSway, 0.3),                      // the share of the scene's slow sway (at anchor) the hero sea takes; the ship always takes all of it
     silk: numAttr(section.dataset.silk, 1),                                // the fold's silk lines stay as the sea the ship sails on down the page (streaming past it with its way); 0 = they fade out with the fold
-    silkBg: numAttr(section.dataset.silkBg, 1),                            // the silk sea as the animated ground of the principles section (#scalability): the lines' strength (1 = as under the ship); 0 = none
+    silkBg: numAttr(section.dataset.silkBg, 1),                            // the animated silk ground of the principles section (#scalability): its strength (1 = full); 0 = none
+    silkBgStyle: section.dataset.silkBgStyle || 'ribbon',                  // that ground: 'ribbon' (the Stripe-style silk ribbon) | 'beach' (the silk sea seen from the shore)
 } : null;
 if (pcfg) for (const [k, v] of new URLSearchParams(location.search)) if (k in pcfg && v !== '') pcfg[k] = Number.isNaN(+v) ? v : +v;   // dev aid: ?shipWorkTilt=45&boat=off
 let layer = null;
 const THEME_ROW = false;   // the ship-style icon row under the colour picker (and the stored choice it writes): off for now
-const MOD_V = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '?t=' + Date.now() : '?v=2026-09-15e';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache): never cached on a local server, versioned elsewhere (bump when they change)
+const MOD_V = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '?t=' + Date.now() : '?v=2026-09-15f';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache): never cached on a local server, versioned elsewhere (bump when they change)
 import('./ink-cursor.js' + MOD_V).catch(e => console.warn('ink cursor', e));   // the pointer as a trail of ink in the picked colour (it checks for a real mouse and reduced motion itself)
 
 const SIM_NOISE = `
@@ -1543,7 +1544,7 @@ async function boot() {
     let FOLD = null;
     if (pcfg.fold && BOAT) { try { FOLD = await import('./voyage-fold.js' + MOD_V); } catch (e) { console.warn('work-spine: the hero sea failed to load (the Lottie stays)', e); } }
     if (pcfg.mode === 'page') startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD);
-    if (FOLD && pcfg.silkBg > 0) FOLD.mountSilk(THREE, document.getElementById('scalability'), { light: coarse, strength: pcfg.silkBg });   // the silk sea behind the principles (it starts drawing when the section comes near)
+    if (FOLD && pcfg.silkBg > 0) FOLD.mountSilk(THREE, document.getElementById('scalability'), { style: pcfg.silkBgStyle, light: coarse, strength: pcfg.silkBg });   // the silk ground behind the principles (it starts drawing when the section comes near)
     if (layer && new URLSearchParams(location.search).get('route') === '1') import('./voyage-editor.js' + MOD_V).then(m => m.mountRouteEditor(layer.routeApi)).catch(e => console.warn('work-spine: route editor', e));
     if (cards.length < 2) return;
     // the work section itself waits until it is within 1.5 viewports
