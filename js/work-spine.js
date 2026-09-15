@@ -1398,10 +1398,10 @@ async function boot() {
     let BOAT = null, THEMES = null;
     if (pcfg.boat !== 'off') {
         try { BOAT = await import('./voyage-boat.js' + MOD_V); THEMES = { atlantic: BOAT }; } catch (e) { console.warn('work-spine: no ship model, particles only', e); }
-        if (THEMES) { try { THEMES.norse = await import('./voyage-norse.js' + MOD_V); } catch (e) { console.warn('work-spine: the Norse lineage failed to load', e); } }
         // the lineage: ?theme= (dev aid), then the picker's stored choice, then the section's data-ship-theme
         let want = new URLSearchParams(location.search).get('theme') || '';   // the picker's theme icons are off for now (THEME_ROW), so a stored choice is ignored: ?theme= only
         if (!want && THEME_ROW) { try { want = localStorage.getItem('ws-ship-theme') || ''; } catch (e) {} }
+        if (THEMES && (THEME_ROW || want === 'norse')) { try { THEMES.norse = await import('./voyage-norse.js' + MOD_V); } catch (e) { console.warn('work-spine: the Norse lineage failed to load', e); } }   // only when it can be chosen (the icon row) or is asked for: it would otherwise cost a request (and a second, unversioned copy of voyage-boat.js)
         if (THEMES && THEMES[want || pcfg.shipTheme]) BOAT = THEMES[want || pcfg.shipTheme];
     }
     if (pcfg.mode === 'page') startParticleLayer(THREE, GPUC, BOAT, THEMES);
