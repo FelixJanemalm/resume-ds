@@ -72,7 +72,7 @@ const pcfg = section ? {
 } : null;
 if (pcfg) for (const [k, v] of new URLSearchParams(location.search)) if (k in pcfg && v !== '') pcfg[k] = Number.isNaN(+v) ? v : +v;   // dev aid: ?shipWorkTilt=45&boat=off
 let layer = null;
-const MOD_V = '?v=2026-09-15a';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache); bump when they change
+const MOD_V = '?v=2026-09-15b';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache); bump when they change
 
 const SIM_NOISE = `
     vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;} vec4 mod289(vec4 x){return x-floor(x*(1.0/289.0))*289.0;}
@@ -668,7 +668,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         return {
             landscape: [   // Felix's route (baked from the editor, 2026-09-12) with the exit reworked the same night: the skiff at the foot of the swell, a wide
                            // sweep up and round into the column, one arc out of the column down to a side shot beside the quote, where the ship levels up
-                           // schooner -> clipper -> paddle steamer -> liner -> container ship as the words are revealed (the reveal runs from #read's top over ~5 px per character)
+                           // ketch -> schooner -> barque -> clipper -> yacht as the words are revealed (the reveal runs from #read's top over ~5 px per character)
                 { at: 'top', x: c.boatX, y: c.boatY, size: c.boatSize, turn: 215.5, tilt: 9.2, heel: 0, level: 0, wake: 0, cam: 0 },                   // the Sept-10 hero, copied: its yaw -0.62 rad about the vertical (bow at -x there, so turn = 180 + 35.5), its roll 0.16 rad about
                                                                                                                                                        // the screen's horizontal axis on the WHOLE scene = tilt 9.2 (water included), pivot on the waterline; sway and bob at rest (shipSway, shipBob)
                 // the cast-off: a real turn with way on. The boat sails off up-left along its bow, turns to starboard through "away" as the camera
@@ -682,15 +682,16 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
                 { at: 'stage-release', x: -0.06, y: -0.38, size: 0.12, turn: 438, tilt: 56, heel: 7, level: L2, wake: 0.95, cam: 0.8, storm: 0 },     // one left-hand arc out of the column, into weather
                 { at: 'stage-release+450', x: -0.17, y: -0.5, size: 0.14, turn: 405, tilt: 26, heel: 7, level: L2, wake: 0.9, cam: 0.8, storm: 0 },   // the passage through the storm: swell, roll, spray, rain, lightning
                 // the side shot and the level-ups: Felix's timings (2026-09-13), pixel offsets from the stage release
-                { at: 'stage-release+1100', x: -0.08, y: -0.625, size: 0.2, turn: 360, tilt: 0, heel: 18.5, level: L2, wake: 0.5, cam: 1, storm: 0 },   // out of it, calm at the quote: the schooner
-                { at: 'stage-release+1200', x: -0.08, y: -0.625, size: 0.2, turn: 360, tilt: 0, heel: 18.5, level: L3, wake: 1, cam: 1 },              // the clipper
-                { at: 'stage-release+1350', x: -0.08, y: -0.625, size: 0.2, turn: 360, tilt: 0, heel: 18.5, level: L4, wake: 1, cam: 1 },              // the machine age, fast: the paddle steamer
-                { at: 'stage-release+1500', x: -0.08, y: -0.625, size: 0.19, turn: 360, tilt: 0, heel: 18.5, level: L5, wake: 1, cam: 1, fleet: 0 },     // the liner (the camera pulls back a touch as the ships grow)
-                { at: 'stage-release+1650', x: -0.08, y: -0.625, size: 0.17, turn: 360, tilt: 0, heel: 18.5, level: L6, wake: 1, cam: 1, fleet: 1 },     // the container ship; "teams to scale": the fleet forms out of the field
+                { at: 'stage-release+1100', x: -0.08, y: -0.625, size: 0.2, turn: 360, tilt: 0, heel: 18.5, level: L2, wake: 0.5, cam: 1 },   // calm at the quote: the ketch (Felix's timings, 2026-09-13)
+                { at: 'stage-release+1200', x: -0.08, y: -0.625, size: 0.2, turn: 360, tilt: 0, heel: 18.5, level: L3, wake: 1, cam: 1 },     // the schooner
+                { at: 'stage-release+1400', x: -0.08, y: -0.625, size: 0.2, turn: 360, tilt: 0, heel: 18.5, level: L4, wake: 1, cam: 1 },     // the barque
+                { at: 'stage-release+1600', x: -0.08, y: -0.625, size: 0.2, turn: 360, tilt: 0, heel: 18.5, level: L4, wake: 1, cam: 1 },
+                { at: 'stage-release+1700', x: -0.08, y: -0.625, size: 0.2, turn: 360, tilt: 0, heel: 18.5, level: L5, wake: 1, cam: 1, fleet: 0 },     // the clipper
+                { at: 'stage-release+1850', x: -0.08, y: -0.625, size: 0.19, turn: 360, tilt: 0, heel: 18.5, level: L6, wake: 1, cam: 1, fleet: 1 },    // the yacht; "teams to scale": the fleet forms out of the field
                 // the launch: the clipper holds until the principles have covered it, becomes the rocket out of sight, and the rocket rises with the
                 // footer (the canvas flips above the page at shipOverlayAt), standing over the footer's edge nose-up (turn -90 / tilt 90), plume down
                 ...(RK < 0 ? [] : [
-                    { at: '#scalability:top@0.55', x: -0.08, y: -0.625, size: 0.17, turn: 360, tilt: 0, heel: 18.5, level: L6, wake: 1, cam: 1, fleet: 1 },
+                    { at: '#scalability:top@0.55', x: -0.08, y: -0.625, size: 0.19, turn: 360, tilt: 0, heel: 18.5, level: L6, wake: 1, cam: 1, fleet: 1 },
                     { at: '#scalability:top@0.25', x: -0.45, y: -0.9, size: 0.15, turn: 270, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1, fleet: 0 },   // the fleet rejoins the field before the launch
                     { at: 'footer:top@1', x: -0.45, y: -0.77, size: 0.15, turn: 270, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1 },
                     { at: 'end', x: -0.45, y: -0.5, size: 0.15, turn: 270, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1 },
@@ -708,12 +709,12 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
                 { at: 'stage-release', x: 0, y: -0.45, size: 0.24, turn: 78, tilt: 56, heel: 7, level: L2, wake: 0.95, cam: 0.8, storm: 0 },
                 { at: 'stage-release+450', x: -0.15, y: -0.55, size: 0.28, turn: 45, tilt: 26, heel: 7, level: L2, wake: 0.9, cam: 0.8, storm: 0 },
                 { at: '#read:top@0', x: -0.05, y: -0.82, size: 0.22, turn: 0, tilt: 0, heel: 3, level: L2, wake: 0.85, cam: 1, storm: 0 },                                // the side shot below the quote
-                { at: '#read:top@0+150', x: -0.05, y: -0.82, size: 0.22, turn: 0, tilt: 0, heel: 3, level: L3, wake: 0.9, cam: 1 },
-                { at: '#read:top@0+300', x: -0.05, y: -0.82, size: 0.22, turn: 0, tilt: 0, heel: 3, level: L4, wake: 0.95, cam: 1 },
-                { at: '#read:top@0+450', x: -0.05, y: -0.82, size: 0.21, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 0 },
-                { at: '#read:top@0+600', x: -0.05, y: -0.82, size: 0.19, turn: 0, tilt: 0, heel: 3, level: L6, wake: 1, cam: 1, fleet: 1 },
+                { at: '#read:top@0+180', x: -0.05, y: -0.82, size: 0.22, turn: 0, tilt: 0, heel: 3, level: L3, wake: 0.9, cam: 1 },
+                { at: '#read:top@0+360', x: -0.05, y: -0.82, size: 0.22, turn: 0, tilt: 0, heel: 3, level: L4, wake: 0.95, cam: 1 },
+                { at: '#read:top@0+540', x: -0.05, y: -0.82, size: 0.22, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 0 },
+                { at: '#read:top@0+720', x: -0.05, y: -0.82, size: 0.21, turn: 0, tilt: 0, heel: 3, level: L6, wake: 1, cam: 1, fleet: 1 },
                 ...(RK < 0 ? [] : [
-                    { at: '#scalability:top@0.55', x: -0.05, y: -0.82, size: 0.19, turn: 0, tilt: 0, heel: 3, level: L6, wake: 1, cam: 1, fleet: 1 },
+                    { at: '#scalability:top@0.55', x: -0.05, y: -0.82, size: 0.21, turn: 0, tilt: 0, heel: 3, level: L6, wake: 1, cam: 1, fleet: 1 },
                     { at: '#scalability:top@0.25', x: 0.5, y: -0.95, size: 0.3, turn: -90, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1, fleet: 0 },
                     { at: 'footer:top@1', x: 0.5, y: -0.95, size: 0.3, turn: -90, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1 },
                     { at: 'end', x: 0.5, y: -0.6, size: 0.3, turn: -90, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1 },
