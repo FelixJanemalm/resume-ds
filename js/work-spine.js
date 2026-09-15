@@ -140,6 +140,7 @@ const SIM_SHARED = `
     // points. Every wave is stationary in the hull frame and follows the one speed scalar: heights and wavelength with way^2 (uWave),
     // foam, spray and churn past thresholds (uWave.z, uClock.zw), the bow wave and spray pulsing as the stem buries (uSea.w), the
     // churn as the stern squats (uMotion.w). Every clock is a uniform accumulated on the CPU; uTime only drives constant-rate jitter.
+    float restFeather(float x, float z){ float r = length(vec2(x / 1.45, z / 1.1)); return pow(1.0 - smoothstep(0.12, 1.0, r), 1.5); }   /* the calm water round a boat at rest: 2.9 x 2.2 L, strongest at the hull, feathered to nothing all round (no edge at the sides or the ends) */
     vec3 flowLocal(vec3 q, vec4 md, float role, out float fade){
       fade = 1.0; float wake = step(6.5, role) * step(role, 7.5), water = step(5.5, role) * step(role, 6.5);
       if (wake > 0.5) {
@@ -184,12 +185,12 @@ const SIM_SHARED = `
            the ship left rest (the lane wraps every 2.6 L, so after 5.2 L of flow it is exactly back at the lane's start) */
         float p0 = mod(h1 * 2.6 + uFlowDep, 2.6), trav = uDepOn * step(1e-4, uDepart) * (1.0 - step(5.2, p0 + uDepart));
         if (trav > 0.5) {
-          float x0 = 1.3 - p0, xr = x0 - uDepart, zr = sgn * 0.78 * pow(qz, 0.75);
+          float x0 = 1.3 - p0, xr = x0 - uDepart, zr = sgn * 1.0 * pow(qz, 0.8);
           q.x = xr; q.z = zr; q.y = ${WATERLINE};
-          fade = smoothstep(-3.9, -3.0, xr) * fall(0.7, 0.9, abs(zr)) * (0.8 + 0.2 * h3) * fall(0.85, 1.15, length(vec2(x0 / 1.25, zr / 0.78)))   /* the rest disc's own window, at the place it lay (what was hidden stays hidden) */
-               * mix(1.0, 0.6, smoothstep(0.0, 3.0, uDepart)) * uWaterFade;
+          fade = smoothstep(-3.9, -3.0, xr) * (0.8 + 0.2 * h3) * restFeather(x0, zr) * 0.8   /* the rest disc's own window, at the place it lay (what was hidden stays hidden) */
+               * mix(1.0, 0.5, smoothstep(0.0, 2.5, uDepart)) * uWaterFade;
           return q; }
-        float zl = sgn * mix(0.62 * pow(qz, 1.4), 0.78 * pow(qz, 0.75), uSwell.z);   // the lane's cross section: denser at the hull under way; at rest (uSwell.z) the Sept-10 disc, 1.5 L wide and even
+        float zl = sgn * mix(0.62 * pow(qz, 1.4), 1.0 * pow(qz, 0.8), uSwell.z);   // the lane's cross section: denser at the hull under way; at rest (uSwell.z) the Sept-10 disc, 1.5 L wide and even
         float xl = 0.75 - mod(h1 * 2.6 + uFlow, 2.6), x = xl + 0.55 * uSwell.z, azl = abs(zl);   // the lane, in the SEA frame: 0.25 L ahead of the stem .. 1.85 L astern, streaming aft; at rest (uSwell.z) it slides forward to sit centred on the hull, as step 1's disc did
         // the same point in the HULL frame (the sea's course lags the hull's at rest, so the hull turns through a disc that stays put):
         // everything the hull does to the water (parting, bow wave, wedge, churn) is measured here, then the point goes back to the sea frame
@@ -232,8 +233,8 @@ const SIM_SHARED = `
         float lit = 3.0 * spray + 1.6 * crest * uWave.x * uHull.z + 1.2 * divLit * uWave.x + 0.35 * max(0.0, trans) * uWave.x
                   + 0.7 * churnLit + 0.8 * clamp(rooster / 0.02, 0.0, 1.0) + swellLit;
         // the window: exactly zero at both lane ends (x = 0.75 and x = -1.85, where mod wraps), soft across, dithered per particle
-        float win = fall(0.45, 0.75, xl) * smoothstep(-1.85, -1.45, xl) * fall(mix(0.38, 0.7, uSwell.z), mix(0.62, 0.9, uSwell.z), azl) * (mix(0.6, 0.8, uSwell.z) + mix(0.4, 0.2, uSwell.z) * h3);   // at rest the dither is lighter: the specks read more evenly
-        win *= mix(1.0, fall(0.85, 1.15, length(vec2(q.x / 1.25, q.z / 0.78))), uSwell.z);                 // at rest the sheet is the Sept-10 disc round the hull (2.5 x 1.5 L), not a lane
+        float win = fall(0.45, 0.75, xl) * smoothstep(-1.85, -1.45, xl) * mix(fall(0.38, 0.62, azl), 1.0, uSwell.z) * (mix(0.6, 0.8, uSwell.z) + mix(0.4, 0.2, uSwell.z) * h3);   // at rest the dither is lighter: the specks read more evenly
+        win *= mix(1.0, restFeather(q.x, q.z), uSwell.z);                 // at rest the sheet is the Sept-10 disc round the hull (2.5 x 1.5 L), not a lane
         float r = length(vec2(q.x, q.z * 1.6));
         float rcrest = 0.5 + 0.5 * sin(r * 20.8 - 2.0 * atan(q.z * 1.6, q.x) - uRipple), ring = uMisc.z * (1.0 - rcrest);   // at anchor only: the Sept-10 speckle disc, a two-armed spiral of brighter, lifted crests, drifting only as slowly as shipRipple says
         q.y += 0.014 * uMisc.z * rcrest;
@@ -243,7 +244,7 @@ const SIM_SHARED = `
         // plus a faint body of broken water inside the wedge so the wake reads as a surface and not as a few bright arms
         float calm = fall(0.06, 0.45, uWay);
         float body = aft * fall(wedge - 0.08, wedge + 0.02, az) * exp(-s / 1.6) * (0.4 + 0.6 * h2);
-        fade = uWaterFade * win * (1.0 * calm + (1.0 - calm) * (0.16 * body + 0.35 * min(lit, 2.2)) + calm * min(lit, 2.2)) * (1.0 - ring) * (1.0 + ringW * (2.0 * rings - 1.0)); }   // at rest as bright as the hull's dots, the rings a +-16% shimmer
+        fade = uWaterFade * win * (0.8 * calm + (1.0 - calm) * (0.16 * body + 0.35 * min(lit, 2.2)) + calm * min(lit, 2.2)) * (1.0 - ring) * (1.0 + ringW * (2.0 * rings - 1.0)); }   // at rest as bright as the hull's dots, the rings a +-16% shimmer
       return q; }
     // The ship's target for one particle, and for the water and foam their lane fade. Sails fill and luff in boat space along their
     // belly normal; the solid roles (hull, deck, sails, spars, rigging, and the reflection with every motion mirrored) roll, pitch
@@ -364,7 +365,7 @@ const PTS_VS = SIM_SHARED + `
       vec3 rel=pw-uCam; float along=dot(rel,uDir); vec3 perp=rel-uDir*along; float d=length(perp);
       vLit=(1.0-smoothstep(0.0,uRadius,d))*step(0.5,along)*(1.0-bf*laneR)*(1.0-0.65*bf); vRand=p.w; vSpeed=length(v);   // the light barely touches the ship and not the sea
       vec4 mv=modelViewMatrix*vec4(pw,1.0);
-      gl_PointSize=uSize*uDPR*aSize*(1.0+0.9*vLit+bf*(uBoatPx-1.0)+2.4*sf+0.25*bf*laneR*clamp(fd-1.0,0.0,1.5)+0.5*bf*laneR*uTrail*step(6.5,role)*step(role,7.5)+bf*laneR*uSwell.z*(1.1*hash1(md.z*7.7)-0.3)+0.3*vFlag+0.15*ff*uRocket+0.4*bf*step(4.5,role)*step(role,5.5)*step(1.5,md.y))*uP/max(-mv.z,1.0)*uIntro;   // the rest disc's specks vary in size (0.7x .. 1.8x)
+      gl_PointSize=uSize*uDPR*aSize*(1.0+0.9*vLit+bf*(uBoatPx-1.0)+2.4*sf+0.25*bf*laneR*clamp(fd-1.0,0.0,1.5)+0.5*bf*laneR*uTrail*step(6.5,role)*step(role,7.5)+bf*laneR*uSwell.z*(0.8*hash1(md.z*7.7)-0.2)+0.3*vFlag+0.15*ff*uRocket+0.4*bf*step(4.5,role)*step(role,5.5)*step(1.5,md.y))*uP/max(-mv.z,1.0)*uIntro;   // the rest disc's specks vary in size (0.7x .. 1.8x)
       gl_Position=projectionMatrix*mv; }`;
 const PTS_FS = `
     uniform vec3 uColorA, uColorB, uColorLit, uColorFlag; uniform float uGlow, uClipTop; varying float vLit, vRand, vSpeed, vBoat, vShade, vStar, vFade, vFlag;
