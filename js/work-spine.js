@@ -592,11 +592,11 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
     // only after every ship (hull, bowsprit, masts, wake) has left it, so a ship always sails out of view before it wraps. Cached per screen size
     let armadaWinKey = '', armadaWinVal = null;
     function armadaWin(tall, unit) {
-        const key = innerWidth + 'x' + VH + ':' + unit.toFixed(3);   // (the block's clip moves with the armada as it rises, so the frame's own edges are the only bound) if (key === armadaWinKey) return armadaWinVal;
+        const extraNDC = 2 * pinnedExtra / Math.max(1, VH), key = innerWidth + 'x' + VH + ':' + unit.toFixed(3) + ':' + pinnedExtra;   /* pinned over a block taller than a viewport, the canvas reaches extraNDC above the frame's top: a ship must clear that before it wraps */   // (the block's clip moves with the armada as it rises, so the frame's own edges are the only bound) if (key === armadaWinKey) return armadaWinVal;
         const V = tall ? ARMADA_VIEW.tall : ARMADA_VIEW.wide, qa = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), M.degToRad(V.tilt)).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -M.degToRad(V.turn)));
         const C = new THREE.Vector3(1, 0, 0).applyQuaternion(qa), Zc = new THREE.Vector3(0, 0, 1).applyQuaternion(qa), Uc = new THREE.Vector3(0, 1, 0).applyQuaternion(qa);
         const A = new THREE.Vector3(V.x * visW / 2, V.y * visH / 2, 0), tanH = Math.tan(M.degToRad(camera.fov) / 2), cz = camera.position.z, P = new THREE.Vector3();
-        const on = (sAl, a, dAl, dUp, hl) => { P.copy(A).addScaledVector(C, sAl + dAl * hl).addScaledVector(Zc, a).addScaledVector(Uc, dUp * hl); const d = cz - P.z; const ny = P.y / (d * tanH); return d > 0.5 && Math.abs(P.x / (d * tanH * camera.aspect)) < 1.12 && ny > -1.12 && ny < 1.12; };
+        const on = (sAl, a, dAl, dUp, hl) => { P.copy(A).addScaledVector(C, sAl + dAl * hl).addScaledVector(Zc, a).addScaledVector(Uc, dUp * hl); const d = cz - P.z; const ny = P.y / (d * tanH); return d > 0.5 && Math.abs(P.x / (d * tanH * camera.aspect)) < 1.12 && ny > -1.12 && ny < 1.12 + extraNDC; };
         let first = Infinity, last = -Infinity;
         for (const S of ARMADA) {
             const a = S[1] * unit, hl = S[2] * unit;
@@ -715,12 +715,13 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
     }
     const raycaster = new THREE.Raycaster();
     const pointer = { ndc: new THREE.Vector2(), target: new THREE.Vector2(), active: false, last: 0 };
-    addEventListener('pointermove', e => { pointer.target.set((e.clientX / innerWidth) * 2 - 1, -((e.clientY / VH) * 2 - 1)); pointer.active = true; pointer.last = performance.now(); }, { passive: true });
+    addEventListener('pointermove', e => { pointer.cx = e.clientX; pointer.cy = e.clientY; pointer.active = true; pointer.last = performance.now(); }, { passive: true });   // placed into the canvas each frame (the canvas scrolls with the page at the ending)
     // point size = uSize * uP / depth; this world is in units (the stage's is in px), so the reference depth is the camera distance
-    let VH = canvas.clientHeight || innerHeight, sizeW = 0, sizeH = 0;   // VH: the layer's stable height in CSS px (the large viewport); every screen-space conversion in the layer uses it, never innerHeight
+    const vhProbe = document.createElement('div'); vhProbe.setAttribute('aria-hidden', 'true'); vhProbe.style.cssText = 'position:fixed;top:0;left:0;width:0;height:100vh;height:100lvh;visibility:hidden;pointer-events:none'; document.body.appendChild(vhProbe);   // the large viewport's height, measured apart from the canvas (which is taller while pinned at the ending)
+    let VH = vhProbe.clientHeight || innerHeight, sizeW = 0, sizeH = 0;   // VH: the layer's stable height in CSS px (the large viewport); every screen-space conversion in the layer uses it, never innerHeight
     function resize() {
-        const w = innerWidth, h = canvas.clientHeight || innerHeight; VH = h; if (w === sizeW && h === sizeH) return; sizeW = w; sizeH = h;   // a resize that leaves the layer's size alone (the address bar) changes nothing, not even the drawing buffer
-        gl.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); U.uP.value = camera.position.z;
+        const w = innerWidth, h = vhProbe.clientHeight || innerHeight; VH = h; if (w === sizeW && h === sizeH) return; sizeW = w; sizeH = h;   // a resize that leaves the layer's size alone (the address bar) changes nothing, not even the drawing buffer
+        applyView(); U.uP.value = camera.position.z;
         visH = 2 * camera.position.z * Math.tan(M.degToRad(camera.fov) / 2); visW = visH * camera.aspect;
         ship.resolvedAt = -1e9;
     }
@@ -1028,10 +1029,30 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
     // blend (multiply in the light theme) behind a quick dip to black, so the voyage can end at the harbour instead of behind a wall
     // where the layer sits: -1 behind the page; 1 above the hero's swell and grid but under its text and picker (while the hero is on
     // screen); 12 above the page with a screen blend in overlay mode at the bottom. A change happens behind a quick dip to black.
+    // the ending is part of the page's bottom: there the canvas is not fixed but absolute, pinned to the document's last viewport, so the browser scrolls
+    // it with the footer on its own compositor thread (a fixed canvas moved by script every frame lags a phone's scroll by a frame and shook)
+    const docEnd = () => Math.max(document.body.offsetHeight, (() => { const f = document.querySelector('footer'); return f ? f.getBoundingClientRect().bottom + scrollY : 0; })());
+    // pinned, the canvas spans the whole ending block (from the block's top edge to the page's end) when that block is taller than a viewport: the camera's
+    // view is extended upward by the extra height (setViewOffset), so the page's last viewport keeps exactly the fixed layer's composition
+    let pinnedTop = NaN, pinnedExtra = 0;
+    function placeCanvas(overlay) {
+        if (!overlay) {
+            if (!Number.isNaN(pinnedTop)) { canvas.style.position = 'fixed'; canvas.style.top = '0px'; canvas.style.height = ''; canvas.style.cssText += ';height:100vh;height:100lvh'; pinnedTop = NaN; pinnedExtra = 0; applyView(); }
+            return;
+        }
+        const end = docEnd(), sel = /^(.+):(top|center|bottom)@/.exec(pcfg.shipOverlayAt || ''), el = sel ? document.querySelector(sel[1]) : null;
+        const blockTop = el ? el.getBoundingClientRect().top + scrollY : end - VH, extra = Math.max(0, Math.round((end - VH) - blockTop)), top = Math.max(0, Math.round(end - VH - extra));
+        if (top !== pinnedTop || extra !== pinnedExtra) { canvas.style.position = 'absolute'; canvas.style.top = top + 'px'; canvas.style.height = (VH + extra) + 'px'; pinnedTop = top; pinnedExtra = extra; applyView(); }
+    }
+    function applyView() {   // the drawing buffer and the projection for the current extra height (0: the plain fixed layer)
+        const w = innerWidth; gl.setSize(w, VH + pinnedExtra, false);
+        camera.aspect = w / VH; if (pinnedExtra > 0) camera.setViewOffset(w, VH, 0, -pinnedExtra, w, VH + pinnedExtra); else camera.clearViewOffset();
+        camera.updateProjectionMatrix();
+    }
     function applyLayer() {
         const overlay = scrollY > ship.overlayY, z = overlay ? '12' : scrollY < ship.heroY ? '1' : '-1';
         if (z === ship.layerZ || ship.flipping) return;
-        const apply = () => { ship.layerZ = z; ship.overlay = overlay; canvas.style.zIndex = z; canvas.style.mixBlendMode = overlay ? (isLight() || groundLum() > 0.2 ? 'multiply' : 'screen') : ''; };
+        const apply = () => { ship.layerZ = z; ship.overlay = overlay; placeCanvas(overlay); canvas.style.zIndex = z; canvas.style.mixBlendMode = overlay ? (isLight() || groundLum() > 0.2 ? 'multiply' : 'screen') : ''; };
         if (true) { apply(); return; }   // every switch is instant now: the hero's happens once the hero is off screen, the footer's under its clip (the dip below is kept for reference, unused)   // the first frame, and the flip above the page at the block's edge (fully clipped then): no dip
         ship.flipping = true; const prev = canvas.style.transition; canvas.style.transition = 'opacity 0.22s ease'; canvas.style.opacity = '0';
         setTimeout(() => { apply(); canvas.style.opacity = '1'; setTimeout(() => { ship.flipping = false; canvas.style.transition = prev; }, 240); }, 240);
@@ -1063,7 +1084,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
             if (y !== null && Math.abs(scrollY - y) > 2) { document.documentElement.style.scrollBehavior = 'auto'; window.scrollTo(0, y); ship.follow = null; ship.lastScroll = scrollY; ship.still = 0; ship.resolvedAt = -1e9; }
         }
         if (now - ship.resolvedAt > 1000) resolveRoute(now);   // sections move as media loads and carousels initialise: re-resolve every second
-        applyLayer();
+        applyLayer(); if (ship.overlay) placeCanvas(true);
         if (!ship.keys.length || !ship.route) return;
         ship.sy = scrollY;   // scroll is the timeline; the follower below supplies all of the time smoothing
         const T = poseAt(ship.sy, _tgt);
@@ -1285,12 +1306,12 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
             const AV = tall ? ARMADA_VIEW.tall : ARMADA_VIEW.wide, aTurn = AV.turn + 1.2 * Math.sin(t * 0.07), aTilt = AV.tilt + 0.8 * Math.sin(t * 0.05 + 1.0);
             _qa.setFromAxisAngle(X, M.degToRad(aTilt)).multiply(_qb.setFromAxisAngle(Y, -M.degToRad(aTurn))); fleetRot.setFromMatrix4(_m4.makeRotationFromQuaternion(_qa));
             fleetAt.set(AV.x * visW / 2, AV.y * visH / 2, 0); U.uFleetScale.value = 1;
-            const below = Math.max(0, document.documentElement.scrollHeight - innerHeight - scrollY);   // px of page still below the viewport: the armada is part of the page's bottom, so it rises into place with the footer
+            const below = ship.overlay ? 0 : Math.max(0, docEnd() - VH - scrollY);   // pinned to the page's bottom the canvas scrolls with it; before the flip (hidden behind the grounds) the shot is lifted by the page still below   // px of page still below the viewport: the armada is part of the page's bottom, so it rises into place with the footer
             for (const u of ALLU) u.uFleetLift.value.set(-below * visH / VH, camera.position.z);   // world units: the table is in them
         } else { fleetRot.copy(shipRotSea); fleetAt.copy(shipAt); U.uFleetScale.value = scale; for (const u of ALLU) u.uFleetLift.value.set(0, camera.position.z); }
         for (const u of ALLU) u.uFleetScale.value = U.uFleetScale.value;
         let clipTop = 1e9;   // above the page the canvas draws only from the block's top edge down (below it the block's own ground; above it the page covers the canvas anyway)
-        if (ship.overlay) { const sel = /^(.+):(top|center|bottom)@/.exec(pcfg.shipOverlayAt || ''), el = sel ? document.querySelector(sel[1]) : null; if (el) clipTop = Math.max(0, VH - el.getBoundingClientRect().top) * (canvas.height / Math.max(1, VH)); }
+        if (ship.overlay) { const sel = /^(.+):(top|center|bottom)@/.exec(pcfg.shipOverlayAt || ''), el = sel ? document.querySelector(sel[1]) : null; if (el) { const cTop = canvas.getBoundingClientRect().top, eTop = el.getBoundingClientRect().top, cssH = VH + pinnedExtra; clipTop = Math.max(0, cssH - (eTop - cTop)) * (canvas.height / Math.max(1, cssH)); } }   // the block's top edge in the canvas's own coordinates (both rects from the same layout, so it holds still while scrolling)
         U.uClipTop.value = clipTop; for (const o of WIRES) o.material.uniforms.uClipTop.value = clipTop;
         const fleetForm = M.clamp(P.fleet, 0, 4) * M.clamp(pcfg.shipFleet, 0, 1);
         for (const u of ALLU) u.uFleetForm.value = fleetForm;
@@ -1346,12 +1367,14 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         lines.material.uniforms.uColor.value.copy(v).lerp(new THREE.Color(0xffffff), 0.2 * (1 - pale));
         mat.blending = pale > 0.3 ? THREE.NormalBlending : THREE.AdditiveBlending; mat.needsUpdate = true;
         if (ship.overlay) canvas.style.mixBlendMode = light ? 'multiply' : 'screen';
-        try { groundKey = getComputedStyle(document.body).backgroundColor; } catch (e) {}
+        if (fold) { const c = new THREE.Color(), hsl = { h: 0, s: 0, l: 0 }; try { c.setStyle(foldColorKey() || '#1466B8'); } catch (e) { c.set(0x1466b8); } c.getHSL(hsl, THREE.SRGBColorSpace); fold.setHue(hsl.h); }   // the hero sea: the picked colour's hue at the lab's saturation and lightness
+        try { groundKey = getComputedStyle(document.body).backgroundColor + foldColorKey(); } catch (e) {}
     }
+    function foldColorKey() { try { return fold ? getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim() : ''; } catch (e) { return ''; } }
     applyTheme();
     new MutationObserver(applyTheme).observe(document.body, { attributes: true, attributeFilter: ['class'] });
     let groundAt = 0;
-    function watchGround(now) { if (now - groundAt < 600) return; groundAt = now; let k = ''; try { k = getComputedStyle(document.body).backgroundColor; } catch (e) {} if (k !== groundKey) applyTheme(); }
+    function watchGround(now) { if (now - groundAt < 600) return; groundAt = now; let k = ''; try { k = getComputedStyle(document.body).backgroundColor + foldColorKey(); } catch (e) {} if (k !== groundKey) applyTheme(); }
     let last = performance.now();
     // adaptive quality: after the first 2.5 s, a slow device gets a lower pixel ratio, half the drawn particles and a half-rate simulation
     const qual = { acc: 0, frames: 0, done: false, half: false, tick: 0, simDt: 0 };
@@ -1359,6 +1382,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         const dt = Math.min(0.05, Math.max(0.001, (now - last) / 1000)); last = now; const t = now * 0.001;
         const stale = !pointer.active || now - pointer.last > 2500;
         if (stale) pointer.target.set(0.55 * Math.sin(t * 0.23), 0.35 * Math.sin(t * 0.31 + 1.0));
+        else pointer.target.set((pointer.cx / innerWidth) * 2 - 1, -(((pointer.cy - (ship.overlay ? canvas.getBoundingClientRect().top + pinnedExtra : 0)) / VH) * 2 - 1));
         pointer.ndc.lerp(pointer.target, stale ? 0.03 : 0.12);
         raycaster.setFromCamera(pointer.ndc, camera);
         velU.uCam.value.copy(raycaster.ray.origin); velU.uDir.value.copy(raycaster.ray.direction);
