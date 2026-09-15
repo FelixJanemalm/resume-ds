@@ -70,14 +70,18 @@
 /* The h1 paints its gradient through its own glyphs; a transformed child inherits the
    transparent fill but not that paint, so the span paints its own gradient. */
 /* An annotation on the heading, not part of it: a pen font, ink-colored, a
-   slight tilt. It paints its own color because the h1 fills its text with a
-   gradient that transformed children do not inherit. The font is loaded by the
-   @import at the top of this sheet, so the homepage markup needs no change. */
+   slight tilt. The anchor is zero-size, so the stamp never re-wraps the heading
+   or moves anything below it; chat.js shrinks the ink if it would overflow.
+   The ink paints its own color because the h1 fills its text with a gradient
+   that children do not inherit. The font is loaded by the @import at the top. */
 .fjc-for {
-  display: inline-block; position: relative; z-index: 3; white-space: nowrap; max-width: 100%;
+  display: inline-block; position: relative; width: 0; height: 0; overflow: visible;
+  vertical-align: baseline; pointer-events: none;
+}
+.fjc-for__ink {
+  position: absolute; left: 0.18em; bottom: 0.02em; z-index: 3; white-space: nowrap;
   font-family: 'Caveat', 'Permanent Marker', cursive; font-weight: 600; letter-spacing: 0.01em;
-  font-size: 0.72em; line-height: 1; transform: rotate(-2deg);
-  margin-left: 0.15em; vertical-align: 0.06em;
+  font-size: 0.72em; line-height: 1; transform: rotate(-2deg); transform-origin: left bottom;
   background: none; -webkit-background-clip: border-box; background-clip: border-box;
   color: var(--button-color, #4faad1); -webkit-text-fill-color: var(--button-color, #4faad1);
 }
@@ -124,8 +128,6 @@
 .fjc[data-state="hero"] .fjc-thread:empty { display: none; }
 
 /* ---- docked state -------------------------------------------------------- */
-html.fjc-docked-page { scroll-padding-bottom: 120px; }
-html.fjc-docked-page body { padding-bottom: 110px; }
 .fjc[data-state="docked"] {
   position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 9000;
   width: min(720px, calc(100vw - 24px)); font-size: 0.95rem;
@@ -154,6 +156,15 @@ html.fjc-docked-page body { padding-bottom: 110px; }
 }
 .fjc[data-state="docked"][data-open="1"] .fjc-msg.fjc-folded { display: flex; }
 
+/* Reserved space for the first line while the posting lookup is in flight. */
+.fjc-msg.fjc-pending { min-height: 4.4em; }
+@media (max-width: 767px) { .fjc-msg.fjc-pending { min-height: 6.6em; } }
+
+/* The docked bar steps aside while the footer (the page's ending) is on screen. */
+/* `translate` is separate from the centering `transform`, so docking never animates sideways. */
+.fjc[data-state="docked"] { transition: translate 0.28s ease, opacity 0.28s ease; }
+.fjc[data-state="docked"].fjc-tucked { translate: 0 calc(100% + 24px); opacity: 0; pointer-events: none !important; }
+
 .fjc-flash { outline: 3px solid var(--fjc-accent); outline-offset: 6px; transition: outline-color 1.5s ease; }
 .fjc-flash.fjc-flash-out { outline-color: transparent; }
 
@@ -163,7 +174,6 @@ html.fjc-docked-page body { padding-bottom: 110px; }
   .fjc-slot { width: 100%; }
   .fjc-msg { max-width: 100%; }
   .fjc-form textarea { width: 100%; }
-  .fjc-for { display: inline; white-space: normal; transform: none; }
   .fjc[data-state="docked"] { left: 8px; right: 8px; bottom: 8px; width: auto; transform: none; padding: 0.5em 0.6em 0.6em; }
   .fjc[data-state="docked"][data-open="1"] .fjc-thread { max-height: 60vh; }
 }

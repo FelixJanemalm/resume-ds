@@ -164,17 +164,46 @@
   // On an application link, stamp "at <Company>?" after the h1, in the
   // heading's own font ("Ship better products faster at Anthropic?"). The
   // first bubble then never needs to name the company.
+  // The stamp is an annotation hung after the heading's last word. It takes no
+  // layout space (a zero-size anchor with the ink positioned off it), so the
+  // heading never re-wraps and nothing below it moves when it arrives. If the
+  // ink would run past the hero column or the screen, it shrinks to fit.
   function markFor(company) {
     var h1 = document.querySelector(".hero h1");
     if (!h1 || !company || h1.querySelector(".fjc-for")) return;
-    h1.appendChild(document.createTextNode(" "));
-    h1.appendChild(el("span", { "class": "fjc-for", text: "at " + company + "?" }));
+    var ink = el("span", { "class": "fjc-for__ink", text: "at " + company + "?" });
+    h1.appendChild(el("span", { "class": "fjc-for", "aria-hidden": "true" }, [ink]));
+    fitStamp();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitStamp);
+    window.addEventListener("resize", fitStamp);
+  }
+  function fitStamp() {
+    var ink = document.querySelector(".fjc-for__ink");
+    if (!ink) return;
+    ink.style.fontSize = "";
+    var col = (ink.closest(".hero-left") || ink.closest("h1")).getBoundingClientRect();
+    var limit = Math.min(col.right, window.innerWidth - 12);
+    var picker = document.getElementById("color-picker-container");   // keep clear of the colour picker card
+    if (picker) {
+      var pr = picker.getBoundingClientRect(), ir = ink.getBoundingClientRect();
+      if (pr.width && pr.top < ir.bottom && pr.bottom > ir.top && pr.left > ir.left) limit = Math.min(limit, pr.left - 12);
+    }
+    for (var i = 0; i < 8; i++) {
+      var r = ink.getBoundingClientRect();
+      if (r.right <= limit) break;
+      var size = parseFloat(getComputedStyle(ink).fontSize);
+      ink.style.fontSize = Math.max(12, size * Math.max(0.55, (limit - r.left) / r.width)) + "px";
+    }
   }
   // Lead with the case studies that matter for the visitor's track (what the
   // retired /for/* pages did statically).
   function leadWith(slugs) {
     var wrap = document.querySelector(".case-study-teasers");
     if (!wrap || !slugs || !slugs.length) return;
+    // The work spine (js/work-spine.js, another owner) reads the cards once when it
+    // starts. Reordering after that would desynchronise it, so stand down.
+    var spine = wrap.closest(".work-spine");
+    if (spine && spine.classList.contains("is-3d")) return;
     var picked = [];
     slugs.forEach(function (slug) {
       var a = wrap.querySelector('a.case-study-teaser[href*="' + slug + '"]');
@@ -182,11 +211,33 @@
     });
     for (var i = picked.length - 1; i >= 0; i--) wrap.insertBefore(picked[i], wrap.firstChild);
   }
-  if (ctx.application_id) {
+  function loadPosting() {
+    if (!ctx.application_id) return;
+    // Reserve the opener's space before the lookup returns, so the hero does not
+    // grow under the visitor when the first line arrives.
+    var pending = null;
+    if (!history.length) {
+      pending = addMsg("assistant", "");
+      pending.classList.add("fjc-pending");
+      showDots(pending);
+    }
+    function settle(text) {
+      if (!pending) return;
+      if (text) {
+        var h = thread.offsetHeight;
+        pending.classList.remove("fjc-pending");
+        renderText(pending, text);
+        if (thread.offsetHeight < h) thread.style.minHeight = h + "px";   // never shrink back under the visitor
+      } else if (pending.parentNode) {
+        pending.parentNode.removeChild(pending);
+      }
+      pending = null;
+      updateFold();
+    }
     fetch(endpoint + "/posting?a=" + encodeURIComponent(ctx.application_id))
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (j) {
-        if (!j) { if (refParam !== ctx.application_id) local.remove("fj_app"); return; }   // stale stored reference
+        if (!j) { settle(null); if (refParam !== ctx.application_id) local.remove("fj_app"); return; }   // stale stored reference
         if (j.company) markFor(j.company);
         leadWith(j.lead);
         if (j.brand_color && local.get("fj_app_color") !== ctx.application_id) {
@@ -197,11 +248,12 @@
         if (j.opener && !history.length) {
           history.push({ role: "assistant", text: j.opener });
           save();
-          addMsg("assistant", j.opener);
-          updateFold();
+          settle(j.opener);
+        } else {
+          settle(null);
         }
       })
-      .catch(function () { /* no stamp, no harm */ });
+      .catch(function () { settle(null); });
   }
 
   var viewWork = document.querySelector(".hero-content .primary-btn");
@@ -499,6 +551,7 @@
     text = (text || "").trim();
     if (!text || busy) return;
     busy = true; sendBtn.disabled = true;
+    thread.style.minHeight = "";
     if (!history.length) history.push({ role: "assistant", text: FALLBACK_OPENER, hidden: true });
     addMsg("user", text);
     history.push({ role: "user", text: text });
@@ -535,24 +588,42 @@
     root.setAttribute("data-open", open ? "1" : "0");
     toggle.setAttribute("aria-label", open ? "Hide the conversation" : "Show the conversation");
     if (open) { unfolded = true; updateFold(); scrollThread(); }
+    if (typeof tuckAtFooter === "function") tuckAtFooter();
   }
   function setState(state) {
     if (root.getAttribute("data-state") === state) return;
     if (state === "docked" && slot) slot.style.minHeight = root.offsetHeight + "px";   // keep the hero's height
     root.setAttribute("data-state", state);
-    document.documentElement.classList.toggle("fjc-docked-page", state === "docked");
     if (state === "hero") { setOpen(false); unfolded = false; updateFold(); }
+    tuckAtFooter();
   }
+  // Dock only once the visitor has scrolled past the input. On a phone the input
+  // can start below the fold; that is "not reached yet", not "scrolled past".
   if (hasHero && "IntersectionObserver" in window) {
     var io = new IntersectionObserver(function (entries) {
-      var r = entries[0].intersectionRatio;
-      if (r < 0.15) setState("docked");
-      else if (r > 0.5) setState("hero");
+      var e = entries[0], r = e.intersectionRatio;
+      var above = e.boundingClientRect.bottom < (e.rootBounds ? e.rootBounds.top : 0) + e.boundingClientRect.height * 0.85;
+      if (r < 0.15 && above) setState("docked");
+      else if (r > 0.5 || !above) setState("hero");
     }, { threshold: [0, 0.15, 0.5, 1] });
     io.observe(slot);
-  } else if (!hasHero) {
-    document.documentElement.classList.add("fjc-docked-page");
   }
+
+  // No padding is added to the page (the footer is the page's ending). Instead the
+  // docked bar steps out of the way while the footer is on screen, unless the
+  // visitor is using it.
+  var footerEl = document.querySelector("footer"), tuckQueued = false;
+  function tuckAtFooter() {
+    tuckQueued = false;
+    var docked = root.getAttribute("data-state") === "docked";
+    var inUse = root.getAttribute("data-open") === "1" || root.contains(document.activeElement);
+    var atFooter = !!footerEl && footerEl.getBoundingClientRect().top < window.innerHeight - 8;
+    root.classList.toggle("fjc-tucked", docked && atFooter && !inUse);
+  }
+  window.addEventListener("scroll", function () {
+    if (!tuckQueued) { tuckQueued = true; requestAnimationFrame(tuckAtFooter); }
+  }, { passive: true });
+  window.addEventListener("resize", tuckAtFooter);
 
   barText.addEventListener("click", function () { setOpen(root.getAttribute("data-open") !== "1"); });
   toggle.addEventListener("click", function () { setOpen(root.getAttribute("data-open") !== "1"); });
@@ -573,5 +644,6 @@
   input.addEventListener("input", autosize);
 
   renderAll();
+  loadPosting();
 
 })();
