@@ -314,7 +314,7 @@ const SIM_POS = SIM_SHARED + `
       if (sf > 0.5 && distance(p.xyz, st.xyz) > uSnap) p.xyz = st.xyz + (p.xyz - st.xyz) * 0.12;   // a far recruit snaps most of the way instead of flying across the screen
       vec4 bA=texture2D(tBoatA,uv), bB=texture2D(tBoatB,uv);
       vec4 fl=texture2D(tFleet,uv);
-      if (uSettle > 0.0 && fleetOn(fl) > 0.5) { float ffd, fsh; vec4 fmd; vec3 ft=fleetTarget(fl,ffd,fsh,fmd); if (fsh > 0.001) { p.xyz = mix(p.xyz, ft, max(uSettle * 0.6, uRocket)); heldP = 1.0; } }   // the fleet streams in and settles on its copy (a little slower than the ship, so the recruits are seen arriving); the rocket swarm is placed outright (its copies move too fast to be chased)
+      if (uSettle > 0.0 && fleetOn(fl) > 0.5) { float ffd, fsh; vec4 fmd; vec3 ft=fleetTarget(fl,ffd,fsh,fmd); if (fsh > 0.001) { float frl = floor(fmd.x + 0.5), fLane = step(5.5, frl) * step(frl, 7.5); p.xyz = mix(p.xyz, ft, max(max(uSettle * 0.6, uRocket), fLane)); heldP = 1.0; } }   /* a copy's water and foam are placed like the ship's (chased, they lagged their streaming lanes by half a hull length: the brightest wake sat well behind the stern) */   // the fleet streams in and settles on its copy (a little slower than the ship, so the recruits are seen arriving); the rocket swarm is placed outright (its copies move too fast to be chased)
       if ((uSettle > 0.0 || uSnapBoat > 0.0) && boatFlag(bA,bB,w)*uForm > 0.5) {
         vec4 mA=texture2D(tMetaA,uv), mB=texture2D(tMetaB,uv); float fdp; vec3 bt=boatTarget(bA,bB,mA,mB,fdp);
         float roleP=floor(mix(mA,mB,boatMixT(bA,bB)).x+0.5), laneP=step(5.5,roleP)*step(roleP,7.5);
