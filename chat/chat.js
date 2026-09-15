@@ -602,10 +602,25 @@
     if (open) { unfolded = true; updateFold(); scrollThread(); }
     if (typeof tuckAtFooter === "function") tuckAtFooter();
   }
+  // Docked, the bar moves to <body>. Inside the hero it sits in the hero column's
+  // stacking layer (z-index 2), and everything in that layer paints under the
+  // work section's pinned card stage, however high the bar's own z-index. Moving
+  // it out lets it float above the whole page; undocked, it goes back in the slot.
+  function place(parent) {
+    if (!parent || root.parentNode === parent) return;
+    var active = document.activeElement, keep = active && root.contains(active);
+    var start = keep && "selectionStart" in active ? active.selectionStart : null, end = keep ? active.selectionEnd : null;
+    parent.appendChild(root);
+    if (keep) {
+      try { active.focus({ preventScroll: true }); } catch (e) { active.focus(); }
+      if (start !== null) try { active.setSelectionRange(start, end); } catch (e) { /* not a text field */ }
+    }
+  }
   function setState(state) {
     if (root.getAttribute("data-state") === state) return;
     if (state === "docked" && slot) slot.style.minHeight = root.offsetHeight + "px";   // keep the hero's height
     root.setAttribute("data-state", state);
+    if (slot) place(state === "docked" ? document.body : slot);
     if (state === "hero") { setOpen(false); unfolded = false; updateFold(); }
     tuckAtFooter();
   }
