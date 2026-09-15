@@ -810,23 +810,22 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
                           // the screen (by +780; the principles reach the ship at about #read's top + 900)
                 { at: 'top', x: 0.3, y: -0.82, size: 0.72, turn: 35, tilt: 0, heel: 2, level: 0, wake: 0, cam: 0 },
                 { at: '#work:center@0.72', x: 0.22, y: -0.45, size: 0.56, turn: 60, tilt: 8, heel: 5, level: 0, wake: 0.35, cam: 0.2 },
-                { at: '#work:center@0.5', x: 0.05, y: -0.1, size: 0.54, turn: 85, tilt: 24, heel: 5, level: L1, wake: 0.65, cam: 0.3 },
-                { at: '#work:center@0.25', x: -0.05, y: 0.12, size: 0.5, turn: 92, tilt: 50, heel: 5, level: L1, wake: 0.85, cam: 0.5 },
-                { at: 'stage@0.14', x: 0, y: 0.18, size: 0.42, turn: 70, tilt: 54, heel: 4, level: L1, wake: 0.9, cam: 1 },                                             // the column: in the gap below the cards
-                { at: 'stage@0.38', x: 0, y: -0.22, size: 0.4, turn: 76, tilt: 57, heel: 4, level: 1.4, wake: 0.92, cam: 0.95 },   /* the descent happens early and slowly: from high as the column pins, down through the bottom of the cards over the column's first two thirds, at a near-constant pace (Felix: organic, no drop at the release) */
-                { at: 'stage@0.64', x: 0, y: -0.52, size: 0.36, turn: 80, tilt: 60, heel: 4, level: 1.75, wake: 0.97, cam: 0.85 },
-                { at: 'stage@0.92', x: 0, y: -0.58, size: 0.34, turn: 84, tilt: 63, heel: 4, level: L2, wake: 1, cam: 0.8 },
-                { at: 'stage-release', x: 0, y: -0.6, size: 0.36, turn: 78, tilt: 56, heel: 7, level: L2, wake: 0.95, cam: 0.8 },
-                { at: 'stage-release+450', x: -0.05, y: -0.6, size: 0.36, turn: 45, tilt: 26, heel: 7, level: L2, wake: 0.9, cam: 0.8 },
-                { at: '#read:top@0', x: -0.02, y: -0.6, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L2, wake: 0.85, cam: 1 },                                           // the side shot below the sticky quote
-                { at: '#read:top@0+180', x: -0.02, y: -0.6, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L3, wake: 0.9, cam: 1 },
-                { at: '#read:top@0+360', x: -0.02, y: -0.6, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L4, wake: 0.95, cam: 1 },
-                { at: '#read:top@0+540', x: -0.02, y: -0.6, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 0 },
-                { at: '#read:top@0+590', x: -0.02, y: -0.6, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 1 },
-                { at: '#read:top@0+655', x: -0.02, y: -0.6, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 2 },
-                { at: '#read:top@0+720', x: -0.02, y: -0.6, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 3 },
+                { at: '#work:center@0.5', x: 0.05, y: -0.22, size: 0.52, turn: 85, tilt: 24, heel: 5, level: L1, wake: 0.65, cam: 0.3 },
+                { at: '#work:center@0.25', x: -0.02, y: -0.4, size: 0.42, turn: 92, tilt: 50, heel: 5, level: L1, wake: 0.85, cam: 0.5 },              // one arc from the hero into the column (it used to climb to 0.12 and dive)
+                // the column, as on desktop: a small ship seen from above in the band below the centred card, sailing down the column's axis
+                { at: 'stage@0.14', x: 0, y: -0.74, size: 0.28, turn: 70, tilt: 54, heel: 4, level: L1, wake: 0.9, cam: 1 },
+                { at: 'stage@0.92', x: 0, y: -0.76, size: 0.22, turn: 84, tilt: 63, heel: 4, level: L2, wake: 1, cam: 0.8 },
+                { at: 'stage-release', x: 0, y: -0.76, size: 0.24, turn: 78, tilt: 56, heel: 7, level: L2, wake: 0.95, cam: 0.8 },
+                { at: 'stage-release+450', x: -0.06, y: -0.74, size: 0.28, turn: 45, tilt: 26, heel: 7, level: L2, wake: 0.9, cam: 0.8 },   // the column's gentle exit into the side shot, as on desktop
+                { at: '#read:top@0', x: -0.02, y: -0.7, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L2, wake: 0.85, cam: 1 },                                           // the side shot below the sticky quote
+                { at: '#read:top@0+180', x: -0.02, y: -0.7, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L3, wake: 0.9, cam: 1 },
+                { at: '#read:top@0+360', x: -0.02, y: -0.7, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L4, wake: 0.95, cam: 1 },
+                { at: '#read:top@0+540', x: -0.02, y: -0.7, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 0 },
+                { at: '#read:top@0+590', x: -0.02, y: -0.7, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 1 },
+                { at: '#read:top@0+655', x: -0.02, y: -0.7, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 2 },
+                { at: '#read:top@0+720', x: -0.02, y: -0.7, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 3 },
                 ...(RK < 0 ? [] : [
-                    { at: '#scalability:top@0.6', x: -0.02, y: -0.6, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 3 },
+                    { at: '#scalability:top@0.6', x: -0.02, y: -0.7, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 3 },
                     { at: '.testimonials-wrapper:top@1', x: 0.5, y: -0.95, size: 0.3, turn: -90, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1, fleet: 4 },
                     { at: 'footer:top@1', x: 0.5, y: -0.95, size: 0.3, turn: -90, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1, fleet: 4 },
                     { at: 'end', x: 0.5, y: -0.6, size: 0.3, turn: -90, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1, fleet: 4 },
