@@ -28,17 +28,17 @@
    role[i]: the particle's role at every level where it exists (a particle never changes role). */
 
 export const WATERLINE = -0.37;
-export const LEVELS = ['skiff', 'sloop', 'schooner', 'clipper', 'steamer', 'liner', 'foiler', 'rocket'];   // the rocket is the voyage's last form (see rocketLevel), not a ship
-export const LEVEL_SCALE = [0.7, 0.85, 1.15, 1.5, 1.35, 1.9, 1.2, 1.0];              // on-screen size multiplier per level
-export const LEVEL_HEEL = [0.62, 1.0, 1.3, 0.95, 0.12, 0.05, 0.6, 0.2];             // wind-heel gain: sail area x CE height / (beam^2 x depth), the sloop = 1; the machine ships barely heel
+export const LEVELS = ['skiff', 'sloop', 'schooner', 'clipper', 'steamer', 'liner', 'container ship', 'rocket'];   // the rocket is the voyage's last form (see rocketLevel), not a ship
+export const LEVEL_SCALE = [0.7, 0.85, 1.15, 1.5, 1.65, 2.0, 2.4, 1.0];              // on-screen size multiplier per level: every ship bigger than the last (the rocket is sized by its own waypoints)
+export const LEVEL_HEEL = [0.62, 1.0, 1.3, 0.95, 0.12, 0.05, 0.03, 0.2];             // wind-heel gain: sail area x CE height / (beam^2 x depth), the sloop = 1; the machine ships barely heel
 export const LEVEL_PIVOT = [0.0, -0.02, -0.04, -0.06, -0.03, -0.02, 0.0, 0.0];      // pitch pivot x (the centre of flotation drifts aft with the finer, longer hulls)
 export const ROCKET = 7;
-export const SMOKE = [0, 0, 0, 0, 1, 1, 0, 0];                                        // funnel smoke per level (a share of the WAKE particles rises from the funnels in the shader)
-export const FUNNELS = [[0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1], [-0.005, -0.047, 0, 1], [0.128, -0.008, -0.18, 3], [0, 0, 0, 1], [0, 0, 0, 1]];   // per level: the first funnel's top (x, y), the spacing to the next (x), the count
+export const SMOKE = [0, 0, 0, 0, 1, 1, 0.6, 0];                                        // funnel smoke per level (a share of the WAKE particles rises from the funnels in the shader)
+export const FUNNELS = [[0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1], [-0.005, -0.047, 0, 1], [0.128, -0.008, -0.18, 3], [-0.41, -0.006, 0, 1], [0, 0, 0, 1]];   // per level: the first funnel's top (x, y), the spacing to the next (x), the count
 export const PADDLE_R = 18.2 / (2 * Math.PI * 32);
 export const LINES = [0, 0, 0.3, 1, 1, 1, 1, 1], SOLID = [0, 0, 0, 0.15, 0.35, 0.5, 0.7, 1];   // dots -> lines -> solid: how much of the wireframe (edges, see buildBoatLevels) and of the surfaces (the hull and sail meshes) each level shows
 export const GRID = { hullU: 24, hullV: 5, sailA: 7, sailUp: 6 };   // the mesh grids: the hull per side (u x v), a sail (across x up)   // the paddle wheels' radius: 32 turns per wrap of the layer's flow clock (18.2 L), so the wrap never jumps a spoke
-export const THEME = { id: 'atlantic', name: 'Atlantic', title: 'Skiff to foiler' };
+export const THEME = { id: 'atlantic', name: 'Atlantic', title: 'Skiff to container ship' };
 export const SQUARE_NORMAL = [0.970, 0, 0.242];   // the square sails' belly normal: the yards braced -14 deg
 export const ROLE = { HULL: 1, DECK: 2, SAIL: 3, SPAR: 4, RIGGING: 5, WATER: 6, WAKE: 7, REFLECTION: 8, FLAG: 9 };   // FLAG: the burgee at the masthead (cloth like a sail in the shader, drawn in its own colour)
 
@@ -53,7 +53,6 @@ const frac = v => v - Math.floor(v);
 const TOP = shadeN([0, 1, 0]);
 const at3 = v => [null, null, null, v, null, null, null];            // a part the clipper alone has
 const at23 = (a, b) => [null, null, a, b, null, null, null];         // a part the schooner and the clipper have
-const SAIL_LV = [0, 1, 2, 3], MACHINE = [4, 5];
 
 export function mulberry32(seed) {
     let a = seed >>> 0;
@@ -67,7 +66,7 @@ export function mulberry32(seed) {
    yachts, flat on the square riggers and the machine ships), steps(x): raised decks above the sheer (quarterdeck,
    forecastle, poop), bulwark: a solid bulwark above the deck line, ports: rows of portholes (the liner). The section is
    measured from the sheer so the hull bottom sits on the waterline along the whole length; the raised decks and the
-   bulwark are drawn as a vertical topside above the sheer. The foiler's entry is only its deck line: its two hulls are catPt. */
+   bulwark are drawn as a vertical topside above the sheer. */
 const HULL = [
     { B: 0.175, c: 0.48, p: 0.55, D: 0.100, tumble: 0.00, rake: 0.02, rakeP: 1, overhang: 0.00, bulwark: 0, sheer: x => -0.300 + 0.055 * 4 * x * x },
     { B: 0.145, c: 0.47, p: 0.50, D: 0.110, tumble: 0.00, rake: 0.03, rakeP: 1, overhang: 0.02, bulwark: 0, sheer: x => -0.302 + 0.028 * 4 * x * x + 0.022 * Math.max(0, 2 * x) ** 2 },
@@ -75,7 +74,7 @@ const HULL = [
     { B: 0.125, c: 0.46, p: 0.42, D: 0.180, tumble: 0.25, rake: 0.09, rakeP: 1.7, overhang: 0.05, bulwark: 0.028, sheer: x => -0.262 + 0.022 * 4 * x * x, steps: x => (x < -0.30 ? 0.025 : 0) + (x > 0.36 ? 0.020 : 0) },
     { B: 0.100, c: 0.48, p: 0.65, D: 0.130, tumble: 0.00, rake: 0.02, rakeP: 1, overhang: 0.02, bulwark: 0.012, sheer: x => -0.272 + 0.018 * 4 * x * x },                                              // the paddle steamer: full-bodied, little sheer
     { B: 0.068, c: 0.50, p: 0.45, D: 0.200, tumble: 0.05, rake: 0.06, rakeP: 1.2, overhang: 0.05, bulwark: 0.010, sheer: x => -0.235 + 0.012 * 4 * x * x + 0.010 * Math.max(0, 2 * x) ** 2, steps: x => (x > 0.34 ? 0.02 : 0), ports: [[0.40, 0.48], [0.66, 0.74]] },   // the liner: long, slim, deep, a tall freeboard
-    { B: 0.190, c: 0.50, p: 0.25, D: 0.045, tumble: 0.00, rake: 0.03, rakeP: 1, overhang: 0.00, bulwark: 0, sheer: x => -0.270 + 0.012 * 4 * x * x },                                                   // the foiler: the deck line of its two hulls, flying above the water (catPt)
+    { B: 0.078, c: 0.50, p: 0.85, D: 0.200, tumble: 0.00, rake: 0.05, rakeP: 1.2, overhang: 0.02, bulwark: 0.008, sheer: x => -0.232 + 0.006 * 4 * x * x + 0.012 * Math.max(0, 2 * x) ** 2, steps: x => (x > 0.41 ? 0.014 : 0) },   // the container ship: the biggest, a box of a hull, a raised forecastle
 ];
 const deckX = (H, x) => H.sheer(x) + (H.steps ? H.steps(x) : 0);   // the deck line: the sheer plus any raised deck
 const topX = (H, x) => deckX(H, x) + H.bulwark;                      // the hull's top edge: the deck line plus the bulwark
@@ -108,26 +107,17 @@ function transomPt(H, v, w) {   // the flat stern face: w across (-1..1)
     const b = H.B * plan(H, 0), S = section(H, 0, v);
     return [hullX(H, 0, v) - 0.004, S.y, w * b * S.hw, shadeN([-1, 0.25, 0.2 * w])];
 }
-/* the foiler: two slim hulls at z = +-CAT.z, flying CAT.fly above the water, each a rounded section from its bottom to its deck
-   (the deck line is HULL[6]); s picks the hull, w the inner (w < 0) or outer face; gun: the deck's edges; transom: the sterns */
-const CAT = { z: 0.16, hb: 0.028, fly: 0.055, c: 0.5, p: 0.45 };
-const catPlan = u => Math.pow(Math.max(0, 1 - Math.pow((u - CAT.c) / (1 - CAT.c), 2)), CAT.p);
-function catPt(u, s, v, w, gun, transom) {
-    const H = HULL[6], x = hullX(H, u, v), dk = deckX(H, x), f = catPlan(u), hb = CAT.hb * f + 0.004, zc = s * CAT.z, side = w < 0 ? -1 : 1;
-    const bottom = WL + CAT.fly + 0.012 * Math.pow(2 * x, 4);   // a little rocker at the ends
-    if (transom) { const t = clamp01(v); return [-0.5, lerp(bottom, dk, t), zc + w * hb * 0.8, shadeN([-1, 0.25, 0.2 * w])]; }
-    if (gun) return [x, dk, zc + side * hb, TOP];
-    const th = v * PI / 2, y = bottom + (dk - bottom) * Math.sin(th), z = zc + side * hb * Math.cos(th) * (0.6 + 0.4 * Math.sin(th));
-    const bow = x > 0.3 ? -(x - 0.3) * 1.5 : 0;
-    return [x, y, z, shadeN([bow, -Math.cos(th) * 0.6, side * Math.sin(th)])];
+/* a hull's anchor: a chain of RIGGING particles from the hawse at the bow (t = 0) to the anchor (t = 1), stowed at the hawse; the shader
+   lowers it by uAnchor (the layer's anchor state) along the chain fraction, kept in meta.z with meta.y = 2 as the marker */
+function anchorPt(L, t, q, w) {
+    const H = HULL[L], hx = hullX(H, 0.94, 1) - 0.015, hy = deckX(H, 0.44) - 0.012, hz = 0.8 * railHB(H, 0.44);
+    if (q < 0.55) return [hx + (w - 0.5) * 0.004, hy - 0.004 * t, hz + (w - 0.5) * 0.004, 0.6, 2, t, 0];                          // the chain (a knot at the hawse until it runs out)
+    const u = (q - 0.55) / 0.45, k = 0.8;   // the anchor, hanging from the chain's end: shank, arms, stock
+    if (u < 0.5) return [hx, hy - 0.05 * k * u * 2, hz + 0.004, 0.75, 2, 1, 0];
+    if (u < 0.82) { const a = (u - 0.5) / 0.32 * 2 - 1; return [hx + a * 0.03 * k, hy - 0.05 * k + 0.012 * k * a * a, hz + 0.004, 0.75, 2, 1, 0]; }
+    return [hx, hy - 0.012 * k, hz + 0.004 + ((u - 0.82) / 0.18 - 0.5) * 0.04 * k, 0.75, 2, 1, 0];
 }
-/* the waterline the layer measures from the hull particles (measureHull) does not exist on a flying hull: the foiler's is the pair
-   of foil struts piercing the water, given here as the 17-station half-beams the layer expects. null: measure the particles */
-export function waterlineOf(L) {
-    if (L !== 6) return null;
-    const beam = new Float32Array(17); for (let k = 0; k < 17; k++) { const x = -0.5 + k / 16; beam[k] = x > -0.47 && x < 0.12 ? 0.02 : 0.012; }
-    return { beam, stem: 0.10, stern: -0.46, entry: 0.5, sternHalf: 0.012 };
-}
+export function waterlineOf() { return null; }   // every hull of this lineage floats: the layer measures the waterline from the particles
 
 /* ---------------------------------------------------------------- masts and sails
    MAST[key][L]: [x, foot y, top y]. Fore-and-aft sails are quads tack/clew/throat/peak (a triangle when throat = peak):
@@ -135,8 +125,8 @@ export function waterlineOf(L) {
    yard braced BETA about the mast: a = 0 port .. 1 starboard, belly toward +x (the wind from astern). Edge samples walk
    the perimeter by a fraction p so they stay on the outline at every level. */
 const MAST = {
-    A: [[0.15, -0.31, 0.24], [0.06, -0.30, 0.66], [0.20, -0.30, 0.66], [0.28, -0.25, 0.80], [0.34, -0.26, 0.02], [0.36, -0.225, 0.075], [0.05, -0.27, 0.35]],   // the foiler's A is the wing's mast
-    B: [null, null, [-0.16, -0.29, 0.72], [-0.29, -0.23, 0.86], [-0.34, -0.26, -0.02], [-0.36, -0.225, 0.055], null],
+    A: [[0.15, -0.31, 0.24], [0.06, -0.30, 0.66], [0.20, -0.30, 0.66], [0.28, -0.25, 0.80], [0.34, -0.26, 0.02], [0.36, -0.225, 0.075], [0.43, -0.216, 0.06]],
+    B: [null, null, [-0.16, -0.29, 0.72], [-0.29, -0.23, 0.86], [-0.34, -0.26, -0.02], [-0.36, -0.225, 0.055], [-0.315, -0.05, 0.075]],   // the container ship's B stands on the bridge
     C: at3([0.00, -0.25, 0.96]),
 };
 const quad = (tack, clew, throat, peak) => ({ tack, clew, throat, peak });
@@ -147,15 +137,14 @@ const SQ5 = {
     mainC: sq(0.00, -0.14, 0.10, 0.23, 0.26), mainT: sq(0.00, 0.13, 0.40, 0.19, 0.21), mainG: sq(0.00, 0.43, 0.62, 0.14, 0.16), mainR: sq(0.00, 0.65, 0.78, 0.11, 0.12), mainSky: sq(0.00, 0.81, 0.91, 0.08, 0.09),
     mizT: sq(-0.29, 0.30, 0.50, 0.14, 0.16), mizG: sq(-0.29, 0.53, 0.68, 0.11, 0.12), mizR: sq(-0.29, 0.71, 0.81, 0.08, 0.09),
 };
-const WING = Object.assign(quad([0.05, -0.25], [-0.22, -0.25], [0.05, 0.33], [-0.03, 0.33]), { rigid: 0.03 });   // the foiler's wing: a tall, narrow, rigid aerofoil (its belly is fixed and small)
 const SAILS = {   // per part, per level: a fore-and-aft quad, a square sail, or null (the machine ships host the cloth on their superstructure, see SUPER)
     main: [quad([0.17, -0.245], [-0.21, -0.235], [0.25, 0.03], [-0.06, 0.23]),          // the skiff's standing lug
         tri([0.05, -0.235], [-0.43, -0.225], [0.055, 0.64]),                                // Bermuda main
         quad([0.19, -0.215], [-0.11, -0.215], [0.19, 0.32], [0.01, 0.46]),                   // gaff foresail
-        SQ5.foreC, null, null, WING],                                                       // fore course; the wing
+        SQ5.foreC, null, null, null],                                                       // fore course
     mizzen: [null, null, quad([-0.17, -0.205], [-0.58, -0.19], [-0.17, 0.42], [-0.42, 0.62]),   // schooner gaff main
         quad([-0.30, -0.15], [-0.60, -0.13], [-0.30, 0.14], [-0.47, 0.27]), null, null, null],   // spanker
-    jib: [null, tri([0.49, -0.26], [0.13, -0.22], [0.065, 0.55]), tri([0.64, -0.19], [0.30, -0.16], [0.20, 0.54]), tri([0.66, -0.16], [0.42, -0.10], [0.28, 0.60]), null, null, tri([0.50, -0.255], [0.10, -0.245], [0.06, 0.20])],
+    jib: [null, tri([0.49, -0.26], [0.13, -0.22], [0.065, 0.55]), tri([0.64, -0.19], [0.30, -0.16], [0.20, 0.54]), tri([0.66, -0.16], [0.42, -0.10], [0.28, 0.60]), null, null, null],
     stay: at23(tri([0.49, -0.235], [0.25, -0.19], [0.20, 0.36]), tri([0.52, -0.19], [0.33, -0.14], [0.28, 0.42])),
     flying: at23(tri([0.76, -0.17], [0.45, -0.12], [0.20, 0.64]), tri([0.80, -0.13], [0.52, -0.06], [0.28, 0.74])),
     jib4: at3(tri([0.93, -0.10], [0.60, -0.02], [0.28, 0.80])),
@@ -203,7 +192,7 @@ function sailAt(L, part, a, up, edgeP) {
 }
 /* the burgee: a pennant at the head of the tallest mast, flying aft (-x), hoist 0.045, tapering to a point 0.13 aft; a = 0 at the
    hoist .. 1 at the fly (where it flutters most), up across the hoist. Cloth like a sail: flap and belly meta, normal +z */
-const TALLEST = ['A', 'A', 'B', 'C', 'A', 'A', 'A'];
+const TALLEST = ['A', 'A', 'B', 'C', 'A', 'A', 'B'];
 function burgeePt(L, a, up) {
     const m = MAST[TALLEST[L]][L] || MAST.A[L], top = m[2] + 0.004, g = Math.min(1, L / 3), h = 0.03 + 0.02 * g, len = 0.09 + 0.05 * g;
     const P = [m[0] - a * len, top - up * h * (1 - a) - 0.4 * h * a, 0.006 * Math.sin(PI * a)];
@@ -228,11 +217,18 @@ const paddleBox = H => (a, up, s) => {   // the sponson over a paddle wheel: a h
     if (f < 0.5) { const r = R * Math.sqrt(up); return [xw - r * Math.cos(ph), yax + r * Math.sin(ph), s * (hb + 0.095), shadeN([0, 0.15, s])]; }
     return [xw - R * Math.cos(ph), yax + R * Math.sin(ph), s * (hb + 0.006 + 0.089 * up), shadeN([-Math.cos(ph), Math.sin(ph), 0.2 * s])];
 };
+const BAYS = [3, 4, 5, 5, 5, 4, 4, 3].map((tiers, k) => ({ x0: 0.34 - k * 0.07, x1: 0.34 - k * 0.07 - 0.066, tiers, h: tiers * 0.027 }));   // eight bays of stacked containers, 3 to 5 high, forward of the bridge
+const bayBox = (H, B) => (a, up, s) => {   // a stack: the top (a along, up across), the sides and ends (a along, up height) with a dark seam at each tier
+    const hw = x => railHB(H, x) * 0.92, f = frac(a * 61.7 + up * 3.1), tier = Math.floor(up * B.tiers), seam = frac(up * B.tiers) < 0.1, col = Math.floor((up * 2 - 1) * 3 + 3);
+    if (f < 0.34) { const x = lerp(B.x0, B.x1, a); return [x, deckX(H, x) + B.h, (up * 2 - 1) * hw(x), TOP * (0.8 + 0.15 * (col % 2))]; }
+    if (f < 0.86) { const x = lerp(B.x0, B.x1, a); return [x, deckX(H, x) + B.h * up, s * hw(x), seam ? 0.3 : (tier % 2 ? 0.58 : 0.88) * shadeN([0, 0.1, s]) / shadeN([0, 0.1, 1])]; }
+    const e = f < 0.93 ? B.x0 : B.x1; return [e, deckX(H, e) + B.h * up, (a * 2 - 1) * hw(e), seam ? 0.3 : shadeN([e === B.x0 ? 1 : -1, 0.1, 0])];
+};
 const SUPER = [null, null, null, null,
     [[tierBox(HULL[4], -0.30, 0.22, 0, 0.035, 0.55, false), 1.2], [tierBox(HULL[4], 0.10, 0.22, 0.035, 0.03, 0.45, true), 0.4], [cyl(0.02, deckX(HULL[4], 0.02) + 0.035, 0.19, 0.02, 0.025, 0.9), 0.8], [paddleBox(HULL[4]), 1.4]],
     [[tierBox(HULL[5], -0.32, 0.30, 0, 0.036, 0.92, true), 1.5], [tierBox(HULL[5], -0.26, 0.26, 0.036, 0.034, 0.80, true), 1.2], [tierBox(HULL[5], -0.20, 0.24, 0.070, 0.030, 0.66, true), 0.9], [tierBox(HULL[5], 0.16, 0.24, 0.100, 0.025, 0.75, true), 0.3],
         ...[0.15, -0.03, -0.21].map(fx => [cyl(fx, deckX(HULL[5], fx) + 0.100, 0.125, 0.021, 0.022, 0.85), 0.34])],
-    null];
+    [...BAYS.map(B => [bayBox(HULL[6], B), 0.9 * B.tiers / 4]), [tierBox(HULL[6], -0.36, -0.27, 0, 0.14, 0.85, true), 1.2], [tierBox(HULL[6], -0.37, -0.28, 0.14, 0.035, 0.98, true), 0.5], [cyl(-0.40, deckX(HULL[6], -0.40) + 0.10, 0.12, 0.02, 0.01, 0.85), 0.5]]];   // the stacks, the accommodation block, the bridge, the funnel
 const SUPER_TOT = SUPER.map(l => l && l.reduce((s, [, w]) => s + w, 0));
 function superPt(L, a, up, s, q) {
     const list = SUPER[L]; if (!list) return null;
@@ -247,7 +243,7 @@ const mastSeg = m => m && [[m[0], m[1], 0], [m[0], m[2], 0]];
 const mastPt = (key, L, t) => { const m = MAST[key][L]; return [m[0], lerp(m[1], m[2], t), 0]; };
 const boomOf = Q => Q && Q.tack && Q.rigid === undefined ? [[Q.tack[0], Q.tack[1] - 0.005, 0.01], [Q.clew[0] - 0.02, Q.clew[1] - 0.005, 0.01]] : null;
 const gaffOf = Q => Q && Q.tack && Q.rigid === undefined && Q.peak[0] !== Q.throat[0] ? [[Q.throat[0], Q.throat[1] + 0.005, 0], [Q.peak[0] - 0.02, Q.peak[1] + 0.008, 0]] : null;
-const BOWSPRIT = [null, null, [[0.48, -0.235, 0], [0.78, -0.165, 0]], [[0.54, -0.200, 0], [0.96, -0.090, 0]], null, null, [[0.25, -0.262, 0], [0.56, -0.252, 0]]];   // the foiler's prodder
+const BOWSPRIT = [null, null, [[0.48, -0.235, 0], [0.78, -0.165, 0]], [[0.54, -0.200, 0], [0.96, -0.090, 0]], null, null, null];
 const SPAR = {
     mastA: MAST.A.map(mastSeg), mastB: MAST.B.map(mastSeg), mastC: MAST.C.map(mastSeg),
     boomA: [boomOf(SAILS.main[0]), boomOf(SAILS.main[1]), boomOf(SAILS.main[2]), yardOf(SQ5.foreC), null, null, null],   // the boom rises to become the fore course yard
@@ -267,10 +263,10 @@ const davits = (H, yOff, xs) => { const out = []; for (const s of [-1, 1]) for (
 const SPAR_HOST = [null, null, null, null,
     [...wheelSpokes(HULL[4], 1), ...wheelSpokes(HULL[4], -1), ...ring(0.02 - 0.025, deckX(HULL[4], 0.02) + 0.225, 0.021, 10, 0.6, 0, 'xz'), seg([0.34, deckX(HULL[4], 0.34) + 0.14, 0], [0.42, deckX(HULL[4], 0.42) + 0.12, 0], 0.7), seg([-0.34, deckX(HULL[4], -0.34) + 0.12, 0], [-0.44, deckX(HULL[4], -0.44) + 0.10, 0], 0.7)],   // the wheels' spokes (spinning), the funnel's rim, two gaffs
     [...davits(HULL[5], 0.036, [-0.24, -0.12, 0.0, 0.12, 0.24]), ...[0.15, -0.03, -0.21].flatMap(fx => ring(fx - 0.022, deckX(HULL[5], fx) + 0.225, 0.022, 10, 0.6, 0, 'xz')), seg([0.36, deckX(HULL[5], 0.36) + 0.16, 0], [0.30, deckX(HULL[5], 0.30) + 0.19, 0.03], 0.7), seg([-0.36, deckX(HULL[5], -0.36) + 0.15, 0], [-0.30, deckX(HULL[5], -0.30) + 0.18, -0.03], 0.7)],   // davits, funnel rims, derricks
-    (() => { const H = HULL[6], dk = x => deckX(H, x), out = [];
-        for (const x of [0.25, -0.25]) out.push(seg([x, dk(x) + 0.004, -CAT.z], [x, dk(x) + 0.004, CAT.z], 0.75));                         // the two crossbeams
-        for (const s of [-1, 1]) { const z = s * CAT.z, yb = WL + CAT.fly;                                                                  // per hull: the main foil strut and its L-foil, the rudder strut and its T-foil
-            out.push(seg([0.05, yb, z], [0.05, WL - 0.12, z], 0.85), seg([0.05, WL - 0.12, z], [0.05, WL - 0.13, z - s * 0.13], 0.85), seg([-0.45, yb, z], [-0.45, WL - 0.09, z], 0.85), seg([-0.45, WL - 0.09, z - 0.03], [-0.45, WL - 0.09, z + 0.03], 0.85)); }
+    (() => { const H = HULL[6], dk = x => deckX(H, x), hw = x => railHB(H, x) * 0.92, out = [];
+        for (const B of BAYS) for (const x of [B.x0, B.x1]) for (const sg of [-1, 1]) out.push(seg([x, dk(x), sg * hw(x)], [x, dk(x) + B.h, sg * hw(x)], 0.8));   // the stacks' corner posts
+        for (const x of [-0.36, -0.27]) for (const sg of [-1, 1]) out.push(seg([x, dk(x), sg * railHB(H, x) * 0.85], [x, dk(x) + 0.175, sg * railHB(H, x) * 0.85], 0.75));   // the block's corners
+        out.push(...ring(-0.41, dk(-0.40) + 0.22, 0.02, 10, 0.6, 0, 'xz'));
         return out; })(),
 ];
 
@@ -329,15 +325,14 @@ const RIG = {
 };
 const RIG_DENSITY = { foreStay: [0, 0.5, 1, 1, 1, 1, 1] };   // fraction of a line's particles present per level (sparser forestay on the sloop so the jib reads apart from the main)
 const RIG_SHADE = k => k.startsWith('rat') || k === 'footropes' ? 0.45 : k === 'braces' || k === 'running' ? 0.5 : 0.6;
-/* the machine ships' rigging hosts: funnel guys, mast stays, an aerial, the foiler's shrouds and trampoline */
+/* the machine ships' rigging hosts: funnel guys, mast stays, an aerial, the container stacks' tier lines */
 const guys = (fx, fy, H, r) => [[[fx, fy, 0], [fx + r, deckX(H, fx + r) + 0.04, 0]], [[fx, fy, 0], [fx - r, deckX(H, fx - r) + 0.04, 0]], [[fx, fy, 0], [fx, deckX(H, fx) + 0.04, railHB(H, fx) * 0.9]], [[fx, fy, 0], [fx, deckX(H, fx) + 0.04, -railHB(H, fx) * 0.9]]];
 const mastStays = (L, key) => { const m = MAST[key][L]; if (!m) return []; return [[[m[0], m[2], 0], railPt(L, m[0] + 0.12, 0)], [[m[0], m[2], 0], railPt(L, m[0] - 0.12, 0)], [[m[0], m[2], 0], railPt(L, m[0], 1)], [[m[0], m[2], 0], railPt(L, m[0], -1)]]; };
 const RIG_HOST = [null, null, null, null,
     [...guys(0.02 - 0.025, deckX(HULL[4], 0.02) + 0.20, HULL[4], 0.14), ...mastStays(4, 'A'), ...mastStays(4, 'B'), [mastPt('A', 4, 1), mastPt('B', 4, 1)]],
     [...[0.15, -0.03, -0.21].flatMap(fx => guys(fx - 0.022, deckX(HULL[5], fx) + 0.21, HULL[5], 0.12)), ...mastStays(5, 'A'), ...mastStays(5, 'B'), [mastPt('A', 5, 1), mastPt('B', 5, 1)]],   // (the aerial between the mastheads)
-    (() => { const H = HULL[6], dk = x => deckX(H, x), out = [[mastPt('A', 6, 0.9), [0.15, dk(0.15), CAT.z]], [mastPt('A', 6, 0.9), [0.15, dk(0.15), -CAT.z]], [mastPt('A', 6, 0.95), [0.54, dk(0.54) + 0.01, 0]]];   // shrouds to each hull, the forestay to the prodder
-        for (let k = 0; k <= 6; k++) { const z = -0.13 + 0.26 * k / 6; out.push([[-0.25, dk(-0.25), z], [0.25, dk(0.25), z]]); }                                                                       // the trampoline: lines along
-        for (let k = 0; k <= 5; k++) { const x = -0.25 + 0.5 * k / 5; out.push([[x, dk(x), -0.13], [x, dk(x), 0.13]]); }                                                                               // and across
+    (() => { const H = HULL[6], dk = x => deckX(H, x), hw = x => railHB(H, x) * 0.92, out = [...mastStays(6, 'A'), ...mastStays(6, 'B')];
+        for (const B of BAYS) for (let k = 1; k <= B.tiers; k++) for (const sg of [-1, 1]) out.push([[B.x0, dk(B.x0) + k * 0.027, sg * hw(B.x0)], [B.x1, dk(B.x1) + k * 0.027, sg * hw(B.x1)]]);   // the tier lines along the stacks' sides
         return out; })(),
 ];
 
@@ -396,9 +391,6 @@ function fittings(L) {
         const k = Math.floor(u * 8), a = 2 * PI * k / 8 + 0.02, r = lerp(0.066, PADDLE_R, frac(u * 8));
         return [xw + r * Math.cos(a), yax + r * Math.sin(a), zw + w * 0.03, 0.88, 1, yax, xw];
     };
-    const tramp = (u, w) => { const x = lerp(-0.23, 0.23, u); return [x, dk(x) - 0.004, w * 0.13, 0.45]; };                                                  // the foiler's trampoline
-    const catDeck = (u, w) => { const x = -0.5 + u, s = w < 0 ? -1 : 1; return [x, dk(x), s * CAT.z + (Math.abs(w) * 2 - 1) * (CAT.hb * catPlan(u) + 0.003), TOP * 0.9]; };   // the two hulls' decks
-    const pod = (u, w) => { const x = lerp(-0.02, 0.12, u), f = face(u), s = w < 0 ? -1 : 1; return f < 0.5 ? [x, dk(x) + 0.02, w * 0.03, TOP * 0.9] : [x, dk(x) + 0.02 * Math.abs(w), s * 0.03, side(s)]; };   // the central pod at the wing's foot
     const bw = H.bulwark + 0.004;
     return [
         [[thwart(0.12, 0.05), 1], [thwart(-0.16, 0.05), 1], [thwart(-0.40, 0.08), 0.8], [foredeck, 0.8], [tiller, 0.5], [oars, 1.2]],
@@ -407,7 +399,7 @@ function fittings(L) {
         [[flat, 3.4], [breakQ(-0.30, 0.025), 0.4], [breakF(0.36, 0.02), 0.4], [rail(-0.49, 0.49, bw, 0), 1.6], [box(0.08, 0.22, 0.04, 0.6), 0.8], [box(-0.22, -0.08, 0.04, 0.6), 0.8], [wheel(-0.46), 0.4], [boat(-0.20, -0.02, 0.06, 0.03), 0.7], [boat(0.08, 0.24, -0.06, 0.03), 0.7], [anchor(0.40, 1), 0.45], [anchor(0.40, -1), 0.45], [figurehead, 0.6], [gallery, 0.8], [capstan(0.40), 0.3], [box(0.28, 0.34, 0.012, 0.4), 0.3], [box(-0.40, -0.34, 0.02, 0.3), 0.3]],
         [[flat, 2.4], [paddleWheel(1), 1.3], [paddleWheel(-1), 1.3], [rail(-0.48, 0.48, bw, 0), 1.2], [wheel(-0.40), 0.3], [box(0.30, 0.38, 0.012, 0.4), 0.3], [capstan(0.42), 0.25], [box(-0.46, -0.36, 0.015, 0.4), 0.25]],
         [[flat, 2.6], ...[-0.24, -0.12, 0.0, 0.12, 0.24].flatMap(x => [[lifeboat(x, 1), 0.16], [lifeboat(x, -1), 0.16]]), [railT(-0.32, 0.30, 0.036 + 0.008, 0.92), 0.8], [railT(-0.26, 0.26, 0.070 + 0.008, 0.80), 0.7], [railT(-0.20, 0.24, 0.100 + 0.008, 0.66), 0.6], [rail(-0.49, 0.49, bw, 0), 1.0], [breakF(0.34, 0.02), 0.3], [capstan(0.44), 0.2], [box(-0.46, -0.38, 0.015, 0.4), 0.2]],
-        [[tramp, 1.6], [catDeck, 1.4], [pod, 0.5]],
+        [[flat, 1.4], [rail(-0.49, 0.49, bw, 0), 1.0], [railT(-0.37, -0.28, 0.175 + 0.006, 0.98), 0.4], [breakF(0.41, 0.014), 0.2], [capstan(0.45), 0.2], [box(0.44, 0.48, 0.012, 0.3), 0.2], [box(-0.47, -0.42, 0.015, 0.4), 0.2]],
     ][L];
 }
 const FIT = [0, 1, 2, 3, 4, 5, 6].map(fittings);
@@ -441,7 +433,7 @@ export function wakePt(rand) {
 /* ---------------------------------------------------------------- allocation */
 const SAIL_W = { burgee: 40, main: 520, mizzen: 330, jib: 260, stay: 220, flying: 180, jib4: 120, topA: 380, topB: 150, foreG: 260, foreR: 170, mainC: 560, mainT: 400, mainG: 280, mainR: 180, mainSky: 100, mizG: 200, mizR: 130 };
 const SPAR_W = { mastA: 120, mastB: 110, mastC: 120, boomA: 45, gaffA: 40, boomB: 35, gaffB: 30, bowsprit: 55, yard_foreG: 32, yard_mainC: 40, yard_mainT: 36, yard_mainG: 32, yard_foreR: 24, yard_mainR: 26, yard_mainSky: 18, yard_mizT: 32, yard_mizG: 26, yard_mizR: 20 };
-const RIG_W = { shroudsA: 130, shroudsB: 110, shroudsC: 130, ratA: 190, ratB: 150, ratC: 200, foreStay: 60, jibStay: 50, flyingStay: 45, jib4Stay: 35, stays: 80, backstay: 50, backstays: 90, running: 100, braces: 170, footropes: 110 };
+const RIG_W = { anchor: 110, shroudsA: 130, shroudsB: 110, shroudsC: 130, ratA: 190, ratB: 150, ratC: 200, foreStay: 60, jibStay: 50, flyingStay: 45, jib4Stay: 35, stays: 80, backstay: 50, backstays: 90, running: 100, braces: 170, footropes: 110 };
 const ROLE_W = [[ROLE.HULL, 0.17], [ROLE.DECK, 0.04], [ROLE.SAIL, 0.28], [ROLE.SPAR, 0.05], [ROLE.RIGGING, 0.05], [ROLE.WATER, 0.22], [ROLE.WAKE, 0.07], [ROLE.REFLECTION, 0.12]];   // the Sept-10 sailboat's mix: sails 39, hull 18, water 18, reflection 16 (with the rigging on the hull at the first two levels)
 const PARTS = { [ROLE.SAIL]: SAIL_W, [ROLE.SPAR]: SPAR_W, [ROLE.RIGGING]: RIG_W };
 const REFL_SAILS = Object.fromEntries(Object.entries(SAIL_W).filter(([k]) => k !== 'burgee'));
@@ -538,10 +530,9 @@ export function buildBoatLevels(count, seed = 1) {
         return L => {
             if (q >= HULL_PRES[L]) return null;
             let p;
-            if (L === 6) p = catPt(u, s, v, w, gun, transom);
-            else if (transom) return transomPt(HULL[L], v, w);
+            if (transom) return transomPt(HULL[L], v, w);
             else { const vv = L === 0 && plank && !gun && !grid ? Math.max(0.012, Math.floor(v * 5) / 5) : v; p = hullPt(HULL[L], u, s, vv, gun); }   // the skiff's lapstrake: plank lands as denser rows (the lowest at the waterline)
-            if (gun) { p[7] = 'gun:' + s + (L === 6 ? (w < 0 ? 'i' : 'o') : ''); p[8] = u; }   // the gunwale: a line feature
+            if (gun) { p[7] = 'gun:' + s; p[8] = u; }   // the gunwale: a line feature
             return p;
         };
     };
@@ -570,6 +561,7 @@ export function buildBoatLevels(count, seed = 1) {
         const q = rand(), t = rand(), jx = (rand() - 0.5) * 0.005, jy = (rand() - 0.5) * 0.005, dq = rand(), dens = RIG_DENSITY[part], sh = RIG_SHADE(part);
         const onHull = genHull(null);   // the skiff and the sloop carry no lines at all (the Sept-10 sailboat had none): their rigging particles thicken the hull, and fly to the lines when the schooner's appear
         return L => {
+            if (part === 'anchor') return anchorPt(L, t, q, dq);
             if (L <= 1) return onHull(L);
             let segs = RIG[part][L], key = 'rg:' + part;
             if (!segs || (dens && dq >= dens[L])) { if (RIG_HOST[L]) { segs = RIG_HOST[L]; key = 'rgh'; } else if (RIG.shroudsA[L]) { segs = RIG.shroudsA[L]; key = 'rg:shroudsA'; } else if (SPAR.mastA[L]) { segs = [SPAR.mastA[L]]; key = 'sp:mastA'; } }   // a line the level lacks hosts on the level's host lines, else on the fore shrouds
