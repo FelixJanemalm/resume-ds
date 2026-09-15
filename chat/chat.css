@@ -69,20 +69,17 @@
 /* Handwritten "for <Company>?" after the h1, on application links and company pages. */
 /* The h1 paints its gradient through its own glyphs; a transformed child inherits the
    transparent fill but not that paint, so the span paints its own gradient. */
-/* An annotation on the heading, not part of it: a pen font, ink-colored, a
-   slight tilt. The anchor is zero-size, so the stamp never re-wraps the heading
-   or moves anything below it; chat.js shrinks the ink if it would overflow.
-   The ink paints its own color because the h1 fills its text with a gradient
-   that children do not inherit. The font is loaded by the @import at the top. */
-.fjc-for {
-  display: inline-block; position: relative; width: 0; height: 0; overflow: visible;
-  vertical-align: baseline; pointer-events: none;
-}
+/* An annotation on the heading, not part of it. .fjc-for is an empty zero-size
+   anchor inside the h1; .fjc-for__ink is drawn in the hero wrapper at the
+   anchor's position by chat.js (inside the h1 the heading's clipped gradient
+   painted a ghost copy of the letters). Pen font, ink-coloured, slight tilt.
+   The font is loaded by the @import at the top of this sheet. */
+.fjc-for { display: inline-block; width: 0; height: 0; overflow: hidden; vertical-align: baseline; }
 .fjc-for__ink {
-  position: absolute; left: 0.18em; bottom: 0.02em; z-index: 3; white-space: nowrap;
+  position: absolute; z-index: 3; white-space: nowrap; pointer-events: none;
   font-family: 'Caveat', 'Permanent Marker', cursive; font-weight: 600; letter-spacing: 0.01em;
-  font-size: 0.72em; line-height: 1; transform: rotate(-2deg); transform-origin: left bottom;
-  background: none; -webkit-background-clip: border-box; background-clip: border-box;
+  line-height: 1; transform: rotate(-2deg); transform-origin: left bottom;
+  background: none; text-shadow: none;
   color: var(--button-color, #4faad1); -webkit-text-fill-color: var(--button-color, #4faad1);
 }
 .fjc-body { flex: 1; min-width: 0; overflow-wrap: anywhere; }
@@ -151,6 +148,9 @@
 .fjc[data-state="docked"] .fjc-thread { display: none; }
 .fjc[data-state="docked"] .fjc-bot { background: var(--fjc-field); backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none; }
 .fjc[data-state="docked"][data-open="1"] .fjc-bar-text { display: none; }
+/* One AI chip at a time: the bar's chip hides once the bubbles (each with a chip) are showing. */
+.fjc[data-state="docked"][data-open="1"] .fjc-bar .fjc-badge { display: none; }
+.fjc[data-state="docked"][data-open="1"] .fjc-bar { justify-content: flex-end; padding-bottom: 0.2em; }
 .fjc[data-state="docked"][data-open="1"] .fjc-thread {
   display: flex; max-height: min(50vh, 460px); overflow-y: auto; padding: 0.2em 0.2em 0.6em; margin-bottom: 0.4em;
 }
@@ -174,7 +174,18 @@
   .fjc-slot { width: 100%; }
   .fjc-msg { max-width: 100%; }
   .fjc-form textarea { width: 100%; }
-  .fjc[data-state="docked"] { left: 8px; right: 8px; bottom: 8px; width: auto; transform: none; padding: 0.5em 0.6em 0.6em; }
+  /* 16px or more: below that, iOS Safari zooms the whole page in when the field is
+     tapped, which made the open companion look wider than the screen. */
+  .fjc-form textarea { font-size: 16px; }
+  /* Clear of the display's rounded corners: inset further, follow the safe-area
+     insets where the browser reports them, and round the bar to match the curve. */
+  .fjc[data-state="docked"] {
+    left: max(14px, env(safe-area-inset-left)); right: max(14px, env(safe-area-inset-right));
+    bottom: calc(14px + env(safe-area-inset-bottom)); width: auto; transform: none;
+    padding: 0.55em 0.7em 0.7em; border-radius: 26px;
+  }
+  .fjc[data-state="docked"] .fjc-form textarea { border-radius: 16px; }
+  .fjc[data-state="docked"] button.fjc-send { border-radius: 16px; }
   .fjc[data-state="docked"][data-open="1"] .fjc-thread { max-height: 60vh; }
 }
 @media (prefers-reduced-motion: reduce) {

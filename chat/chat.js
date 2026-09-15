@@ -164,35 +164,48 @@
   // On an application link, stamp "at <Company>?" after the h1, in the
   // heading's own font ("Ship better products faster at Anthropic?"). The
   // first bubble then never needs to name the company.
-  // The stamp is an annotation hung after the heading's last word. It takes no
-  // layout space (a zero-size anchor with the ink positioned off it), so the
-  // heading never re-wraps and nothing below it moves when it arrives. If the
-  // ink would run past the hero column or the screen, it shrinks to fit.
+  // The stamp is an annotation hung after the heading's last word. Only an empty,
+  // zero-size anchor goes inside the <h1>; the handwriting is drawn in the hero
+  // wrapper at the anchor's position. (The h1 paints its gradient through every
+  // glyph inside it, which left an unrotated ghost copy under the ink.) Nothing
+  // takes layout space, so the heading never re-wraps; the ink shrinks to fit the
+  // hero column and keeps clear of the colour picker.
+  var stampAnchor = null, stampInk = null;
   function markFor(company) {
     var h1 = document.querySelector(".hero h1");
-    if (!h1 || !company || h1.querySelector(".fjc-for")) return;
-    var ink = el("span", { "class": "fjc-for__ink", text: "at " + company + "?" });
-    h1.appendChild(el("span", { "class": "fjc-for", "aria-hidden": "true" }, [ink]));
+    if (!h1 || !company || stampAnchor) return;
+    var host = h1.closest(".hero-wrapper") || h1.parentElement;
+    stampAnchor = el("span", { "class": "fjc-for", "aria-hidden": "true" });
+    h1.appendChild(stampAnchor);
+    stampInk = el("span", { "class": "fjc-for__ink", "aria-hidden": "true", text: "at " + company + "?" });
+    host.appendChild(stampInk);
     fitStamp();
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitStamp);
     window.addEventListener("resize", fitStamp);
+    if ("ResizeObserver" in window) new ResizeObserver(fitStamp).observe(h1);
+    setTimeout(fitStamp, 600); setTimeout(fitStamp, 2000);   // late fonts and hero layout
   }
   function fitStamp() {
-    var ink = document.querySelector(".fjc-for__ink");
-    if (!ink) return;
-    ink.style.fontSize = "";
-    var col = (ink.closest(".hero-left") || ink.closest("h1")).getBoundingClientRect();
+    if (!stampAnchor || !stampInk) return;
+    var h1 = stampAnchor.closest("h1"), host = stampInk.parentElement;
+    var hostRect = host.getBoundingClientRect(), a = stampAnchor.getBoundingClientRect();
+    var size = parseFloat(getComputedStyle(h1).fontSize) * 0.72;
+    stampInk.style.fontSize = size + "px";
+    var col = (h1.closest(".hero-left") || h1).getBoundingClientRect();
     var limit = Math.min(col.right, window.innerWidth - 12);
-    var picker = document.getElementById("color-picker-container");   // keep clear of the colour picker card
-    if (picker) {
-      var pr = picker.getBoundingClientRect(), ir = ink.getBoundingClientRect();
-      if (pr.width && pr.top < ir.bottom && pr.bottom > ir.top && pr.left > ir.left) limit = Math.min(limit, pr.left - 12);
-    }
+    var picker = document.getElementById("color-picker-container");
     for (var i = 0; i < 8; i++) {
-      var r = ink.getBoundingClientRect();
-      if (r.right <= limit) break;
-      var size = parseFloat(getComputedStyle(ink).fontSize);
-      ink.style.fontSize = Math.max(12, size * Math.max(0.55, (limit - r.left) / r.width)) + "px";
+      var gap = size * 0.25;
+      stampInk.style.left = (a.left - hostRect.left + gap) + "px";
+      stampInk.style.top = (a.top - hostRect.top - size * 0.95) + "px";   // anchor sits on the baseline
+      var r = stampInk.getBoundingClientRect(), lim = limit;
+      if (picker) {
+        var pr = picker.getBoundingClientRect();
+        if (pr.width && pr.top < r.bottom && pr.bottom > r.top && pr.left > r.left) lim = Math.min(lim, pr.left - 12);
+      }
+      if (r.right <= lim || size <= 12) break;
+      size = Math.max(12, size * Math.max(0.55, (lim - r.left) / r.width));
+      stampInk.style.fontSize = size + "px";
     }
   }
   // Lead with the case studies that matter for the visitor's track (what the
@@ -472,7 +485,7 @@
     if (DEEP[target]) { linkCard(msg, DEEP[target][0], deepUrl(target)); return; }
     if (CASE[target]) {
       var teaser = document.querySelector('a.case-study-teaser[href*="' + target.slice(5) + '"]');
-      if (go && teaser) { teaser.scrollIntoView({ behavior: "smooth", block: "center" }); flash(teaser); }
+      if (go && teaser) { markOwnScroll(); teaser.scrollIntoView({ behavior: "smooth", block: "center" }); flash(teaser); }
       linkCard(msg, CASE[target][0], CASE[target][1]);
       return;
     }
@@ -485,11 +498,11 @@
     if (target === "resume") { linkCard(msg, "Resume.pdf", "/Resume.pdf"); return; }
     if (target === "contact") {
       var f = document.querySelector("footer");
-      if (go && f) f.scrollIntoView({ behavior: "smooth", block: "end" });
+      if (go && f) { markOwnScroll(); f.scrollIntoView({ behavior: "smooth", block: "end" }); }
       linkCard(msg, "hello@felixjanemalm.com", "mailto:hello@felixjanemalm.com");
       return;
     }
-    if (target === "home") { if (go) window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+    if (target === "home") { if (go) { markOwnScroll(); window.scrollTo({ top: 0, behavior: "smooth" }); } return; }
     var node = findSection(target);
     if (!node) return;
     if (go) { scrollToNode(node); return; }
@@ -516,7 +529,10 @@
     for (var i = 0; i < heads.length; i++) if (spec.heading.test(heads[i].textContent.trim())) return heads[i];
     return null;
   }
+  var ownScrollUntil = 0;   // page scrolls the widget starts itself (navigate) must not fold the companion
+  function markOwnScroll() { ownScrollUntil = Date.now() + 1500; }
   function scrollToNode(node) {
+    markOwnScroll();
     var top = node.getBoundingClientRect().top + window.pageYOffset - 96;   // clear the fixed header
     window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
   }
@@ -666,8 +682,21 @@
     var atFooter = !!footerEl && footerEl.getBoundingClientRect().top < window.innerHeight - 8;
     root.classList.toggle("fjc-tucked", docked && atFooter && !inUse);
   }
+  // On phones the open companion covers much of the screen, so when the visitor
+  // scrolls the page and is not typing, it folds back to the compact bar.
+  // Scrolls the widget starts itself (navigate) and small jitters are ignored.
+  var phoneMq = window.matchMedia ? window.matchMedia("(max-width: 767px)") : null;
+  var foldFromY = null;
+  function foldOnScroll() {
+    var open = root.getAttribute("data-open") === "1" && root.getAttribute("data-state") === "docked";
+    if (!open || !phoneMq || !phoneMq.matches || document.activeElement === input || Date.now() < ownScrollUntil) {
+      foldFromY = null; return;
+    }
+    if (foldFromY === null) { foldFromY = window.pageYOffset; return; }
+    if (Math.abs(window.pageYOffset - foldFromY) > 32) { foldFromY = null; setOpen(false); }
+  }
   window.addEventListener("scroll", function () {
-    if (!tuckQueued) { tuckQueued = true; requestAnimationFrame(function () { syncState(); tuckAtFooter(); }); }
+    if (!tuckQueued) { tuckQueued = true; requestAnimationFrame(function () { syncState(); foldOnScroll(); tuckAtFooter(); }); }
   }, { passive: true });
   window.addEventListener("resize", function () { syncState(); tuckAtFooter(); });
   syncState();
