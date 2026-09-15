@@ -1235,7 +1235,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         const smoke = BOAT && BOAT.SMOKE ? tbl(BOAT.SMOKE) * (1 - rocketMix) : 0, FN = BOAT && BOAT.FUNNELS;   // funnel smoke and the funnels' tops, mixed between the two levels
         if (FN) shipU.funnel.set(FN[lo][0] + (FN[hi][0] - FN[lo][0]) * mix, FN[lo][1] + (FN[hi][1] - FN[lo][1]) * mix, FN[lo][2] + (FN[hi][2] - FN[lo][2]) * mix, FN[lo][3] + (FN[hi][3] - FN[lo][3]) * mix);
         // the anchor goes down once the ship has come to rest (at the hero, or wherever the reader stopped), and comes up as the wind returns
-        const dropT = restW * M.smoothstep(ship.anchor, 0.3, 0.8) * (1 - rocketMix);
+        const dropT = restW * M.smoothstep(ship.anchor, 0.3, 0.8) * (1 - rocketMix) * M.smoothstep(lvl, 0.5, 1);   // not on the skiff (the hero's little boat): the sloop is the first to carry one
         ship.anchorDrop += M.clamp(dropT - ship.anchorDrop, -dt / 1.3, dt / 2.2);   // lowered over 2.2 s (eased as a fall in the shader), weighed in 1.3 s
         if (ship.anchorDrop < 0.02) ship.anchorSide = shipRot.elements[8] >= 0 ? 1 : -1;   // the side that faces the camera, chosen while it is stowed (it never jumps sides while down)
         for (const u of ALLU) { u.uSmoke.value = smoke; u.uSmokeClk.value = ship.smokeClk; u.uPaddle.value = ship.paddle; u.uAnchor.value = ship.anchorDrop; u.uAnchorSide.value = ship.anchorSide || 1; }
