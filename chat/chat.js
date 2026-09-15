@@ -265,10 +265,22 @@
   var bar = el("div", { "class": "fjc-bar" }, [el("span", { "class": "fjc-badge", text: "AI" }), barText, toggle]);
   var earlier = el("button", { "class": "fjc-earlier", type: "button", hidden: "" });
   var thread = el("div", { "class": "fjc-thread", role: "log", "aria-live": "polite" });
-  var placeholder = ctx.application_id
-    ? "Ask anything, or paste a job description"
-    : "What are you hiring for? Ask anything, or paste the job description";
+  // Placeholder by available width: the full ask on wide screens, a line that fits on phones.
+  var PLACEHOLDERS = ctx.application_id
+    ? { wide: "Ask anything, or paste a job description", narrow: "Ask anything about the role" }
+    : { wide: "What are you hiring for? Ask anything, or paste the job description", narrow: "What role are you hiring for?" };
+  var narrowMq = window.matchMedia ? window.matchMedia("(max-width: 520px)") : null;
+  var placeholder = narrowMq && narrowMq.matches ? PLACEHOLDERS.narrow : PLACEHOLDERS.wide;
   var input = el("textarea", { rows: "1", placeholder: placeholder, "aria-label": "Ask about Felix" });
+  function syncPlaceholder() {
+    placeholder = narrowMq && narrowMq.matches ? PLACEHOLDERS.narrow : PLACEHOLDERS.wide;
+    input.setAttribute("placeholder", placeholder);
+    if (typeof updateFold === "function" && !lastBotText()) barText.textContent = placeholder;
+  }
+  if (narrowMq) {
+    if (narrowMq.addEventListener) narrowMq.addEventListener("change", syncPlaceholder);
+    else if (narrowMq.addListener) narrowMq.addListener(syncPlaceholder);
+  }
   var sendBtn = el("button", { "class": "fjc-send", type: "submit", "aria-label": "Send", html: ARROW });
   var form = el("form", { "class": "fjc-form" }, [input, sendBtn]);
   var slot = null;
@@ -597,16 +609,14 @@
     if (state === "hero") { setOpen(false); unfolded = false; updateFold(); }
     tuckAtFooter();
   }
-  // Dock only once the visitor has scrolled past the input. On a phone the input
-  // can start below the fold; that is "not reached yet", not "scrolled past".
-  if (hasHero && "IntersectionObserver" in window) {
-    var io = new IntersectionObserver(function (entries) {
-      var e = entries[0], r = e.intersectionRatio;
-      var above = e.boundingClientRect.bottom < (e.rootBounds ? e.rootBounds.top : 0) + e.boundingClientRect.height * 0.85;
-      if (r < 0.15 && above) setState("docked");
-      else if (r > 0.5 || !above) setState("hero");
-    }, { threshold: [0, 0.15, 0.5, 1] });
-    io.observe(slot);
+  // Dock exactly when the input has scrolled fully above the top of the screen,
+  // decided from its box on every scroll frame. (An intersection observer only
+  // reports at thresholds, which real phones and programmatic scrolling can skip.)
+  // Below the fold on load means "not reached yet": the hero state stays.
+  // The slot keeps its height while docked, so the decision cannot flip-flop.
+  function syncState() {
+    if (!hasHero || !slot) return;
+    setState(slot.getBoundingClientRect().bottom < 0 ? "docked" : "hero");
   }
 
   // No padding is added to the page (the footer is the page's ending). Instead the
@@ -621,9 +631,10 @@
     root.classList.toggle("fjc-tucked", docked && atFooter && !inUse);
   }
   window.addEventListener("scroll", function () {
-    if (!tuckQueued) { tuckQueued = true; requestAnimationFrame(tuckAtFooter); }
+    if (!tuckQueued) { tuckQueued = true; requestAnimationFrame(function () { syncState(); tuckAtFooter(); }); }
   }, { passive: true });
-  window.addEventListener("resize", tuckAtFooter);
+  window.addEventListener("resize", function () { syncState(); tuckAtFooter(); });
+  syncState();
 
   barText.addEventListener("click", function () { setOpen(root.getAttribute("data-open") !== "1"); });
   toggle.addEventListener("click", function () { setOpen(root.getAttribute("data-open") !== "1"); });
