@@ -211,6 +211,18 @@
     });
     for (var i = picked.length - 1; i >= 0; i--) wrap.insertBefore(picked[i], wrap.firstChild);
   }
+  // The work spine reads the cards the moment its module runs, before any lookup can
+  // return, so a first visit keeps the default order. The order is remembered per
+  // link, and on return visits it is applied here, synchronously, before the spine
+  // (a later script in the page) starts.
+  (function leadFromMemory() {
+    if (!ctx.application_id) return;
+    try {
+      var m = JSON.parse(local.get("fj_lead") || "null");
+      if (m && m.ref === ctx.application_id && Array.isArray(m.lead)) leadWith(m.lead);
+    } catch (e) { /* nothing remembered */ }
+  })();
+
   function loadPosting() {
     if (!ctx.application_id) return;
     // Reserve the opener's space before the lookup returns, so the hero does not
@@ -240,6 +252,7 @@
         if (!j) { settle(null); if (refParam !== ctx.application_id) local.remove("fj_app"); return; }   // stale stored reference
         if (j.company) markFor(j.company);
         leadWith(j.lead);
+        if (Array.isArray(j.lead)) local.set("fj_lead", JSON.stringify({ ref: ctx.application_id, lead: j.lead }));
         if (j.brand_color && local.get("fj_app_color") !== ctx.application_id) {
           // The site in their colors: same token pipeline the picker uses, applied once per link.
           setAccent({ color: j.brand_color, mode: "auto", quiet: true });
