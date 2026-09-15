@@ -57,7 +57,7 @@ const pcfg = section ? {
     shipLines: numAttr(section.dataset.shipLines, 1), shipSolid: numAttr(section.dataset.shipSolid, 1),   // dots -> lines -> solid: the wireframe's and the surfaces' strength (x the module's per-level tables)
     shipFleet: numAttr(section.dataset.shipFleet, 1), shipFleetSize: numAttr(section.dataset.shipFleetSize, 1),   // the fleet (the route's `fleet` key): field particles form three small copies of the ship in formation round it; strength (0 = none) and the copies' size (x)
     shipTrail: numAttr(section.dataset.shipTrail, 5),                   // the wake as a chart line: foam dropped at the transom stays in the sea and fades over this many seconds, so the ship draws its own dotted route (0 = the short foam strip behind the hull instead)
-    shipStorm: numAttr(section.dataset.shipStorm, 1), shipRain: numAttr(section.dataset.shipRain, 1.6),   // the passage through weather (the route's `storm` key, 0..1): its strength, and how fast the field falls as rain at full storm (world units per second; 0 = none)
+    shipStorm: numAttr(section.dataset.shipStorm, 1.5), shipRain: numAttr(section.dataset.shipRain, 3),   // the passage through weather (the route's `storm` key, 0..1): its strength, and how fast the field falls as rain at full storm (world units per second; 0 = none)
     shipSettle: numAttr(section.dataset.shipSettle, 7),     // how fast ship particles take their places (per second): 7 lands a recruit in about 0.4 s
     shipLag: numAttr(section.dataset.shipLag, 0.9), shipLagPos: numAttr(section.dataset.shipLagPos, 0.6), shipLagSize: numAttr(section.dataset.shipLagSize, 0.8),   // seconds the drawn pose takes to close 95% of a scroll jump: angles / position (x, y, wake) / framing (size and level share one lag so the hull length holds while the ship evolves)
     shipLean: numAttr(section.dataset.shipLean, 0.02),                   // banking: deg of heel per deg/s of turn, capped at 5 (negative carves into the turn instead)
@@ -154,7 +154,7 @@ const SIM_SHARED = `
         float alive = smoothstep(ha * 0.9 - 0.08, ha * 0.9 + 0.08, uWave.z);                       // the COUNT of foam grows with the way, each particle easing in over its own band ('active' is reserved in GLSL ES 1.0)
         fade = uWave.z * alive * smoothstep(0.0, 0.05, d1) * exp(-d / (0.45 * uWave.w * (1.0 + 1.5 * uRocket))) * fall(0.9, 1.0, d1)   // zero at birth (d1 = 0) and at the far end (d1 = 1); the length follows the way (x2.5 for the rocket)
              * (0.4 + 0.6 * hash1(md.z * 17.3 + floor(uClock.x + h * 5.0))) * (1.0 + 2.0 * uRocket * exp(-d / 0.5));   // the rocket's exhaust burns brightest at the nozzle
-        if (uTrail > 0.5) fade = 0.7 * uWave.z * alive * smoothstep(0.0, 0.04, d1) * pow(1.0 - d1, 1.3) * (0.5 + 0.5 * hash1(md.z * 17.3)); }   // the trail: a steady dot that fades with age
+        if (uTrail > 0.5) fade = 1.1 * uWave.z * alive * smoothstep(0.0, 0.04, d1) * pow(1.0 - d1, 1.1) * (0.6 + 0.4 * hash1(md.z * 17.3)); }   // the trail: a steady dot that fades with age
       else if (water > 0.5 && uRocket > 0.5) {
         // the rocket: the same particles are the air tearing past the body (streaks from ahead of the nose to past the tail, hugging the
         // skin) and sparks thrown from the nozzle in a cone; both stream at uFlow, which the CPU runs 4x faster for the rocket
@@ -332,7 +332,7 @@ const PTS_VS = SIM_SHARED + `
       vec3 rel=pw-uCam; float along=dot(rel,uDir); vec3 perp=rel-uDir*along; float d=length(perp);
       vLit=(1.0-smoothstep(0.0,uRadius,d))*step(0.5,along)*(1.0-bf*laneR)*(1.0-0.65*bf); vRand=p.w; vSpeed=length(v);   // the light barely touches the ship and not the sea
       vec4 mv=modelViewMatrix*vec4(pw,1.0);
-      gl_PointSize=uSize*uDPR*aSize*(1.0+0.9*vLit+bf*(uBoatPx-1.0)+2.4*sf+0.25*bf*laneR*clamp(fd-1.0,0.0,1.5)+bf*laneR*uSwell.z*(1.1*hash1(md.z*7.7)-0.3)+0.3*vFlag)*uP/max(-mv.z,1.0)*uIntro;   // the rest disc's specks vary in size (0.7x .. 1.8x)
+      gl_PointSize=uSize*uDPR*aSize*(1.0+0.9*vLit+bf*(uBoatPx-1.0)+2.4*sf+0.25*bf*laneR*clamp(fd-1.0,0.0,1.5)+0.5*bf*laneR*uTrail*step(6.5,role)*step(role,7.5)+bf*laneR*uSwell.z*(1.1*hash1(md.z*7.7)-0.3)+0.3*vFlag)*uP/max(-mv.z,1.0)*uIntro;   // the rest disc's specks vary in size (0.7x .. 1.8x)
       gl_Position=projectionMatrix*mv; }`;
 const PTS_FS = `
     uniform vec3 uColorA, uColorB, uColorLit, uColorFlag; uniform float uGlow; varying float vLit, vRand, vSpeed, vBoat, vShade, vStar, vFade, vFlag;
@@ -677,7 +677,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
                 { at: '#work:center@0.25', x: -0.28, y: 0.14, size: 0.33, turn: 325, tilt: 50, heel: 5, level: L1, wake: 0.85, cam: 0.85 },              // authored heel stays small: the wind adds its own and the sum is soft-limited at 18
                 { at: 'stage@0.14', x: 0, y: -0.38, size: 0.26, turn: 430, tilt: 54, heel: 4, level: L1, wake: 0.9, cam: 1 },                           // the crane keeps rising into the top view
                 { at: 'stage@0.92', x: -0.05, y: -0.36, size: 0.1, turn: 444, tilt: 63, heel: 4, level: L2, wake: 1, cam: 0.8 },
-                { at: 'stage-release', x: -0.06, y: -0.38, size: 0.12, turn: 438, tilt: 56, heel: 7, level: L2, wake: 0.95, cam: 0.8, storm: 0.3 },     // one left-hand arc out of the column, into weather
+                { at: 'stage-release', x: -0.06, y: -0.38, size: 0.12, turn: 438, tilt: 56, heel: 7, level: L2, wake: 0.95, cam: 0.8, storm: 0.6 },     // one left-hand arc out of the column, into weather
                 { at: 'stage-release+450', x: -0.17, y: -0.5, size: 0.14, turn: 405, tilt: 26, heel: 7, level: L2, wake: 0.9, cam: 0.8, storm: 1 },   // the passage through the storm: swell, roll, spray, rain, lightning
                 // the side shot and the level-ups: Felix's timings (2026-09-13), pixel offsets from the stage release
                 { at: 'stage-release+1100', x: -0.08, y: -0.625, size: 0.2, turn: 360, tilt: 0, heel: 18.5, level: L2, wake: 0.5, cam: 1, storm: 0 },   // out of it, calm at the quote: the schooner
@@ -1060,12 +1060,12 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         // the cursor is the wind at anchor: where the pointer sits across the hull (along the hull's z axis as it projects on the screen,
         // half a hull length for full wind) the sails fill away from it, the ship heels away from it, and they flog as it crosses the bow
         const zsx = -Math.sin(M.degToRad(P.turn)), zsy = -Math.cos(M.degToRad(P.turn)) * Math.sin(M.degToRad(P.tilt));
-        const cwT = M.clamp(((pointer.ndc.x - P.x) * visW / 2 * zsx + (pointer.ndc.y - P.y) * visH / 2 * zsy) / (0.6 * Math.max(0.05, scale)), -1, 1);
+        const cwT = M.clamp(((pointer.ndc.x - P.x) * visW / 2 * zsx + (pointer.ndc.y - P.y) * visH / 2 * zsy) / (0.45 * Math.max(0.05, scale)), -1, 1);
         ship.cw += (cwT - ship.cw) * Math.min(1, dt / 0.7);
         const cwOnT = pcfg.shipCursorWind * restW * (pointer.active && now - pointer.last < 2500 ? 1 : 0) * (1 - rocketMix);
         ship.cwOn += (cwOnT - ship.cwOn) * Math.min(1, dt / 1.0);
         const cwOn = M.clamp(ship.cwOn, 0, 1), cw = ship.cw;
-        let heelT = P.heel + side * (pcfg.shipHeelWind * tbl(LEVEL_HEEL) * Math.pow(way, 1.3) + 2.5 * gust + 6 * storm) - 5 * cw * cwOn;
+        let heelT = P.heel + side * (pcfg.shipHeelWind * tbl(LEVEL_HEEL) * Math.pow(way, 1.3) + 2.5 * gust + 6 * storm) - 8 * cw * cwOn;
         heelT = 18 * Math.tanh(heelT / 18);   // soft limit, so the roll never pins flat on a clamp
         if (ship.heel === null) { ship.heel = heelT; ship.heelVel = 0; shipRot0.copy(shipRot); shipAt0.copy(shipAt); }
         const omegaR = 6.2832 / (2.6 + 1.6 * lvn);
@@ -1083,7 +1083,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         const flapAmp = 0.03 * pcfg.shipFlap * (0.25 + 0.6 * luff + 1.2 * gust + 0.7 * (1 - Math.abs(cw)) * cwOn);   // head to the cursor's wind the cloth flogs
         // organic cloth: the belly breathes slowly (most when the sail is not drawing), and a slow billow rolls over it; both scale with shipFlap
         const breath = 0.22 * pcfg.shipFlap * (1 - 0.6 * fill) * (Math.sin(t * 0.37) + 0.5 * Math.sin(t * 0.61 + 1.0)) / 1.5;
-        const bellyMul = M.lerp((0.6 + 0.6 * fill) * (1 + breath), -1.2 * cw * (1 + breath), cwOn);   // the cursor's wind: the belly signed, away from the pointer
+        const bellyMul = M.lerp((0.6 + 0.6 * fill) * (1 + breath), -1.6 * cw * (1 + breath), cwOn);   // the cursor's wind: the belly signed, away from the pointer
         ship.billowPh = (ship.billowPh + dt * (0.5 + 0.8 * Wa + 0.6 * gust)) % 6283.185;
         shipU.sail2.set(0, 0.35 * pcfg.shipFlap * (0.5 + 0.5 * luff + 0.4 * gust) * (1 - 0.4 * fill), ship.billowPh, 0);
         ship.flutPh = (ship.flutPh + dt * (1.8 + 4.0 * Wa + 2.5 * gust)) % 6283.185;
@@ -1109,7 +1109,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         const Vsea = Vflow * scale * camW;   // world units per second: the lane's flow in hull lengths x the hull's on-screen length
         ship.driftX -= dt * (Vsea * hx * Math.max(1, pcfg.shipCurrent) + 0.25 * pcfg.shipRain * storm); ship.driftY -= dt * (Vsea * hy * Math.max(1, pcfg.shipCurrent) + pcfg.shipRain * storm); ship.camW = camW;   // in the storm the field falls as rain, slanted
         velU.uCurl.value = pcfg.pCurl * (1 + 2 * storm);   // the field churns
-        if (storm > 0.25 && Math.random() < dt * 0.3 * storm) { ship.flash = 1; ship.flash2 = Math.random() < 0.6 ? 0.13 : 0; }   // lightning: a Poisson process, often a double flash
+        if (storm > 0.25 && Math.random() < dt * 0.6 * storm) { ship.flash = 1; ship.flash2 = Math.random() < 0.6 ? 0.13 : 0; }   // lightning: a Poisson process, often a double flash
         if (ship.flash2 > 0) { ship.flash2 -= dt; if (ship.flash2 <= 0) ship.flash = 1; }
         ship.flash *= Math.exp(-dt / 0.1);
         velU.uDrift.value.set(ship.driftX, ship.driftY); U.uDrift.value.set(ship.driftX, ship.driftY); posU.uDrift.value.set(ship.driftX, ship.driftY);
