@@ -188,10 +188,8 @@ body:has(#ws-particles) .reader { background-color: transparent; }
 .work-spine[data-ship-grounds="translucent"] ~ .testimonials-wrapper .Wallop-list::after { background: linear-gradient(to left, color-mix(in srgb, var(--primaryBgTint) 45%, transparent), transparent 60%); }
 .work-spine[data-ship-grounds="translucent"] ~ .tools::before { background: linear-gradient(to right, color-mix(in srgb, var(--primaryBgTint) 45%, transparent), transparent 25%, transparent 75%, color-mix(in srgb, var(--primaryBgTint) 45%, transparent)); }
 
-/* The voyage in the hero: while the hero is on screen the particle layer is drawn above the Lottie swell (the ship rides in on it),
-   so the work stage must stack above the layer, and the swell drifts ahead of the page a little (--ws-lottie-y from work-spine.js). */
+/* The voyage in the hero: while the hero is on screen the particle layer is drawn above the Lottie swell, so the work stage must stack above the layer. */
 .work-spine.is-3d .work-spine__stage { z-index: 2; }
-.hero-wrapper dotlottie-player { translate: 0 var(--ws-lottie-y, 0px); }
 .hero-wrapper #scroll-down-arrow { z-index: 2; }
 .work-heading { position: relative; z-index: 2; }
 
