@@ -72,6 +72,7 @@ const pcfg = section ? {
 } : null;
 if (pcfg) for (const [k, v] of new URLSearchParams(location.search)) if (k in pcfg && v !== '') pcfg[k] = Number.isNaN(+v) ? v : +v;   // dev aid: ?shipWorkTilt=45&boat=off
 let layer = null;
+const MOD_V = '?v=2026-09-15a';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache); bump when they change
 
 const SIM_NOISE = `
     vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;} vec4 mod289(vec4 x){return x-floor(x*(1.0/289.0))*289.0;}
@@ -1285,14 +1286,14 @@ async function boot() {
     try { GPUC = await import('three/addons/misc/GPUComputationRenderer.js'); } catch (e) { console.warn('work-spine: no GPU particles', e); }
     let BOAT = null, THEMES = null;
     if (pcfg.boat !== 'off') {
-        try { BOAT = await import('./voyage-boat.js'); THEMES = { atlantic: BOAT }; } catch (e) { console.warn('work-spine: no ship model, particles only', e); }
-        if (THEMES) { try { THEMES.norse = await import('./voyage-norse.js'); } catch (e) { console.warn('work-spine: the Norse lineage failed to load', e); } }
+        try { BOAT = await import('./voyage-boat.js' + MOD_V); THEMES = { atlantic: BOAT }; } catch (e) { console.warn('work-spine: no ship model, particles only', e); }
+        if (THEMES) { try { THEMES.norse = await import('./voyage-norse.js' + MOD_V); } catch (e) { console.warn('work-spine: the Norse lineage failed to load', e); } }
         // the lineage: ?theme= (dev aid), then the picker's stored choice, then the section's data-ship-theme
         let want = new URLSearchParams(location.search).get('theme') || ''; if (!want) { try { want = localStorage.getItem('ws-ship-theme') || ''; } catch (e) {} }
         if (THEMES && THEMES[want || pcfg.shipTheme]) BOAT = THEMES[want || pcfg.shipTheme];
     }
     if (pcfg.mode === 'page') startParticleLayer(THREE, GPUC, BOAT, THEMES);
-    if (layer && new URLSearchParams(location.search).get('route') === '1') import('./voyage-editor.js').then(m => m.mountRouteEditor(layer.routeApi)).catch(e => console.warn('work-spine: route editor', e));
+    if (layer && new URLSearchParams(location.search).get('route') === '1') import('./voyage-editor.js' + MOD_V).then(m => m.mountRouteEditor(layer.routeApi)).catch(e => console.warn('work-spine: route editor', e));
     if (cards.length < 2) return;
     // the work section itself waits until it is within 1.5 viewports
     await new Promise(resolve => {
