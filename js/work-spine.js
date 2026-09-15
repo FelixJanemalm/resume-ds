@@ -721,6 +721,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
     const pointer = { ndc: new THREE.Vector2(), target: new THREE.Vector2(), active: false, last: 0 };
     addEventListener('pointermove', e => { pointer.cx = e.clientX; pointer.cy = e.clientY; pointer.active = true; pointer.last = performance.now(); }, { passive: true });   // placed into the canvas each frame (the canvas scrolls with the page at the ending)
     // point size = uSize * uP / depth; this world is in units (the stage's is in px), so the reference depth is the camera distance
+    const svhProbe = document.createElement('div'); svhProbe.setAttribute('aria-hidden', 'true'); svhProbe.style.cssText = 'position:fixed;top:0;left:0;width:0;height:100vh;height:100svh;visibility:hidden;pointer-events:none'; document.body.appendChild(svhProbe);   // the small viewport's height (the browser's bars showing)
     const vhProbe = document.createElement('div'); vhProbe.setAttribute('aria-hidden', 'true'); vhProbe.style.cssText = 'position:fixed;top:0;left:0;width:0;height:100vh;height:100lvh;visibility:hidden;pointer-events:none'; document.body.appendChild(vhProbe);   // the large viewport's height, measured apart from the canvas (which is taller while pinned at the ending)
     let VH = vhProbe.clientHeight || innerHeight, sizeW = 0, sizeH = 0;   // VH: the layer's stable height in CSS px (the large viewport); every screen-space conversion in the layer uses it, never innerHeight
     function resize() {
@@ -813,19 +814,19 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
                 { at: '#work:center@0.25', x: -0.05, y: 0.12, size: 0.5, turn: 92, tilt: 50, heel: 5, level: L1, wake: 0.85, cam: 0.5 },
                 { at: 'stage@0.14', x: 0, y: 0.18, size: 0.42, turn: 70, tilt: 54, heel: 4, level: L1, wake: 0.9, cam: 1 },                                             // the column: in the gap below the cards
                 { at: 'stage@0.38', x: 0, y: -0.22, size: 0.4, turn: 76, tilt: 57, heel: 4, level: 1.4, wake: 0.92, cam: 0.95 },   /* the descent happens early and slowly: from high as the column pins, down through the bottom of the cards over the column's first two thirds, at a near-constant pace (Felix: organic, no drop at the release) */
-                { at: 'stage@0.64', x: 0, y: -0.6, size: 0.36, turn: 80, tilt: 60, heel: 4, level: 1.75, wake: 0.97, cam: 0.85 },
-                { at: 'stage@0.92', x: 0, y: -0.68, size: 0.34, turn: 84, tilt: 63, heel: 4, level: L2, wake: 1, cam: 0.8 },
-                { at: 'stage-release', x: 0, y: -0.7, size: 0.36, turn: 78, tilt: 56, heel: 7, level: L2, wake: 0.95, cam: 0.8 },
-                { at: 'stage-release+450', x: -0.08, y: -0.71, size: 0.36, turn: 45, tilt: 26, heel: 7, level: L2, wake: 0.9, cam: 0.8 },
-                { at: '#read:top@0', x: -0.02, y: -0.72, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L2, wake: 0.85, cam: 1 },                                           // the side shot below the sticky quote
-                { at: '#read:top@0+180', x: -0.02, y: -0.72, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L3, wake: 0.9, cam: 1 },
-                { at: '#read:top@0+360', x: -0.02, y: -0.72, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L4, wake: 0.95, cam: 1 },
-                { at: '#read:top@0+540', x: -0.02, y: -0.72, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 0 },
-                { at: '#read:top@0+590', x: -0.02, y: -0.72, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 1 },
-                { at: '#read:top@0+655', x: -0.02, y: -0.72, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 2 },
-                { at: '#read:top@0+720', x: -0.02, y: -0.72, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 3 },
+                { at: 'stage@0.64', x: 0, y: -0.52, size: 0.36, turn: 80, tilt: 60, heel: 4, level: 1.75, wake: 0.97, cam: 0.85 },
+                { at: 'stage@0.92', x: 0, y: -0.58, size: 0.34, turn: 84, tilt: 63, heel: 4, level: L2, wake: 1, cam: 0.8 },
+                { at: 'stage-release', x: 0, y: -0.6, size: 0.36, turn: 78, tilt: 56, heel: 7, level: L2, wake: 0.95, cam: 0.8 },
+                { at: 'stage-release+450', x: -0.05, y: -0.6, size: 0.36, turn: 45, tilt: 26, heel: 7, level: L2, wake: 0.9, cam: 0.8 },
+                { at: '#read:top@0', x: -0.02, y: -0.6, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L2, wake: 0.85, cam: 1 },                                           // the side shot below the sticky quote
+                { at: '#read:top@0+180', x: -0.02, y: -0.6, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L3, wake: 0.9, cam: 1 },
+                { at: '#read:top@0+360', x: -0.02, y: -0.6, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L4, wake: 0.95, cam: 1 },
+                { at: '#read:top@0+540', x: -0.02, y: -0.6, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 0 },
+                { at: '#read:top@0+590', x: -0.02, y: -0.6, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 1 },
+                { at: '#read:top@0+655', x: -0.02, y: -0.6, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 2 },
+                { at: '#read:top@0+720', x: -0.02, y: -0.6, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 3 },
                 ...(RK < 0 ? [] : [
-                    { at: '#scalability:top@0.6', x: -0.02, y: -0.72, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 3 },
+                    { at: '#scalability:top@0.6', x: -0.02, y: -0.6, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 3 },
                     { at: '.testimonials-wrapper:top@1', x: 0.5, y: -0.95, size: 0.3, turn: -90, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1, fleet: 4 },
                     { at: 'footer:top@1', x: 0.5, y: -0.95, size: 0.3, turn: -90, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1, fleet: 4 },
                     { at: 'end', x: 0.5, y: -0.6, size: 0.3, turn: -90, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1, fleet: 4 },
@@ -1075,7 +1076,10 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         ship.resolvedAt = now;
         try {
             const src = VH > innerWidth ? keyframes().portrait : keyframes().landscape;
-            const keys = src.map(k => ({ y: resolveAt(k.at), k: Object.assign({}, POSE_DEFAULTS, k) })).filter(e => Number.isFinite(e.y)).sort((a, b) => a.y - b.y);
+            // phones: the waypoints' heights are authored against the visible area with the browser's bars showing (the small viewport, which the work stage and
+            // its cards use too); the layer is the large viewport's height, so they are mapped into it from the top (no change where both heights agree)
+            const tallR = VH > innerWidth ? Math.min(1, (svhProbe.clientHeight || VH) / VH) : 1;
+            const keys = src.map(k => ({ y: resolveAt(k.at), k: Object.assign({}, POSE_DEFAULTS, k, tallR < 1 ? { y: 1 - (1 - k.y) * tallR } : {}) })).filter(e => Number.isFinite(e.y)).sort((a, b) => a.y - b.y);
             for (let i = 1; i < keys.length; i++) if (keys[i].y <= keys[i - 1].y) keys[i].y = keys[i - 1].y + 1;
             if (keys.length < 2) { ship.keys = keys; ship.route = null; return; }
             prepKeys(keys);
