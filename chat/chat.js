@@ -223,6 +223,13 @@
     } catch (e) { /* nothing remembered */ }
   })();
 
+  // window.fjcLead: a promise that settles once this link's case-study order has
+  // been applied (or there is none). The work spine can await it, with a short
+  // timeout, before it reads the cards, so first visits get the order too:
+  //   if (window.fjcLead) await Promise.race([window.fjcLead, new Promise(r => setTimeout(r, 800))]);
+  var resolveLead = function () {};
+  window.fjcLead = ctx.application_id ? new Promise(function (r) { resolveLead = r; }) : Promise.resolve();
+
   function loadPosting() {
     if (!ctx.application_id) return;
     // Reserve the opener's space before the lookup returns, so the hero does not
@@ -249,9 +256,10 @@
     fetch(endpoint + "/posting?a=" + encodeURIComponent(ctx.application_id))
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (j) {
-        if (!j) { settle(null); if (refParam !== ctx.application_id) local.remove("fj_app"); return; }   // stale stored reference
+        if (!j) { resolveLead(); settle(null); if (refParam !== ctx.application_id) local.remove("fj_app"); return; }   // stale stored reference
         if (j.company) markFor(j.company);
         leadWith(j.lead);
+        resolveLead();
         if (Array.isArray(j.lead)) local.set("fj_lead", JSON.stringify({ ref: ctx.application_id, lead: j.lead }));
         if (j.brand_color && local.get("fj_app_color") !== ctx.application_id) {
           // The site in their colors: same token pipeline the picker uses, applied once per link.
@@ -266,7 +274,7 @@
           settle(null);
         }
       })
-      .catch(function () { settle(null); });
+      .catch(function () { resolveLead(); settle(null); });
   }
 
   var viewWork = document.querySelector(".hero-content .primary-btn");
