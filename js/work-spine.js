@@ -784,9 +784,9 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
                 { at: '#work:center@0.72', x: 0.22, y: -0.45, size: 0.56, turn: 60, tilt: 8, heel: 5, level: 0, wake: 0.35, cam: 0.2 },
                 { at: '#work:center@0.5', x: 0.05, y: -0.1, size: 0.54, turn: 85, tilt: 24, heel: 5, level: L1, wake: 0.65, cam: 0.3 },
                 { at: '#work:center@0.25', x: -0.05, y: 0.12, size: 0.5, turn: 92, tilt: 50, heel: 5, level: L1, wake: 0.85, cam: 0.5 },
-                { at: 'stage@0.14', x: 0, y: -0.52, size: 0.42, turn: 70, tilt: 54, heel: 4, level: L1, wake: 0.9, cam: 1 },                                             // the column: in the gap below the cards
-                { at: 'stage@0.92', x: 0, y: -0.54, size: 0.34, turn: 84, tilt: 63, heel: 4, level: L2, wake: 1, cam: 0.8 },
-                { at: 'stage-release', x: 0, y: -0.54, size: 0.36, turn: 78, tilt: 56, heel: 7, level: L2, wake: 0.95, cam: 0.8 },
+                { at: 'stage@0.14', x: 0, y: 0.22, size: 0.42, turn: 70, tilt: 54, heel: 4, level: L1, wake: 0.9, cam: 1 },                                             // the column: in the gap below the cards
+                { at: 'stage@0.92', x: 0, y: 0.22, size: 0.34, turn: 84, tilt: 63, heel: 4, level: L2, wake: 1, cam: 0.8 },
+                { at: 'stage-release', x: 0, y: 0.1, size: 0.36, turn: 78, tilt: 56, heel: 7, level: L2, wake: 0.95, cam: 0.8 },
                 { at: 'stage-release+450', x: -0.1, y: -0.66, size: 0.38, turn: 45, tilt: 26, heel: 7, level: L2, wake: 0.9, cam: 0.8 },
                 { at: '#read:top@0', x: -0.02, y: -0.76, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L2, wake: 0.85, cam: 1 },                                           // the side shot below the sticky quote
                 { at: '#read:top@0+180', x: -0.02, y: -0.76, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L3, wake: 0.9, cam: 1 },
@@ -1438,14 +1438,14 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         fov: num(ds.fov, 35),
         fovPortrait: num(ds.fovPortrait, 55),
         camOffset: num(ds.camOffset, 2),        // camera's local z offset inside its group
-        edge: num(ds.edge, 0), edgePortrait: 0,        // scroll dead zone at both ends; 0 keeps the motion continuous with the page scroll
+        edge: num(ds.edge, 0), edgePortrait: num(ds.edgePortrait, NaN),   // edgePortrait unset: the end blend's share of the scroll, so on a phone the first card rises into the centre before the helix turns (and the last leaves only after it stops)        // scroll dead zone at both ends; 0 keeps the motion continuous with the page scroll
         lerp: num(ds.lerp, 0.2),
         blend: num(ds.blend, 0.45),            // end blend, as a fraction of the viewport height: over this much scroll after the pin the card keeps
                                                 // moving up at page speed and decelerates to centre (velocity-matched), and the reverse before release; 0 = hard stop
         cardFrac: num(ds.cardFrac, 0.6),        // card width as a fraction of the visible width (upper bound; see layout())
         gap: num(ds.gap, 0.45),                 // minimum clearance between neighbouring cards, in units
         cardFracPortrait: 0.86,
-        camYPortrait: num(ds.camYPortrait, -0.47),   // portrait: the camera's height against the card (units; negative = the card sits higher on screen). -0.7 was theirs; -0.47 lands the card ~40 px lower on a phone (Felix, 2026-09-15)
+        camYPortrait: num(ds.camYPortrait, NaN),   // portrait: the camera's height against the card (units; negative = the card sits higher on screen). Unset (the default): computed per screen so the front card is centred in the space below the sticky header, on any phone (Felix, 2026-09-15; theirs was -0.7)
         spineScale: num(ds.spineScale, 1),
         spineSpacing: num(ds.spineSpacing, 0.65),   // their SpineInstancer: y = 4 - 0.65 i
         spineTwist: num(ds.spineTwist, 0.4),        // rotation.y = 0.4 i
@@ -1859,7 +1859,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
 
     /* ---------- layout: helix + camera targets ---------- */
     const targets = [];
-    let portrait = false, S = 240, yStep = 0, lastCardW = 0, lastCardH = 0, lastCap = '';
+    let portrait = false, S = 240, camYP = 0, edgeP = 0, yStep = 0, lastCardW = 0, lastCardH = 0, lastCap = '';
     /* Constellations: one small figure per card on a plane just behind it (toward the axis), stars as soft
        points and lines that draw themselves in edge by edge as the card comes to front, fading as it leaves.
        Figures are unit-square coordinates (y up) matched to the case studies: a traceability chain, a small
@@ -1876,7 +1876,10 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         camera.updateProjectionMatrix();
 
         const dist = cfg.radius + cfg.camOffset;                       // camera-to-card distance, in their units
-        S = h / (2 * dist * Math.tan(M.degToRad(camera.fov) / 2));     // px per unit: puts the card plane exactly at the CSS perspective distance, so cards raster 1:1
+        S = h / (2 * dist * Math.tan(M.degToRad(camera.fov) / 2));
+        { const hdr = document.querySelector('header'), hb = hdr ? Math.max(0, Math.min(h * 0.3, hdr.getBoundingClientRect().bottom)) : 0;   // a unit at the card plane is exactly S px, so the camera's height places the card: centred in the space below the sticky header
+          camYP = Number.isFinite(cfg.camYPortrait) ? cfg.camYPortrait : (hb / 2) / S;
+          const totalP = Math.max(1, section.offsetHeight - h); edgeP = Number.isFinite(cfg.edgePortrait) ? cfg.edgePortrait : Math.min(0.2, cfg.blend * h / totalP); }     // px per unit: puts the card plane exactly at the CSS perspective distance, so cards raster 1:1
         camera.near = 0.2 * S; camera.far = 60 * S; camera.updateProjectionMatrix();
         const visW = w / S;                                            // visible width in units at the card
         const visH = h / S;
@@ -1908,7 +1911,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
             angle -= step;
             obj.position.y = out.y = -yStep * i * S;
             const t = { position: out, quaternion: obj.quaternion.clone() };
-            if (portrait) t.position.y += (cfg.centerpiece === 'axis' && cfg.axisOrbs > 0.5 ? 0.45 : cfg.camYPortrait) * S;   // axis: camera a little above the card so its node clears the header; otherwise theirs
+            if (portrait) t.position.y += (cfg.centerpiece === 'axis' && cfg.axisOrbs > 0.5 ? 0.45 : camYP) * S;   // axis: camera a little above the card so its node clears the header; otherwise theirs
             targets.push(t);
         });
         world.scale.setScalar(S);
@@ -1937,13 +1940,13 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
 
     function update(now) {
         const p = progress();
-        const edge = portrait ? cfg.edgePortrait : cfg.edge;
+        const edge = portrait ? edgeP : cfg.edge;
         const sv = smooth(p, edge, 1 - edge);
         const seg = sv * (n - 1);
         // the camera rides the outer helix itself: constant radius, azimuth and height continuous in seg.
         // (interpolating between per-card targets cut chords, pulling the camera in and out once per card)
         const stepRad = M.degToRad(portrait ? cfg.stepPortrait : cfg.step), az = -stepRad * seg, Rcam = cfg.radius * 2 * S;
-        target.position.set(Rcam * Math.cos(az), -yStep * seg * S + (portrait && cfg.centerpiece === 'axis' && cfg.axisOrbs > 0.5 ? 0.45 : portrait ? cfg.camYPortrait : 0) * S, Rcam * Math.sin(az));
+        target.position.set(Rcam * Math.cos(az), -yStep * seg * S + (portrait && cfg.centerpiece === 'axis' && cfg.axisOrbs > 0.5 ? 0.45 : portrait ? camYP : 0) * S, Rcam * Math.sin(az));
         _look.set(target.position.x * 2, target.position.y, target.position.z * 2);   // face outward, like the cards
         target.lookAt(_look);
         // end blend: camera offset (scene px move the card 1:1 on screen) of (D/2)(1 - s/D)^2, whose slope at s = 0 is exactly -1,
@@ -2026,7 +2029,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         if (!item) return;
         const x = item.index / (n - 1);
         const inv = x + (x - x * x * (3 - 2 * x));                     // their invSmooth
-        const edge = portrait ? cfg.edgePortrait : cfg.edge;
+        const edge = portrait ? edgeP : cfg.edge;
         const p = edge + inv * (1 - 2 * edge);
         const total = section.offsetHeight - stage.clientHeight;
         window.scrollTo({ top: section.offsetTop + p * total, behavior: 'auto' });
