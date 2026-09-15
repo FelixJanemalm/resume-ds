@@ -305,7 +305,14 @@
     : { wide: "What are you hiring for? Ask anything, or paste the job description", narrow: "What role are you hiring for?" };
   var narrowMq = window.matchMedia ? window.matchMedia("(max-width: 520px)") : null;
   var placeholder = narrowMq && narrowMq.matches ? PLACEHOLDERS.narrow : PLACEHOLDERS.wide;
-  var input = el("textarea", { rows: "1", placeholder: placeholder, "aria-label": "Ask about Felix" });
+  // A chat message, not a form field: without a <form> ancestor and with these hints,
+  // iOS Safari and password managers stop offering passwords, cards and contacts.
+  var input = el("textarea", {
+    rows: "1", placeholder: placeholder, "aria-label": "Ask about Felix", name: "fjc-message",
+    autocomplete: "off", autocorrect: "on", autocapitalize: "sentences", spellcheck: "true",
+    inputmode: "text", enterkeyhint: "send",
+    "data-1p-ignore": "true", "data-lpignore": "true", "data-bwignore": "true", "data-form-type": "other"
+  });
   function syncPlaceholder() {
     placeholder = narrowMq && narrowMq.matches ? PLACEHOLDERS.narrow : PLACEHOLDERS.wide;
     input.setAttribute("placeholder", placeholder);
@@ -315,8 +322,8 @@
     if (narrowMq.addEventListener) narrowMq.addEventListener("change", syncPlaceholder);
     else if (narrowMq.addListener) narrowMq.addListener(syncPlaceholder);
   }
-  var sendBtn = el("button", { "class": "fjc-send", type: "submit", "aria-label": "Send", html: ARROW });
-  var form = el("form", { "class": "fjc-form" }, [input, sendBtn]);
+  var sendBtn = el("button", { "class": "fjc-send", type: "button", "aria-label": "Send", html: ARROW });
+  var form = el("div", { "class": "fjc-form", role: "group", "aria-label": "Ask about Felix" }, [input, sendBtn]);
   var slot = null;
 
   root.appendChild(bar);
@@ -712,9 +719,10 @@
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && root.getAttribute("data-open") === "1") { setOpen(false); input.blur(); }
   });
-  form.addEventListener("submit", function (e) { e.preventDefault(); var t = input.value; input.value = ""; autosize(); send(t); });
+  function submit() { var t = input.value; input.value = ""; autosize(); send(t); }
+  sendBtn.addEventListener("click", submit);
   input.addEventListener("keydown", function (e) {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); form.dispatchEvent(new Event("submit", { cancelable: true })); }
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit(); }
   });
   function autosize() { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 120) + "px"; }
   input.addEventListener("input", autosize);
