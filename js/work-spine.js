@@ -406,7 +406,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
     if (!GPUC) return;
     const canvas = document.createElement('canvas');
     canvas.id = 'ws-particles'; canvas.setAttribute('aria-hidden', 'true');
-    canvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none;opacity:0;transition:opacity 1.6s ease';
+    canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100vh;height:100lvh;z-index:-1;pointer-events:none;opacity:0;transition:opacity 1.6s ease';   // the LARGE viewport's height: a phone's address bar sliding in and out never resizes the layer (it only covers or uncovers its bottom edge)
     document.body.appendChild(canvas);   // appended last: z-index does the layering, and nothing else on the page sees it as the first canvas
     let gl;
     try { gl = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: 'high-performance' }); } catch (e) { canvas.remove(); return; }
@@ -572,7 +572,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
     // only after every ship (hull, bowsprit, masts, wake) has left it, so a ship always sails out of view before it wraps. Cached per screen size
     let armadaWinKey = '', armadaWinVal = null;
     function armadaWin(tall, unit) {
-        const key = innerWidth + 'x' + innerHeight + ':' + unit.toFixed(3);   // (the block's clip moves with the armada as it rises, so the frame's own edges are the only bound) if (key === armadaWinKey) return armadaWinVal;
+        const key = innerWidth + 'x' + VH + ':' + unit.toFixed(3);   // (the block's clip moves with the armada as it rises, so the frame's own edges are the only bound) if (key === armadaWinKey) return armadaWinVal;
         const V = tall ? ARMADA_VIEW.tall : ARMADA_VIEW.wide, qa = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), M.degToRad(V.tilt)).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -M.degToRad(V.turn)));
         const C = new THREE.Vector3(1, 0, 0).applyQuaternion(qa), Zc = new THREE.Vector3(0, 0, 1).applyQuaternion(qa), Uc = new THREE.Vector3(0, 1, 0).applyQuaternion(qa);
         const A = new THREE.Vector3(V.x * visW / 2, V.y * visH / 2, 0), tanH = Math.tan(M.degToRad(camera.fov) / 2), cz = camera.position.z, P = new THREE.Vector3();
@@ -665,7 +665,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         if (!stars.cur) return;
         // targets in this camera's world at z = 1, from the stage-projected centre and size in px
         const zs = 1, k = (camera.position.z - zs) / camera.position.z, wu = visW * k, hu = visH * k;
-        const cx = ((stars.cx / innerWidth) - 0.5) * wu, cy = (0.5 - (stars.cy / innerHeight)) * hu, sw = stars.w / innerWidth * wu, sh = stars.h / innerHeight * hu;
+        const cx = ((stars.cx / innerWidth) - 0.5) * wu, cy = (0.5 - (stars.cy / VH)) * hu, sw = stars.w / innerWidth * wu, sh = stars.h / VH * hu;
         const inv = new Int8Array(STAR_N).fill(-1); stars.cur.map.forEach((si, j) => inv[si] = j);
         for (let i = 0; i < STAR_N; i++) {
             const sd = stars.seed[i] * 6.28; let u, v;
@@ -692,10 +692,12 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
     }
     const raycaster = new THREE.Raycaster();
     const pointer = { ndc: new THREE.Vector2(), target: new THREE.Vector2(), active: false, last: 0 };
-    addEventListener('pointermove', e => { pointer.target.set((e.clientX / innerWidth) * 2 - 1, -((e.clientY / innerHeight) * 2 - 1)); pointer.active = true; pointer.last = performance.now(); }, { passive: true });
+    addEventListener('pointermove', e => { pointer.target.set((e.clientX / innerWidth) * 2 - 1, -((e.clientY / VH) * 2 - 1)); pointer.active = true; pointer.last = performance.now(); }, { passive: true });
     // point size = uSize * uP / depth; this world is in units (the stage's is in px), so the reference depth is the camera distance
+    let VH = canvas.clientHeight || innerHeight, sizeW = 0, sizeH = 0;   // VH: the layer's stable height in CSS px (the large viewport); every screen-space conversion in the layer uses it, never innerHeight
     function resize() {
-        const w = innerWidth, h = innerHeight; gl.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); U.uP.value = camera.position.z;
+        const w = innerWidth, h = canvas.clientHeight || innerHeight; VH = h; if (w === sizeW && h === sizeH) return; sizeW = w; sizeH = h;   // a resize that leaves the layer's size alone (the address bar) changes nothing, not even the drawing buffer
+        gl.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); U.uP.value = camera.position.z;
         visH = 2 * camera.position.z * Math.tan(M.degToRad(camera.fov) / 2); visW = visH * camera.aspect;
         ship.resolvedAt = -1e9;
     }
@@ -781,19 +783,19 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
                 { at: '#work:center@0.72', x: 0.22, y: -0.45, size: 0.56, turn: 60, tilt: 8, heel: 5, level: 0, wake: 0.35, cam: 0.2 },
                 { at: '#work:center@0.5', x: 0.05, y: -0.1, size: 0.54, turn: 85, tilt: 24, heel: 5, level: L1, wake: 0.65, cam: 0.3 },
                 { at: '#work:center@0.25', x: -0.05, y: 0.12, size: 0.5, turn: 92, tilt: 50, heel: 5, level: L1, wake: 0.85, cam: 0.5 },
-                { at: 'stage@0.14', x: 0, y: -0.62, size: 0.42, turn: 70, tilt: 54, heel: 4, level: L1, wake: 0.9, cam: 1 },                                             // the column: in the gap below the cards
-                { at: 'stage@0.92', x: 0, y: -0.64, size: 0.34, turn: 84, tilt: 63, heel: 4, level: L2, wake: 1, cam: 0.8 },
-                { at: 'stage-release', x: 0, y: -0.64, size: 0.36, turn: 78, tilt: 56, heel: 7, level: L2, wake: 0.95, cam: 0.8 },
-                { at: 'stage-release+450', x: -0.1, y: -0.7, size: 0.38, turn: 45, tilt: 26, heel: 7, level: L2, wake: 0.9, cam: 0.8 },
-                { at: '#read:top@0', x: -0.02, y: -0.8, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L2, wake: 0.85, cam: 1 },                                           // the side shot below the sticky quote
-                { at: '#read:top@0+180', x: -0.02, y: -0.8, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L3, wake: 0.9, cam: 1 },
-                { at: '#read:top@0+360', x: -0.02, y: -0.8, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L4, wake: 0.95, cam: 1 },
-                { at: '#read:top@0+540', x: -0.02, y: -0.8, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 0 },
-                { at: '#read:top@0+620', x: -0.02, y: -0.8, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 1 },
-                { at: '#read:top@0+700', x: -0.02, y: -0.8, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 2 },
-                { at: '#read:top@0+780', x: -0.02, y: -0.8, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 3 },
+                { at: 'stage@0.14', x: 0, y: -0.52, size: 0.42, turn: 70, tilt: 54, heel: 4, level: L1, wake: 0.9, cam: 1 },                                             // the column: in the gap below the cards
+                { at: 'stage@0.92', x: 0, y: -0.54, size: 0.34, turn: 84, tilt: 63, heel: 4, level: L2, wake: 1, cam: 0.8 },
+                { at: 'stage-release', x: 0, y: -0.54, size: 0.36, turn: 78, tilt: 56, heel: 7, level: L2, wake: 0.95, cam: 0.8 },
+                { at: 'stage-release+450', x: -0.1, y: -0.66, size: 0.38, turn: 45, tilt: 26, heel: 7, level: L2, wake: 0.9, cam: 0.8 },
+                { at: '#read:top@0', x: -0.02, y: -0.76, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L2, wake: 0.85, cam: 1 },                                           // the side shot below the sticky quote
+                { at: '#read:top@0+180', x: -0.02, y: -0.76, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L3, wake: 0.9, cam: 1 },
+                { at: '#read:top@0+360', x: -0.02, y: -0.76, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L4, wake: 0.95, cam: 1 },
+                { at: '#read:top@0+540', x: -0.02, y: -0.76, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 0 },
+                { at: '#read:top@0+590', x: -0.02, y: -0.76, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 1 },
+                { at: '#read:top@0+655', x: -0.02, y: -0.76, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 2 },
+                { at: '#read:top@0+720', x: -0.02, y: -0.76, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 3 },
                 ...(RK < 0 ? [] : [
-                    { at: '#scalability:top@0.6', x: -0.02, y: -0.8, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 3 },
+                    { at: '#scalability:top@0.6', x: -0.02, y: -0.76, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 3 },
                     { at: '.testimonials-wrapper:top@1', x: 0.5, y: -0.95, size: 0.3, turn: -90, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1, fleet: 4 },
                     { at: 'footer:top@1', x: 0.5, y: -0.95, size: 0.3, turn: -90, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1, fleet: 4 },
                     { at: 'end', x: 0.5, y: -0.6, size: 0.3, turn: -90, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1, fleet: 4 },
@@ -807,23 +809,23 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
        flipped to the bottom-left and the ship rests on it, so it rides in from the left. Any other layout: a plain entry from the side. */
     function lottieRect() {   // the swell's box in document space (its parallax translate removed), or null until it has laid out
         const el = document.querySelector('.hero-wrapper dotlottie-player'); if (!el) return null;
-        const r = el.getBoundingClientRect(); if (!(r.width > 0.1 * innerWidth && r.height > 0.1 * innerHeight)) return null;
+        const r = el.getBoundingClientRect(); if (!(r.width > 0.1 * innerWidth && r.height > 0.1 * VH)) return null;
         return { left: r.left, top: r.top + scrollY, width: r.width, height: r.height };
     }
     function entryPoints(w0) {
         const r = lottieRect();
-        const toN = (fx, fy) => ({ x: ((r.left + fx * r.width) / innerWidth) * 2 - 1, y: 1 - ((r.top + fy * r.height) / innerHeight) * 2 });   // rect fractions -> NDC at scroll 0
+        const toN = (fx, fy) => ({ x: ((r.left + fx * r.width) / innerWidth) * 2 - 1, y: 1 - ((r.top + fy * r.height) / VH) * 2 });   // rect fractions -> NDC at scroll 0
         const rest = { x: w0.x, y: w0.y };
-        if (r && innerWidth > 1200 && innerWidth >= innerHeight) {   // the unflipped swell, top-right
+        if (r && innerWidth > 1200 && innerWidth >= VH) {   // the unflipped swell, top-right
             const foot = toN(0.78, 0.74), crest = toN(0.46, 0.63);
             return [{ at: 0, x: 1.18, y: foot.y - 0.02 }, { at: 380, x: foot.x, y: foot.y }, { at: 700, x: crest.x, y: crest.y + 0.02 }, { at: 1000, ...rest }];
         }
-        if (innerHeight > innerWidth) return [{ at: 0, x: -1.2, y: rest.y + 0.02 }, { at: 450, x: -0.5, y: rest.y + 0.05 }, { at: 760, x: 0.05, y: rest.y - 0.02 }, { at: 1000, ...rest }];
+        if (VH > innerWidth) return [{ at: 0, x: -1.2, y: rest.y + 0.02 }, { at: 450, x: -0.5, y: rest.y + 0.05 }, { at: 760, x: 0.05, y: rest.y - 0.02 }, { at: 1000, ...rest }];
         const fromRight = Math.abs(w0.turn) > 90;
         return [{ at: 0, x: fromRight ? 1.2 : -1.2, y: rest.y }, { at: 500, x: rest.x + (fromRight ? 0.35 : -0.35), y: rest.y + 0.03 }, { at: 1000, ...rest }];
     }
     function resolveAt(at) {
-        const vh = innerHeight, maxY = Math.max(0, document.documentElement.scrollHeight - vh);
+        const vh = VH, maxY = Math.max(0, document.documentElement.scrollHeight - innerHeight);   // '@v' marks in the stable height (they must not move with the address bar); 'end' is the page's real last scroll
         const m = /^(.*?)([+-]\d+(?:\.\d+)?)?$/.exec(String(at)), key = m[1], off = +(m[2] || 0);
         let y;
         if (key === 'top') y = 0;
@@ -1017,7 +1019,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
     function resolveRoute(now) {
         ship.resolvedAt = now;
         try {
-            const src = innerHeight > innerWidth ? keyframes().portrait : keyframes().landscape;
+            const src = VH > innerWidth ? keyframes().portrait : keyframes().landscape;
             const keys = src.map(k => ({ y: resolveAt(k.at), k: Object.assign({}, POSE_DEFAULTS, k) })).filter(e => Number.isFinite(e.y)).sort((a, b) => a.y - b.y);
             for (let i = 1; i < keys.length; i++) if (keys[i].y <= keys[i - 1].y) keys[i].y = keys[i - 1].y + 1;
             if (keys.length < 2) { ship.keys = keys; ship.route = null; return; }
@@ -1060,7 +1062,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         // follows that curve; the curve ends at the first waypoint, and scrolling during the ride simply adds the route's offset
         if (ship.t0 < 0) {
             if (ship.seen < 0) ship.seen = now;
-            const wantSwell = pcfg.shipEntry > 0 && innerWidth > 1200 && innerWidth >= innerHeight && scrollY < 200;
+            const wantSwell = pcfg.shipEntry > 0 && innerWidth > 1200 && innerWidth >= VH && scrollY < 200;
             if (wantSwell && !lottieRect() && now - ship.seen < 2500) { P.x += 2.6; ship.crest = 0; }   // the swell has not laid out yet: wait a little, ship kept off the right edge
             else { ship.t0 = now; ship.entry = pcfg.shipEntry > 0 && scrollY < 200; const w0 = ship.keys[0].k; ship.entryEnd = { x: w0.x, y: w0.y }; ship.entryRoute = buildRoute(entryPoints(w0), visW / visH, { softStart: 1 }); }   // a page that opens already scrolled shows the ship where it is
         }
@@ -1205,7 +1207,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         // three waves (the route's fleet key 0..3): the first close round the ship, the next two farther out and higher toward the horizon, smaller
         const fsz = pcfg.shipFleetSize;
         const launch = ship.overlay || rocketMix > 0.5;   // the switch: at the block's edge (the canvas flips above the page there, fully clipped) or mid-morph behind the principles, whichever comes first
-        const tall = innerHeight > innerWidth, unit = (tall ? ARMADA_VIEW.tall : ARMADA_VIEW.wide).unit || Math.max(0.4, Math.min(1, visW / 12));   // on a narrow screen the ranks close up and the hulls shrink
+        const tall = VH > innerWidth, unit = (tall ? ARMADA_VIEW.tall : ARMADA_VIEW.wide).unit || Math.max(0.4, Math.min(1, visW / 12));   // on a narrow screen the ranks close up and the hulls shrink
         const AW = launch ? armadaWin(tall, unit) : null, RUN0 = AW ? AW.s0 : 0, RUNLEN = AW ? AW.len : ARMADA_LOOP; ship.armadaWin = AW;   // world units along the course: both ends out of the frame for this screen
         const fTex = launch ? armadaTex : fleetTex; if (U.tFleet.value !== fTex) for (const u of ALLU) u.tFleet.value = fTex;
         for (let k = 0; k < ARMADA_K; k++) {
@@ -1224,11 +1226,11 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
             _qa.setFromAxisAngle(X, M.degToRad(aTilt)).multiply(_qb.setFromAxisAngle(Y, -M.degToRad(aTurn))); fleetRot.setFromMatrix4(_m4.makeRotationFromQuaternion(_qa));
             fleetAt.set(AV.x * visW / 2, AV.y * visH / 2, 0); U.uFleetScale.value = 1;
             const below = Math.max(0, document.documentElement.scrollHeight - innerHeight - scrollY);   // px of page still below the viewport: the armada is part of the page's bottom, so it rises into place with the footer
-            for (const u of ALLU) u.uFleetLift.value.set(-below * visH / innerHeight, camera.position.z);   // world units: the table is in them
+            for (const u of ALLU) u.uFleetLift.value.set(-below * visH / VH, camera.position.z);   // world units: the table is in them
         } else { fleetRot.copy(shipRotSea); fleetAt.copy(shipAt); U.uFleetScale.value = scale; for (const u of ALLU) u.uFleetLift.value.set(0, camera.position.z); }
         for (const u of ALLU) u.uFleetScale.value = U.uFleetScale.value;
         let clipTop = 1e9;   // above the page the canvas draws only from the block's top edge down (below it the block's own ground; above it the page covers the canvas anyway)
-        if (ship.overlay) { const sel = /^(.+):(top|center|bottom)@/.exec(pcfg.shipOverlayAt || ''), el = sel ? document.querySelector(sel[1]) : null; if (el) clipTop = Math.max(0, innerHeight - el.getBoundingClientRect().top) * (canvas.height / Math.max(1, innerHeight)); }
+        if (ship.overlay) { const sel = /^(.+):(top|center|bottom)@/.exec(pcfg.shipOverlayAt || ''), el = sel ? document.querySelector(sel[1]) : null; if (el) clipTop = Math.max(0, VH - el.getBoundingClientRect().top) * (canvas.height / Math.max(1, VH)); }
         U.uClipTop.value = clipTop; for (const o of WIRES) o.material.uniforms.uClipTop.value = clipTop;
         const fleetForm = M.clamp(P.fleet, 0, 4) * M.clamp(pcfg.shipFleet, 0, 1);
         for (const u of ALLU) u.uFleetForm.value = fleetForm;
@@ -1248,7 +1250,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         for (const o of WIRES) o.visible = o.material.uniforms.uAlpha.value > 0.002;
         const trailOn = pcfg.shipTrail > 0 && rocketMix < 0.5 ? 1 : 0;   // the rocket's plume is the strip
         for (const u of ALLU) { u.uTrail.value = trailOn; u.uTrailClk.value = ship.trail; }
-        const fieldGone = Number.isFinite(ship.overlayY) ? M.smoothstep(scrollY, ship.overlayY - 0.8 * innerHeight, ship.overlayY) : 0;   // the field is gone by the overlay mark (the footer): the rocket stands alone
+        const fieldGone = Number.isFinite(ship.overlayY) ? M.smoothstep(scrollY, ship.overlayY - 0.8 * VH, ship.overlayY) : 0;   // the field is gone by the overlay mark (the footer): the rocket stands alone
         U.uFieldDim.value = fieldTheme * (1 - 0.55 * fieldGone) * (1 - pcfg.shipFieldDim * M.clamp(P.cam, 0, 1) * M.smoothstep(way, 0.1, 0.5)) * (1 + 3 * ship.flash);   // at the ending the field stays as the sea the fleet sails on, dimmed
         U.uGlow.value = glowBase * (1 + 1.2 * ship.flash);
         // uniforms: the vec4s and uBeam are shared instances across the three materials (see boatU), written once; uSettle is set in frame() from the simulated step
@@ -1357,7 +1359,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         theme: () => themeId, setTheme, themes: () => THEMES ? Object.keys(THEMES) : [],
         // the path editor's window on the route (js/voyage-editor.js, ?route=1)
         routeApi: {
-            orientation: () => innerHeight > innerWidth ? 'portrait' : 'landscape',
+            orientation: () => VH > innerWidth ? 'portrait' : 'landscape',
             tables: () => keyframes(), defaults: () => keyframeTables(), stored: () => routeOverride,
             set(o, list) { routeOverride = Object.assign({}, routeOverride || {}, { [o]: list }); try { localStorage.setItem(routeStore, JSON.stringify(routeOverride)); } catch (e) {} resolveRoute(performance.now()); },
             reset() { routeOverride = null; try { localStorage.removeItem(routeStore); } catch (e) {} resolveRoute(performance.now()); },
@@ -1366,7 +1368,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
             params: () => pcfg, setParam(k, v) { if (k in pcfg) { pcfg[k] = v; layer.sync(); } },
             attrs: keys => keys.filter(k => k in pcfg).map(k => `data-${k.replace(/[A-Z]/g, m => '-' + m.toLowerCase())}="${pcfg[k]}"`).join(' '),
             resolveAt, keys: () => ship.keys, sample: (sc, out) => ship.route ? ship.route.sample(sc, out) : null, pose: () => ship.pose, state: () => ship,
-            toPx: (x, y) => [(x * 0.5 + 0.5) * innerWidth, (0.5 - y * 0.5) * innerHeight], fromPx: (px, py) => [px / innerWidth * 2 - 1, 1 - py / innerHeight * 2],
+            toPx: (x, y) => [(x * 0.5 + 0.5) * innerWidth, (0.5 - y * 0.5) * VH], fromPx: (px, py) => [px / innerWidth * 2 - 1, 1 - py / VH * 2],
         },
         // called by the work section every frame while it is active: figure index and where the figure sits on screen (px)
         setStars(k, cx, cy, w, h) { if (k !== stars.fig) starsSetFigure(k); stars.cx = cx; stars.cy = cy; stars.w = w; stars.h = h; stars.last = performance.now(); },
@@ -1442,6 +1444,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         cardFrac: num(ds.cardFrac, 0.6),        // card width as a fraction of the visible width (upper bound; see layout())
         gap: num(ds.gap, 0.45),                 // minimum clearance between neighbouring cards, in units
         cardFracPortrait: 0.86,
+        camYPortrait: num(ds.camYPortrait, -0.47),   // portrait: the camera's height against the card (units; negative = the card sits higher on screen). -0.7 was theirs; -0.47 lands the card ~40 px lower on a phone (Felix, 2026-09-15)
         spineScale: num(ds.spineScale, 1),
         spineSpacing: num(ds.spineSpacing, 0.65),   // their SpineInstancer: y = 4 - 0.65 i
         spineTwist: num(ds.spineTwist, 0.4),        // rotation.y = 0.4 i
@@ -1904,7 +1907,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
             angle -= step;
             obj.position.y = out.y = -yStep * i * S;
             const t = { position: out, quaternion: obj.quaternion.clone() };
-            if (portrait) t.position.y += (cfg.centerpiece === 'axis' && cfg.axisOrbs > 0.5 ? 0.45 : -0.7) * S;   // axis: camera a little above the card so its node clears the header; otherwise theirs
+            if (portrait) t.position.y += (cfg.centerpiece === 'axis' && cfg.axisOrbs > 0.5 ? 0.45 : cfg.camYPortrait) * S;   // axis: camera a little above the card so its node clears the header; otherwise theirs
             targets.push(t);
         });
         world.scale.setScalar(S);
@@ -1939,7 +1942,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         // the camera rides the outer helix itself: constant radius, azimuth and height continuous in seg.
         // (interpolating between per-card targets cut chords, pulling the camera in and out once per card)
         const stepRad = M.degToRad(portrait ? cfg.stepPortrait : cfg.step), az = -stepRad * seg, Rcam = cfg.radius * 2 * S;
-        target.position.set(Rcam * Math.cos(az), -yStep * seg * S + (portrait && cfg.centerpiece === 'axis' && cfg.axisOrbs > 0.5 ? 0.45 : portrait ? -0.7 : 0) * S, Rcam * Math.sin(az));
+        target.position.set(Rcam * Math.cos(az), -yStep * seg * S + (portrait && cfg.centerpiece === 'axis' && cfg.axisOrbs > 0.5 ? 0.45 : portrait ? cfg.camYPortrait : 0) * S, Rcam * Math.sin(az));
         _look.set(target.position.x * 2, target.position.y, target.position.z * 2);   // face outward, like the cards
         target.lookAt(_look);
         // end blend: camera offset (scene px move the card 1:1 on screen) of (D/2)(1 - s/D)^2, whose slope at s = 0 is exactly -1,
