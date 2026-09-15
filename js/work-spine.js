@@ -75,7 +75,8 @@ const pcfg = section ? {
     foldScale: numAttr(section.dataset.foldScale, 1),                      // the fold's sea relative to the ship (1 = as tuned in the look-dev lab)
     foldRide: numAttr(section.dataset.foldRide, 1),                        // how much the hull answers the fold's swell (heave, pitch, roll); 0 = only the layer's own swell
     foldSway: numAttr(section.dataset.foldSway, 0.3),                      // the share of the scene's slow sway (at anchor) the hero sea takes; the ship always takes all of it
-    silk: numAttr(section.dataset.silk, 1),                                // the fold's silk lines stay as the sea the ship sails on down the page (streaming past it with its way); 0 = they fade out with the fold
+    silk: numAttr(section.dataset.silk, 0),                                // 1 = the fold's silk lines stay as the sea the ship sails on down the page (streaming past it with its way); 0 = they fade out into the work section (Felix, 2026-09-15)
+    silkGoneAt: section.dataset.silkGoneAt || 'stage-pin',                 // the scroll mark by which the silk lines have faded out (from foldFadeAt), as the work section pins
     silkBg: numAttr(section.dataset.silkBg, 1),                            // the animated silk ground of the principles section (#scalability): its strength (1 = full); 0 = none
     silkBgStyle: section.dataset.silkBgStyle || 'ribbon',                  // that ground: 'ribbon' (the Stripe-style silk ribbon) | 'beach' (the silk sea seen from the shore)
 } : null;
@@ -1095,7 +1096,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
             ship.fleetLevel = sail.length ? Math.round(Math.max(...sail)) : 0;   // the fleet is the ship the route ends on (its last level before the launch)
             const oy = pcfg.shipGrounds === 'overlay' ? resolveAt('#scalability:top@0.55') : pcfg.shipGrounds === 'opaque' && pcfg.shipOverlayAt ? resolveAt(pcfg.shipOverlayAt) : null; ship.overlayY = oy === null ? Infinity : oy;   // 'overlay': from the principles down; 'opaque': from shipOverlayAt (the rocket over the footer)
             const hy = Math.max(resolveAt('.hero-wrapper:bottom@0') ?? -1, resolveAt('.hero-wrapper dotlottie-player:bottom@0') ?? -1); ship.heroY = hy;   // the layer goes behind the page once the hero and its swell (which overhangs the hero's bottom) have left the screen: nothing it could change is visible then, so the switch needs no dip (the dip was the ship's blink)
-            if (fold) { const fy = resolveAt(pcfg.foldFlatAt), f0 = resolveAt(pcfg.foldFadeAt), f1 = resolveAt(pcfg.foldGoneAt); ship.foldFlatY = fy ?? 700; ship.foldFadeY = f0 ?? 480; ship.foldGoneY = Math.max((f1 ?? 790), ship.foldFadeY + 1); }   // the hero sea's scroll marks
+            if (fold) { const fy = resolveAt(pcfg.foldFlatAt), f0 = resolveAt(pcfg.foldFadeAt), f1 = resolveAt(pcfg.foldGoneAt); ship.foldFlatY = fy ?? 700; ship.foldFadeY = f0 ?? 480; ship.foldGoneY = Math.max((f1 ?? 790), ship.foldFadeY + 1); const sg = resolveAt(pcfg.silkGoneAt); ship.silkGoneY = Math.max(sg ?? ship.foldGoneY + 250, ship.foldGoneY);}   // the hero sea's scroll marks
         } catch (e) { console.warn('work-spine: route', e); }
     }
     function shipFrame(t, dt, now) {
@@ -1190,7 +1191,8 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
             foldTheta = h0.turn - FOLD.LAB.yaw;
             foldAmt = 1 - M.smoothstep(sS, 0, Math.max(1, ship.foldFlatY || 700));
             foldW = on ? 1 - M.smoothstep(sS, ship.foldFadeY || 480, ship.foldGoneY || 790) : 0;
-            silkW = on && !ship.overlay && rocketMix < 0.5 ? Math.max(foldW, M.clamp(pcfg.silk, 0, 1)) : 0;   // the silk lines: on down the page until the ending
+            const linesW = 1 - M.smoothstep(sS, ship.foldFadeY || 480, ship.silkGoneY || 1040);   // the silk lines outlast the wall a little: gone as the work section pins
+            silkW = on && !ship.overlay && rocketMix < 0.5 ? Math.max(foldW, linesW, M.clamp(pcfg.silk, 0, 1)) : 0;   // (with data-silk="1" they stay on down the page until the ending)
             const hideLottie = on && shown;   // the fold replaces the Lottie (it fades out as the layer fades in); phones keep it
             if (lottieHost && hideLottie !== ship.lottieHidden) {
                 ship.lottieHidden = hideLottie; lottieHost.style.transition = 'opacity 1.6s ease'; lottieHost.style.opacity = hideLottie ? '0' : '';
