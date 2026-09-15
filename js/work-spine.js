@@ -326,7 +326,7 @@ const PTS_VS = SIM_SHARED + `
       if (ff > 0.5) {   // the fleet: drawn where the sim put it; the source's shade, role and lane fade; arrives dark and lights up in place
         float fsh; vec4 fmd; vec3 ft=fleetTarget(fl,fd,fsh,fmd); ff*=step(0.001,fsh); pw=p.xyz; vShade=fsh; role=floor(fmd.x+0.5); laneR=step(5.5,role)*step(role,7.5); vShade=mix(vShade,0.5,laneR);
         float fs=fleetCopy(fl.z-1.0).w;
-        nearT=1.0-smoothstep(0.12,0.5,distance(pw,ft)/max(0.05,uFleetScale*fs)); bf=0.85*ff; vBoat=bf; fd*=mix(1.0,0.5,uRocket); fd=mix(1.0,fd,laneR)*mix(1.0,uReflect,step(7.5,role)*step(role,8.5)); }
+        nearT=1.0-smoothstep(0.12,0.5,distance(pw,ft)/max(0.05,uFleetScale*fs)); bf=0.85*ff; vBoat=bf; fd*=mix(1.0,0.75,uRocket); fd=mix(1.0,fd,laneR)*mix(1.0,uReflect,step(7.5,role)*step(role,8.5)); }
       else if (bf > 0.5 && laneR > 0.5) { pw=mix(boatTarget(bA,bB,mA,mB,fd), p.xyz, uSoftLane);          // water and foam: drawn from the lane under way (position and fade from ONE evaluation); at rest from the spring-held position, the lane's fade kept
         if (uTrail > 0.5 && role > 6.5 && role < 7.5 && isSmoke(md) < 0.5) { float age = fract(hash1(md.z * 13.1) + uTrailClk); pw = drawPos(p.xyz, 0.0); pw.xy += (vec2(hash1(md.z * 3.1), hash1(md.z * 7.9)) - 0.5) * age * 0.3 * uBoatScale; } }   // the trail: where it fell in the sea, dispersing slowly
       else if (bf > 0.5) { pw=carry(p.xyz); float fdn; vec3 bt=boatTarget(bA,bB,mA,mB,fdn); float rec=1.0-step(0.01,bA.w)*step(0.01,bB.w); nearT=mix(1.0, 1.0-smoothstep(0.12,0.5,distance(pw,bt)/uBoatScale), rec); }   // solids ride the pose; a recruit (absent at one of the two levels) arrives dark and lights up in place
@@ -1117,8 +1117,9 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         // along the hull's x axis as it projects on the screen (so from above the sea runs along the course, from the side it runs along the
         // horizon, and a ship sailing into the depth leaves the field still); a still field belongs to a ship at anchor or to a camera
         // that stands while the ship crosses the frame. Nearer particles stream faster (drawPos parallax), and the field dims a little
-        const camW = M.clamp(P.cam, 0, 1) * Math.min(1, pcfg.shipCurrent), hx = Math.cos(M.degToRad(turn)), hy = -Math.sin(M.degToRad(turn)) * Math.sin(M.degToRad(tilt));
-        const Vsea = Vflow * scale * camW;   // world units per second: the lane's flow in hull lengths x the hull's on-screen length
+        const launchW = rocketMix > 0.5 ? 1 : 0, RUN = M.degToRad(14);   // the ending: the fleet of yachts runs up to the right and the sea streams back past them
+        const camW = M.clamp(P.cam, 0, 1) * Math.min(1, pcfg.shipCurrent), hx = M.lerp(Math.cos(M.degToRad(turn)), Math.cos(RUN), launchW), hy = M.lerp(-Math.sin(M.degToRad(turn)) * Math.sin(M.degToRad(tilt)), Math.sin(RUN), launchW);
+        const Vsea = Vflow * M.lerp(scale, 0.19 * visW * 1.75, launchW) * camW;   // world units per second: the lane's flow in hull lengths x the hull's on-screen length (the fleet's at the ending)
         ship.driftX -= dt * (Vsea * hx * Math.max(1, pcfg.shipCurrent) + 0.25 * pcfg.shipRain * storm); ship.driftY -= dt * (Vsea * hy * Math.max(1, pcfg.shipCurrent) + pcfg.shipRain * storm); ship.camW = camW;   // in the storm the field falls as rain, slanted
         velU.uCurl.value = pcfg.pCurl * (1 + 2 * storm);   // the field churns
         if (storm > 0.25 && Math.random() < dt * 0.6 * storm) { ship.flash = 1; ship.flash2 = Math.random() < 0.6 ? 0.13 : 0; }   // lightning: a Poisson process, often a double flash
@@ -1132,11 +1133,11 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         const launch = rocketMix > 0.5;   // the switch happens out of sight, mid-morph behind the principles
         for (let k = 0; k < FLEET_K; k++) {
             const F = launch ? FOOT_POS[k] : FLEET_POS[k], wob = 0.06 * Math.sin(t * (0.19 + 0.02 * k) + k);
-            if (launch) { const B = FOOT_POS[k], run = ((B[3] + t * B[4]) % 4.6 + 4.6) % 4.6; fleetU[k].set(-2.3 + run, B[0] - 0.5 + 0.22 * run + 0.015 * Math.sin(t * 0.23 + k), B[1] + 0.05 * Math.sin(t * 0.17 + 2 * k), B[2] * fsz); }   // 4.6 hull lengths of travel up to the right (both ends off the screen), the ships level
+            if (launch) { const B = FOOT_POS[k], run = ((B[3] + t * B[4]) % 4.6 + 4.6) % 4.6; fleetU[k].set(-2.3 + run, B[0] + 0.015 * Math.sin(t * 0.23 + k), B[1] + 0.05 * Math.sin(t * 0.17 + 2 * k), B[2] * fsz); }   // 4.6 hull lengths of travel along the frame's x (both ends off the screen)
             else fleetU[k].set(F[0] + wob, F[1] + 0.015 * Math.sin(t * 0.23 + k), F[2] + 0.05 * Math.sin(t * 0.17 + 2 * k), F[3] * fsz);
         }
         if (launch) {   // the yachts sail on as the backdrop of the launch: a side view of their own across the footer, the fleet's frame is no longer the ship's
-            _qa.setFromAxisAngle(X, M.degToRad(4)).multiply(_qb.setFromAxisAngle(Y, 0)); fleetRot.setFromMatrix4(_m4.makeRotationFromQuaternion(_qa));   // a level side view; the run itself climbs to the right (lift grows with it)
+            _qa.setFromAxisAngle(Z, RUN).multiply(_qb.setFromAxisAngle(X, M.degToRad(4))); fleetRot.setFromMatrix4(_m4.makeRotationFromQuaternion(_qa));   // the frame's x runs up to the right: bows along the run, the sea streaming back the same way
             fleetAt.set(0, -0.78 * visH / 2 + 0.03 * Math.sin(t * 0.7), 0); U.uFleetScale.value = 0.19 * visW * levels[Math.max(0, (RKL >= 0 ? RKL : levels.length) - 1)].scale;
         } else { fleetRot.copy(shipRotSea); fleetAt.copy(shipAt); U.uFleetScale.value = scale; }
         for (const u of ALLU) u.uFleetScale.value = U.uFleetScale.value;
@@ -1158,7 +1159,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         const trailOn = pcfg.shipTrail > 0 && rocketMix < 0.5 ? 1 : 0;   // the rocket's plume is the strip
         for (const u of ALLU) { u.uTrail.value = trailOn; u.uTrailClk.value = ship.trail; }
         const fieldGone = Number.isFinite(ship.overlayY) ? M.smoothstep(scrollY, ship.overlayY - 0.8 * innerHeight, ship.overlayY) : 0;   // the field is gone by the overlay mark (the footer): the rocket stands alone
-        U.uFieldDim.value = fieldTheme * (1 - fieldGone) * (1 - pcfg.shipFieldDim * M.clamp(P.cam, 0, 1) * M.smoothstep(way, 0.1, 0.5)) * (1 + 3 * ship.flash);
+        U.uFieldDim.value = fieldTheme * (1 - 0.55 * fieldGone) * (1 - pcfg.shipFieldDim * M.clamp(P.cam, 0, 1) * M.smoothstep(way, 0.1, 0.5)) * (1 + 3 * ship.flash);   // at the ending the field stays as the sea the fleet sails on, dimmed
         U.uGlow.value = glowBase * (1 + 1.2 * ship.flash);
         // uniforms: the vec4s and uBeam are shared instances across the three materials (see boatU), written once; uSettle is set in frame() from the simulated step
         shipU.wave.set(amp * pcfg.shipWave * (1 + 1.5 * storm), ship.lambda, foamGain, foamLen);
