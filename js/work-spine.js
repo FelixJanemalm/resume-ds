@@ -64,6 +64,7 @@ const pcfg = section ? {
     shipSoftStart: numAttr(section.dataset.shipSoftStart, 0.3),          // the route's velocity at the very first pixel of scroll, relative to the first leg's mean: motion begins at once, gently
     shipCurrent: numAttr(section.dataset.shipCurrent, 1),                // the field as the sea: how much of the water's speed the whole field streams past at while the camera holds the ship (x the route's cam)
     shipFieldDim: numAttr(section.dataset.shipFieldDim, 0.35),           // how much the field dims under way while the camera holds the ship (0 = not at all)
+    pField: numAttr(section.dataset.pField, coarse ? 0 : 1),            // the all-over background particles (the field / the sea): 1 shown, 0 hidden (off on phones for now, Felix 2026-09-15); the ship, its water, the fleets and the armada are unaffected
     shipTheme: section.dataset.shipTheme || 'atlantic',                 // the ship's lineage: 'atlantic' (skiff to clipper) | 'norse' (faering to the Long Serpent); the picker's icon row and ?theme= override it
     shipOverlayAt: section.dataset.shipOverlayAt !== undefined ? section.dataset.shipOverlayAt : '.testimonials-wrapper:top@1',   // with opaque grounds: the scroll mark from which the canvas is drawn ABOVE the page, clipped to that element's top edge downward (the armada is the background of the testimonials-to-footer block: it scrolls in with the block, no fade); '' = never
     shipWay: numAttr(section.dataset.shipWay, 1),           // how fast the water streams past the hull under way (hull lengths per second at full wake)
@@ -779,7 +780,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
                           // at the bottom-right of the hero, climbs past the Work heading, sits in the gap below the cards in the column, then levels up
                           // below the sticky quote as its words reveal (#read's top .. +540), and the fleet's three waves land while the quote still holds
                           // the screen (by +780; the principles reach the ship at about #read's top + 900)
-                { at: 'top', x: 0.36, y: -0.84, size: 0.56, turn: 35, tilt: 0, heel: 2, level: 0, wake: 0, cam: 0 },
+                { at: 'top', x: 0.3, y: -0.82, size: 0.72, turn: 35, tilt: 0, heel: 2, level: 0, wake: 0, cam: 0 },
                 { at: '#work:center@0.72', x: 0.22, y: -0.45, size: 0.56, turn: 60, tilt: 8, heel: 5, level: 0, wake: 0.35, cam: 0.2 },
                 { at: '#work:center@0.5', x: 0.05, y: -0.1, size: 0.54, turn: 85, tilt: 24, heel: 5, level: L1, wake: 0.65, cam: 0.3 },
                 { at: '#work:center@0.25', x: -0.05, y: 0.12, size: 0.5, turn: 92, tilt: 50, heel: 5, level: L1, wake: 0.85, cam: 0.5 },
@@ -1251,7 +1252,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         const trailOn = pcfg.shipTrail > 0 && rocketMix < 0.5 ? 1 : 0;   // the rocket's plume is the strip
         for (const u of ALLU) { u.uTrail.value = trailOn; u.uTrailClk.value = ship.trail; }
         const fieldGone = Number.isFinite(ship.overlayY) ? M.smoothstep(scrollY, ship.overlayY - 0.8 * VH, ship.overlayY) : 0;   // the field is gone by the overlay mark (the footer): the rocket stands alone
-        U.uFieldDim.value = fieldTheme * (1 - 0.55 * fieldGone) * (1 - pcfg.shipFieldDim * M.clamp(P.cam, 0, 1) * M.smoothstep(way, 0.1, 0.5)) * (1 + 3 * ship.flash);   // at the ending the field stays as the sea the fleet sails on, dimmed
+        U.uFieldDim.value = pcfg.pField * fieldTheme * (1 - 0.55 * fieldGone) * (1 - pcfg.shipFieldDim * M.clamp(P.cam, 0, 1) * M.smoothstep(way, 0.1, 0.5)) * (1 + 3 * ship.flash);   // at the ending the field stays as the sea the fleet sails on, dimmed
         U.uGlow.value = glowBase * (1 + 1.2 * ship.flash);
         // uniforms: the vec4s and uBeam are shared instances across the three materials (see boatU), written once; uSettle is set in frame() from the simulated step
         shipU.wave.set(amp * pcfg.shipWave * (1 + 1.5 * storm), ship.lambda, foamGain, foamLen);
