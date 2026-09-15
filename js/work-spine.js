@@ -74,6 +74,9 @@ const pcfg = section ? {
     foldFadeAt: section.dataset.foldFadeAt || '#work:center@0.5', foldGoneAt: section.dataset.foldGoneAt || '.hero-wrapper:bottom@0',   // the fold's sea fades out between these marks as the ship gets under way (its own water and the field take over)
     foldScale: numAttr(section.dataset.foldScale, 1),                      // the fold's sea relative to the ship (1 = as tuned in the look-dev lab)
     foldRide: numAttr(section.dataset.foldRide, 1),                        // how much the hull answers the fold's swell (heave, pitch, roll); 0 = only the layer's own swell
+    foldSway: numAttr(section.dataset.foldSway, 0.3),                      // the share of the scene's slow sway (at anchor) the hero sea takes; the ship always takes all of it
+    silk: numAttr(section.dataset.silk, 1),                                // the fold's silk lines stay as the sea the ship sails on down the page (streaming past it with its way); 0 = they fade out with the fold
+    silkBg: numAttr(section.dataset.silkBg, 1),                            // the silk sea as the animated ground of the principles section (#scalability): the lines' strength (1 = as under the ship); 0 = none
 } : null;
 if (pcfg) for (const [k, v] of new URLSearchParams(location.search)) if (k in pcfg && v !== '') pcfg[k] = Number.isNaN(+v) ? v : +v;   // dev aid: ?shipWorkTilt=45&boat=off
 let layer = null;
@@ -623,6 +626,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
     const fleetTex = dataTex(fleetData), fleetU = Array.from({ length: ARMADA_K }, () => new THREE.Vector4(0, 0, 0, 0.001));
     const shipRot = new THREE.Matrix3(), shipAt = new THREE.Vector3(), shipRot0 = new THREE.Matrix3(), shipAt0 = new THREE.Vector3();
     const shipRotSea = new THREE.Matrix3();   // the sea's pose: the hull's tilt, the sea's own course (lags the hull's at rest)
+    const foldSea = new THREE.Matrix3(), foldT = new THREE.Matrix3(), foldD = new THREE.Vector3();   // the hero sea's pose (the hull's tilt, the calm course) and two scratch values
     const fleetRot = new THREE.Matrix3(), fleetAt = new THREE.Vector3();   // the fleet's frame: the ship's while it sails, its own at the launch (the yachts stay on the sea as the backdrop while the ship is the rocket)
     const shipU = { sail2: new THREE.Vector4(0, 0, 0, 0), wave: new THREE.Vector4(0, 0.3, 0, 0.15), sea: new THREE.Vector4(0, 2.618, 0, 0), motion: new THREE.Vector4(0, 0, 0, 0), sail: new THREE.Vector4(1, 0, 0, 0), clock: new THREE.Vector4(0, 0, 0, 0), hull: new THREE.Vector4(0.5, -0.5, 1, 0.02), misc: new THREE.Vector4(-0.02, 0, 0, 1.6), beam: new Float32Array(17), swell: new THREE.Vector4(1, 0, 0, 0), funnel: new THREE.Vector4(0, 0, 0, 1) };
     const boatU = () => ({ tBoatA: { value: levels[0].pos }, tBoatB: { value: levels[0].pos }, tMetaA: { value: levels[0].meta }, tMetaB: { value: levels[0].meta }, uMix: { value: 0 }, uForm: { value: shipOn ? 1 : 0 }, uBoatScale: { value: 1 }, uBoat: { value: shipAt }, uRot: { value: shipRot }, uTime: { value: 0 }, uRipple: { value: 0 }, uFlow: { value: 0 }, uSettle: { value: 0 }, uWay: { value: 0 }, uReflect: { value: 1 }, uStarT: { value: starT }, uN: { value: N }, uStarForm: { value: 0 }, uSnap: { value: 1.2 }, uSnapBoat: { value: 0.02 }, uRocket: { value: 0 }, uSoft: { value: 0 }, uLoose: { value: 0 }, uSoftLane: { value: 0 }, uRotSea: { value: shipRotSea }, uSeaD: { value: new THREE.Vector2(1, 0) }, uSqN: { value: new THREE.Vector3().fromArray((shipOn && BOAT.SQUARE_NORMAL) || [0.970, 0, 0.242]) }, uTrail: { value: 0 }, uTrailClk: { value: 0 }, uTrailClk0: { value: 0 }, tFleet: { value: fleetTex }, tFleetPos: { value: levels[0].pos }, tFleetMeta: { value: levels[0].meta }, uFleet: { value: fleetU }, uFleetForm: { value: 0 }, uFleetScale: { value: 1 }, uFleetBoat: { value: fleetAt }, uFleetRot: { value: fleetRot }, uFleetLift: { value: new THREE.Vector2(0, 12) }, uSmoke: { value: 0 }, uSmokeClk: { value: 0 }, uPaddle: { value: 0 }, uAnchor: { value: 0 }, uAnchorSide: { value: 1 }, uDepart: { value: 0 }, uFlowDep: { value: 0 }, uDepOn: { value: 0 }, uWaterFade: { value: 1 }, uFunnel: { value: shipU.funnel },
@@ -887,6 +891,11 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         }
     }
     const segAt = s => { const keys = ship.keys; let i = 0; while (i < keys.length - 2 && s >= keys[i + 1].y) i++; return i; };
+    function seaYawAt(s) {   // the sea's calm course at a scroll (resolveRoute's table, linear between its 8 px steps)
+        const T = ship.seaYaw; if (!T) return ship.keys.length ? ship.keys[0].k.turn : 0;
+        const u = (s - T.y0) / 8, i = Math.floor(u); if (i <= 0) return T.tab[0]; if (i >= T.tab.length - 1) return T.tab[T.tab.length - 1];
+        return T.tab[i] + (T.tab[i + 1] - T.tab[i]) * (u - i);
+    }
     function poseAt(s, out) {   // the keyframe pose at scroll s (cubic Hermite per property)
         const keys = ship.keys, i = segAt(s), a = keys[i], b = keys[Math.min(i + 1, keys.length - 1)], h = b.y - a.y;
         const u = h > 0 ? M.clamp((s - a.y) / h, 0, 1) : 1, u2 = u * u, u3 = u2 * u;
@@ -1070,6 +1079,12 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
             prepKeys(keys);
             ship.route = buildRoute(keys.map(k => ({ at: k.y, x: k.k.x, y: k.k.y })), visW / visH, { softStart: pcfg.shipSoftStart });
             ship.keys = keys;
+            if (fold) {   // the sea's calm course per 8 px of scroll: the hero's course plus the course changes made while the camera moves (1 - cam), none of the ship's own turns under a still camera; a function of scroll, so scrolling back returns it exactly
+                const y0 = keys[0].y, n = Math.max(2, Math.ceil((keys[keys.length - 1].y - y0) / 8) + 1), tab = new Float32Array(n), q = {};
+                let prev = keys[0].k.turn, acc = prev;
+                for (let i = 0; i < n; i++) { poseAt(y0 + i * 8, q); acc += (q.turn - prev) * (1 - M.clamp(q.cam, 0, 1)); prev = q.turn; tab[i] = acc; }
+                ship.seaYaw = { y0, tab };
+            }
             const RKq = BOAT && BOAT.ROCKET !== undefined ? BOAT.ROCKET : Infinity, sail = keys.map(e => e.k.level).filter(l => l < RKq - 0.01);
             ship.fleetLevel = sail.length ? Math.round(Math.max(...sail)) : 0;   // the fleet is the ship the route ends on (its last level before the launch)
             const oy = pcfg.shipGrounds === 'overlay' ? resolveAt('#scalability:top@0.55') : pcfg.shipGrounds === 'opaque' && pcfg.shipOverlayAt ? resolveAt(pcfg.shipOverlayAt) : null; ship.overlayY = oy === null ? Infinity : oy;   // 'overlay': from the principles down; 'opaque': from shipOverlayAt (the rocket over the footer)
@@ -1081,7 +1096,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         if (!shipOn) return;
         if (jumpTo && !jumpTo.touched && now - jumpTo.t0 < 9000) {
             const y = section.classList.contains('is-3d') ? resolveAt(jumpTo.at) : section.offsetTop;   // first to the work section so it initialises, then to the mark
-            if (y !== null && Math.abs(scrollY - y) > 2) { document.documentElement.style.scrollBehavior = 'auto'; window.scrollTo(0, y); ship.follow = null; ship.lastScroll = scrollY; ship.still = 0; ship.resolvedAt = -1e9; }
+            if (y !== null && Math.abs(scrollY - y) > 2) { document.documentElement.style.scrollBehavior = 'auto'; window.scrollTo(0, y); ship.follow = null; ship.seaF = null; ship.silkAt = null; ship.lastScroll = scrollY; ship.still = 0; ship.resolvedAt = -1e9; }
         }
         if (now - ship.resolvedAt > 1000) resolveRoute(now);   // sections move as media loads and carousels initialise: re-resolve every second
         applyLayer(); if (ship.overlay) placeCanvas(true);
@@ -1154,17 +1169,22 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         const wayT = M.clamp(0.72 * P.wake * (1 - anchor) + 0.55 * ship.wind, 0, 1.2), tauW = wayT > ship.way ? 0.35 + 0.15 * lvn : 1.3 + 0.5 * lvn;
         ship.way += (wayT - ship.way) * (1 - Math.exp(-dt / tauW));
         const way = ship.way, amp = way * way, sea = 0.3 + 0.7 * way, restW = 1 - M.smoothstep(way, 0.05, 0.4);   // restW: 1 at anchor .. 0 under way
-        // the hero's sea (js/voyage-fold.js): laid down flat by the scroll (foldAmt 1 -> 0) and faded out as the ship gets under way (foldW), wide
-        // screens only. The lab's sea is placed in the ship's sea frame so it sits on screen where it sat in the lab, seen from the same place:
-        // k (world units per lab unit) from the camera's distance to the hero's spot, growing and shrinking with the ship as the route zooms
-        let foldW = 0, foldAmt = 1, foldK = 1, foldTheta = 0;
+        // the hero's sea (js/voyage-fold.js): laid down flat by the scroll (foldAmt 1 -> 0), its risen sheet and dots faded out as the ship gets under
+        // way (foldW), its silk lines kept as the sea the ship sails on (silkW), wide screens only. The lab's sea is placed in the ship's sea frame so
+        // it sits on screen where it sat in the lab, seen from the same place: k (world units per lab unit) from the camera's distance to the hero's
+        // spot, zooming with the route's framing (size) but not with the ship's growth, so a bigger ship is bigger on the same swell. All of it runs on
+        // the sea's own smoothed scroll (the pose's angle lag), so the fold's height, course and tilt always move together
+        let foldW = 0, foldAmt = 1, foldK = 1, foldTheta = 0, silkW = 0;
         if (fold) {
             const on = VH <= innerWidth, h0 = ship.keys[0].k;
-            const scaleHero = Math.max(1e-4, h0.size * visW * levels[M.clamp(Math.round(h0.level), 0, levels.length - 1)].scale);
-            foldK = Math.hypot(camera.position.x - h0.x * visW / 2, camera.position.y - h0.y * visH / 2, camera.position.z) / FOLD.LAB.camDist * (scale / scaleHero) * pcfg.foldScale;
+            if (!ship.seaF) ship.seaF = { p: { s: scrollY }, v: { s: 0 } };
+            follow(ship.seaF, 's', scrollY, pcfg.shipLag, dt);
+            const sS = ship.seaF.p.s;
+            foldK = Math.hypot(camera.position.x - h0.x * visW / 2, camera.position.y - h0.y * visH / 2, camera.position.z) / FOLD.LAB.camDist * (P.size / Math.max(1e-4, h0.size)) * pcfg.foldScale;
             foldTheta = h0.turn - FOLD.LAB.yaw;
-            foldAmt = 1 - M.smoothstep(scrollY, 0, Math.max(1, ship.foldFlatY || 700));
-            foldW = on ? 1 - M.smoothstep(scrollY, ship.foldFadeY || 480, ship.foldGoneY || 790) : 0;
+            foldAmt = 1 - M.smoothstep(sS, 0, Math.max(1, ship.foldFlatY || 700));
+            foldW = on ? 1 - M.smoothstep(sS, ship.foldFadeY || 480, ship.foldGoneY || 790) : 0;
+            silkW = on && !ship.overlay && rocketMix < 0.5 ? Math.max(foldW, M.clamp(pcfg.silk, 0, 1)) : 0;   // the silk lines: on down the page until the ending
             const hideLottie = on && shown;   // the fold replaces the Lottie (it fades out as the layer fades in); phones keep it
             if (lottieHost && hideLottie !== ship.lottieHidden) {
                 ship.lottieHidden = hideLottie; lottieHost.style.transition = 'opacity 1.6s ease'; lottieHost.style.opacity = hideLottie ? '0' : '';
@@ -1212,8 +1232,8 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         const lift = 1 + 0.3 * M.smoothstep(P.tilt, 50, 60);   // from above the heave reads small: a little more of it there (pitch stays under 4 degrees)
         const thetaA = 1.4 * A * ks * sinc * pcfg.shipBob, hA = A * sinc * lift * pcfg.shipBob, ph = ship.phiE;
         let pitch = -thetaA * (Math.sin(ph) + 0.35 * Math.sin(1.83 * ph + 1.1)) / 1.35, heave = hA * (Math.cos(ph) + 0.35 * Math.cos(1.83 * ph + 1.1)) / 1.35, foldRoll = 0;
-        if (fold && foldW > 0) {   // on the fold's sea the hull rides its swell: the water under the bow, the stern and both sides (the course against the sea's from the last frame)
-            const dS = ship.dSea || 0, r = fold.ride([Math.cos(dS), -Math.sin(dS)], foldTheta, foldK, scale, t, dt), g = foldW * pcfg.foldRide;
+        if (fold && silkW > 0) {   // on the fold's sea the hull rides its swell: the water under the bow, the stern and both sides (its course on that sea and the flow from the last frame)
+            const b = ship.silkB || 0, r = fold.ride({ bowX: Math.cos(b), bowZ: -Math.sin(b), k: foldK, L: scale, t, dt, flowX: ship.silkX || 0, flowZ: ship.silkZ || 0 }), g = silkW * pcfg.foldRide;
             pitch += g * r.pitch; heave += g * r.heave; foldRoll = g * r.roll;
         }
         // where in the cycle the stem is deepest (plunge: spray and the bow wave) and the stern (squat: churn), from the bow's immersion in the fundamental
@@ -1263,9 +1283,8 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         const turnSea = ship.turnSea + swayYaw;
         _qa.setFromAxisAngle(X, M.degToRad(tilt)).multiply(_qb.setFromAxisAngle(Y, -M.degToRad(turnSea)));
         shipRotSea.setFromMatrix4(_m4.makeRotationFromQuaternion(_qa));
-        const dSea = M.degToRad(turnSea - turn); ship.dSea = dSea; for (const u of ALLU) { u.uSeaD.value.set(Math.cos(dSea), Math.sin(dSea)); u.uSoftLane.value = pcfg.shipSoft * restW; }   // at rest the water is spring-held like the hull
+        const dSea = M.degToRad(turnSea - turn); for (const u of ALLU) { u.uSeaD.value.set(Math.cos(dSea), Math.sin(dSea)); u.uSoftLane.value = pcfg.shipSoft * restW; }   // at rest the water is spring-held like the hull
         shipAt.set(P.x * visW / 2, P.y * visH / 2 + restW * pcfg.shipBob * 0.04 * Math.sin(t * 0.8), 0);   // at rest the whole scene bobs (Sept 10: 0.04 units at 0.8 rad/s)
-        if (fold) fold.place(shipAt, shipRotSea, foldTheta, foldK, camera.position, foldAmt, foldW, t);   // the hero's sea: in the sea's frame, so it sways and bobs with the scene and the ship floats on it
         const snap = now - ship.t0 < 700 ? 0.02 : 0;
         // the field is the sea: while the camera holds the ship (the route's cam), the whole field streams past astern at the water's speed,
         // along the hull's x axis as it projects on the screen (so from above the sea runs along the course, from the side it runs along the
@@ -1278,6 +1297,27 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         const vxT = Vsea * hx * Math.max(1, pcfg.shipCurrent), vyT = Vsea * hy * Math.max(1, pcfg.shipCurrent), kS = 1 - Math.exp(-dt / 0.9);
         ship.vsx = (ship.vsx || 0) + (vxT - (ship.vsx || 0)) * kS; ship.vsy = (ship.vsy || 0) + (vyT - (ship.vsy || 0)) * kS;   // its velocity eases (0.9 s): a quick change of course, or scrolling back through the turns, never snaps its direction
         ship.driftX -= dt * (ship.vsx + 0.25 * pcfg.shipRain * storm); ship.driftY -= dt * (ship.vsy + pcfg.shipRain * storm); ship.camW = camW;   // in the storm the field falls as rain, slanted
+        if (fold) {
+            // the hero's sea and the silk lines: on the ship's waterline, at its tilt (the scene's sway included), on the calm course (the hero's course
+            // plus only the turns made while the camera moves, with the scene's yaw sway), so the water never swings with the ship's own turns
+            // the sea takes only a share of the scene's sway (foldSway): on a wall that runs to the horizon a full sway swings its far end across the
+            // screen; the ship keeps its whole sway, so it rocks gently on a calmer sea
+            const sw = M.clamp(pcfg.foldSway, 0, 1), yawS = seaYawAt(ship.seaF ? ship.seaF.p.s : scrollY) + sw * swayYaw, tiltS = tilt - (1 - sw) * sceneTilt;
+            _qa.setFromAxisAngle(X, M.degToRad(tiltS)).multiply(_qb.setFromAxisAngle(Y, -M.degToRad(yawS))); foldSea.setFromMatrix4(_m4.makeRotationFromQuaternion(_qa));
+            const b = M.degToRad(yawS - foldTheta - turn); ship.silkB = b; ship.seaYawNow = yawS; ship.foldNow = { amt: foldAmt, w: foldW, silk: silkW, k: foldK, tilt: tiltS };   // the hull's course in the lab's sea (and the sea's state, for QA tooling)
+            // the pattern streams past the hull at the field's designed speed, eased like the field (lab units per second: hull lengths per second x the hull in lab units)
+            const vT = silkW > 0 ? VflowDesign * scale / Math.max(1e-4, foldK) : 0;
+            ship.silkV = (ship.silkV || 0) + (vT - (ship.silkV || 0)) * kS;
+            ship.silkX = (ship.silkX || 0) + Math.cos(b) * ship.silkV * dt; ship.silkZ = (ship.silkZ || 0) - Math.sin(b) * ship.silkV * dt;
+            // and where the camera holds still (cam) while the ship crosses the frame, the water stays put under it instead of travelling with it
+            if (ship.silkAt && shipAt.distanceTo(ship.silkAt) < 1) {
+                fold.rotation(foldSea, foldTheta, foldT).transpose();
+                foldD.copy(shipAt).sub(ship.silkAt).applyMatrix3(foldT).multiplyScalar(M.clamp(P.cam, 0, 1) / Math.max(1e-4, foldK));
+                ship.silkX += foldD.x; ship.silkZ += foldD.z;
+            }
+            (ship.silkAt || (ship.silkAt = new THREE.Vector3())).copy(shipAt);
+            fold.place({ at: shipAt, rotSea: foldSea, theta: foldTheta, k: foldK, cam: camera.position, fold: foldAmt, vis: foldW, lines: silkW, dots: foldW, flowX: ship.silkX, flowZ: ship.silkZ, t, zoom: P.size / Math.max(1e-4, ship.keys[0].k.size) });
+        }
         velU.uCurl.value = pcfg.pCurl * (1 + 2 * storm);   // the field churns
         if (storm > 0.25 && Math.random() < dt * 0.6 * storm) { ship.flash = 1; ship.flash2 = Math.random() < 0.6 ? 0.13 : 0; }   // lightning: a Poisson process, often a double flash
         if (ship.flash2 > 0) { ship.flash2 -= dt; if (ship.flash2 <= 0) ship.flash = 1; }
@@ -1367,7 +1407,11 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         lines.material.uniforms.uColor.value.copy(v).lerp(new THREE.Color(0xffffff), 0.2 * (1 - pale));
         mat.blending = pale > 0.3 ? THREE.NormalBlending : THREE.AdditiveBlending; mat.needsUpdate = true;
         if (ship.overlay) canvas.style.mixBlendMode = light ? 'multiply' : 'screen';
-        if (fold) { const c = new THREE.Color(), hsl = { h: 0, s: 0, l: 0 }; try { c.setStyle(foldColorKey() || '#1466B8'); } catch (e) { c.set(0x1466b8); } c.getHSL(hsl, THREE.SRGBColorSpace); fold.setHue(hsl.h); }   // the hero sea: the picked colour's hue at the lab's saturation and lightness
+        if (fold) {   // the hero sea: the picked colour's hue at the lab's saturation and lightness; the page's ground, which the wall's edges fade into
+            const c = new THREE.Color(), hsl = { h: 0, s: 0, l: 0 }; try { c.setStyle(foldColorKey() || '#1466B8'); } catch (e) { c.set(0x1466b8); } c.getHSL(hsl, THREE.SRGBColorSpace); fold.setHue(hsl.h);
+            let m = null; try { m = /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/.exec(getComputedStyle(document.body).backgroundColor || ''); } catch (e) {}
+            if (m) fold.setGround(+m[1] / 255, +m[2] / 255, +m[3] / 255);
+        }
         try { groundKey = getComputedStyle(document.body).backgroundColor + foldColorKey(); } catch (e) {}
     }
     function foldColorKey() { try { return fold ? getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim() : ''; } catch (e) { return ''; } }
@@ -1441,6 +1485,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
     if (THEME_ROW) mountThemeRow();   // off for now: the lineage icons under the colour picker may come back later
     layer = section.wsLayer = {
         theme: () => themeId, setTheme, themes: () => THEMES ? Object.keys(THEMES) : [],
+        fold,   // the hero's sea (its uniforms are live: a dev aid for tuning in the console)
         // the path editor's window on the route (js/voyage-editor.js, ?route=1)
         routeApi: {
             orientation: () => VH > innerWidth ? 'portrait' : 'landscape',
@@ -1493,6 +1538,7 @@ async function boot() {
     let FOLD = null;
     if (pcfg.fold && BOAT) { try { FOLD = await import('./voyage-fold.js' + MOD_V); } catch (e) { console.warn('work-spine: the hero sea failed to load (the Lottie stays)', e); } }
     if (pcfg.mode === 'page') startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD);
+    if (FOLD && pcfg.silkBg > 0) FOLD.mountSilk(THREE, document.getElementById('scalability'), { light: coarse, strength: pcfg.silkBg });   // the silk sea behind the principles (it starts drawing when the section comes near)
     if (layer && new URLSearchParams(location.search).get('route') === '1') import('./voyage-editor.js' + MOD_V).then(m => m.mountRouteEditor(layer.routeApi)).catch(e => console.warn('work-spine: route editor', e));
     if (cards.length < 2) return;
     // the work section itself waits until it is within 1.5 viewports

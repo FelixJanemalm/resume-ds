@@ -193,6 +193,12 @@ body:has(#ws-particles) .reader { background-color: transparent; }
 .hero-wrapper #scroll-down-arrow { z-index: 2; }
 .work-heading { position: relative; z-index: 2; }
 
+/* The silk sea as a section's animated ground (js/voyage-fold.js mountSilk): its canvas sits over the section's own gradient and under its content,
+   fading out toward the section's top and bottom edges so it never meets the neighbouring sections with a line. */
+.ws-silk-host { position: relative; isolation: isolate; }
+.ws-silk { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; display: block; pointer-events: none;
+    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 16%, #000 84%, transparent); mask-image: linear-gradient(to bottom, transparent, #000 16%, #000 84%, transparent); }
+
 /* The ship's lineage: an icon row under the colour picker (mounted by work-spine.js). The chosen one takes the picked accent. */
 .ws-themes { display: flex; gap: 8px; margin-top: 14px; }
 #color-picker-container .ws-theme { position: static; transform: none; z-index: auto; width: 38px; height: 34px; padding: 0; display: grid; place-items: center; border-radius: 8px; cursor: pointer;   /* testimonials.css positions every button absolutely: undone here */

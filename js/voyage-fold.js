@@ -1,15 +1,16 @@
-/* voyage-fold.js — the hero's sea: the Lottie's banded swell remade inside the particle layer's 3D world.
+/* voyage-fold.js — the hero's sea: the Lottie's banded swell remade inside the particle layer's 3D world, and the silk sea it lays down into.
  *
  * One sheet of water. Flat round the ship, it curls up at a crescent-shaped fold line into a tall fan of bands in the picked colour (the
  * Lottie's look: a bright leading edge on each band, falling to dark, a glow at the foot, fine silky strands, a sheen where the sheet turns
- * edge-on). The bands ARE the swell: they run down the fold and out across the sea as thin crest lines, and the ship rides that same swell
- * (seaHeight below mirrors the shader, so the layer can read the water under the bow, the stern and both sides). Dots -> lines -> solid in
- * space: solid where the sheet has risen, crest lines on the flat sea, dots all over, and the fold's far end and lip dissolve into dots.
- * Scrolling lays the fold down (fold 1 -> 0) and the layer fades it out as the ship gets under way.
+ * edge-on). The bands ARE the swell: they run down the fold and out across the sea as thin crest lines (the silk lines), and the ship rides that
+ * same swell (seaHeight below mirrors the shader, so the layer can read the water under the bow, the stern and both sides). Dots -> lines ->
+ * solid in space: solid where the sheet has risen, crest lines on the flat sea, dots all over, and the fold's far end and lip dissolve. Scrolling
+ * lays the fold down (fold 1 -> 0); the flat sheet's silk lines can stay as the sea the ship sails on (lines), streaming past it (flow).
+ * mountSilk() draws the same silk sea as the animated ground of a page section.
  *
  * Built and tuned in the look-dev page (the exploration workspace's fold-lab/, 2026-09-15; Felix: "all the defaults are already great for this
  * new water"). Every length below is in that lab's world units; the layer places the lab's sea in the ship's own sea frame (its waterline
- * centre, the sea's tilt and course, the scene's sway and bob) so that the fold sits on screen where it sat in the lab while the ship keeps
+ * centre, the sea's tilt, a calm course, the scene's sway and bob) so that the fold sits on screen where it sat in the lab while the ship keeps
  * its own start-scene pose: world = at + rot * (p - S) * k, with S the lab ship's spot on its sea and k world units per lab unit.
  */
 
@@ -18,7 +19,8 @@ export const LAB = { S: [-0.447, 1.777], camDist: 13.61, yaw: 15 };   // the lab
 export const DEFAULTS = {
     sat: 0.92, lum: 0.55, hueDrift: -4, edge: 0.3, floor: 0.2, baseGlow: 0.35,
     axis: -5, x0: 6, bend: -0.1, R: 4, phiMax: 130, fan: 0.3, foldDamp: 0.9, wallDark: 0.7, farDark: 0.008,
-    farA: 40, farB: 75, lipLen: 4, lipSoft: 5, spray: 0.35, sprayLen: 6,
+    farA: 60, farB: 140, fogA: 30, lipLen: 4, lipSoft: 5, spray: 0.35, sprayLen: 6,   // the far end: fading into the page's ground from fogA, gone by farB (camera distance, lab units); the lab had 40 / 75 and faded to black
+    nearA: 2.5, nearB: 7,                                                              // the wall dissolves as it comes this close in front of the camera (lab units): it can never sweep over the lens
     amp: 0.16, lambda: 3.6, speed: 0.45, amp2: 0.05, lambda2: 2.2, dir2: 35,
     bands: 2, bandPow: 2.5, strand: 0.25, strandFreq: 18, sheen: 0.55, sheenPow: 3.5, light: 0.45, grain: 1,
     solidA: 2, solidB: 30, lineGain: 0.55, lineWidth: 1.1, lineFar: 26, dotGain: 1.1, dotOnSolid: 0.25, dotPx: 2, dotFar: 30,
@@ -26,10 +28,12 @@ export const DEFAULTS = {
 
 const SEA = `
     uniform float uTime, uFold, uX0, uR, uPhiMax, uFan, uAxis, uBend, uAmp, uLambda, uSpeed, uAmp2, uLambda2, uDir2, uFoldDamp;
-    uniform vec3 uAt; uniform mat3 uRot; uniform float uK; uniform vec2 uS;
+    uniform vec3 uAt; uniform mat3 uRot; uniform float uK; uniform vec2 uS, uFlow;
     /* the run: distance along the swell's travel, measured from a crescent (bend), so the bands are arcs round the fold */
     float runOf(vec2 xz, out float across){ vec2 d = vec2(cos(uAxis), sin(uAxis)); across = dot(xz, vec2(-d.y, d.x)); return dot(xz, d) - uBend * across * across * 0.1; }
+    /* the swell at a point of the sheet; uFlow streams the pattern past the ship (the fold itself stays where it is) */
     float swellH(vec2 xz, float t, out float q){
+      xz += uFlow;
       float across; float run = runOf(xz, across); q = (run + uSpeed * t) / uLambda;
       vec2 d2 = vec2(cos(uDir2), sin(uDir2)); float q2 = (dot(xz, d2) + uSpeed * 0.8 * t) / uLambda2;
       return uAmp * cos(6.2831853 * q) + uAmp2 * cos(6.2831853 * q2); }
@@ -49,10 +53,8 @@ const SEA = `
       p += n * h; }
     /* the lab's sea placed in the ship's sea frame */
     vec3 toWorld(vec3 p){ return uAt + uRot * ((p - vec3(uS.x, 0.0, uS.y)) * uK); }
-    /* how solid the sheet is: risen (phi), not too far away, not past the lip (there it breaks into dots) */
-    uniform float uSolidA, uSolidB, uFarA, uFarB, uLipLen, uLipSoft;
-    float solidOf(float phi, float dist, float beyond){
-      return smoothstep(uSolidA, max(uSolidA + 0.01, uSolidB), degrees(phi)) * (1.0 - smoothstep(uFarA, max(uFarA + 0.01, uFarB), dist)) * (1.0 - smoothstep(uLipLen, uLipLen + uLipSoft, beyond)); }
+    /* never clipped by the camera's far plane (the sea runs on far past it; it has faded out by then): depth held just inside */
+    vec4 project(vec4 mv){ vec4 c = projectionMatrix * mv; c.z = min(c.z, c.w * 0.9999); return c; }
     vec3 hueShift(vec3 c, float a){ vec3 g = vec3(0.57735); vec3 pr = g * dot(g, c); vec3 U = c - pr; vec3 V = cross(g, U); return U * cos(a) + V * sin(a) + pr; }`;
 
 const SHEET_VS = SEA + `
@@ -61,15 +63,13 @@ const SHEET_VS = SEA + `
       vec3 p, n; float q, phi, across, beyond;
       deform(position, p, n, q, phi, across, beyond);
       vW = p; vQ = q; vPhi = phi; vAcross = across; vBeyond = beyond;
-      gl_Position = projectionMatrix * viewMatrix * vec4(toWorld(p), 1.0); }`;
+      gl_Position = project(viewMatrix * vec4(toWorld(p), 1.0)); }`;
 
-/* shaded in the lab's own space (uCam: the layer's camera mapped into it), so the light, the sheen and every fade are the lab's */
+/* shaded in the lab's own space (uCam, uCamFwd: the layer's camera mapped into it), so the light, the sheen and every fade are the lab's */
 const SHEET_FS = `
-    uniform vec3 uColor, uCam; uniform float uTime, uBands, uBandPow, uHueDrift, uEdge, uFloor, uStrand, uStrandFreq, uSheen, uSheenPow, uLight, uGrain;
-    uniform float uLineGain, uLineWidth, uLineFar, uWallDark, uFarDark, uPhiMax, uFold, uBaseGlow, uVis, uSolidA, uSolidB, uFarA, uFarB, uLipLen, uLipSoft;
+    uniform vec3 uColor, uCam, uCamFwd, uGround; uniform float uTime, uBands, uBandPow, uHueDrift, uEdge, uFloor, uStrand, uStrandFreq, uSheen, uSheenPow, uLight, uGrain;
+    uniform float uLineGain, uLineWidth, uLineFar, uWallDark, uFarDark, uPhiMax, uFold, uBaseGlow, uVis, uLines, uSolidA, uSolidB, uFarA, uFarB, uFogA, uLipLen, uLipSoft, uNearA, uNearB;
     varying vec3 vW; varying float vQ, vPhi, vAcross, vBeyond;
-    float solidOf(float phi, float dist, float beyond){
-      return smoothstep(uSolidA, max(uSolidA + 0.01, uSolidB), degrees(phi)) * (1.0 - smoothstep(uFarA, max(uFarA + 0.01, uFarB), dist)) * (1.0 - smoothstep(uLipLen, uLipLen + uLipSoft, beyond)); }
     vec3 hueShift(vec3 c, float a){ vec3 g = vec3(0.57735); vec3 pr = g * dot(g, c); vec3 U = c - pr; vec3 V = cross(g, U); return U * cos(a) + V * sin(a) + pr; }
     float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
     float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -79,10 +79,11 @@ const SHEET_FS = `
       float qb = vQ * uBands, t = fract(qb), fw = fwidth(qb);
       vec2 sp = vec2(vAcross * uStrandFreq, vQ * 1.5); float sAA = 1.0 - smoothstep(0.35, 1.0, length(fwidth(sp)));   /* no strands where they would alias */
       float dist = length(uCam - vW);
-      /* material first (cheap): solid where the sheet has risen, crest lines on the flat sea; nothing else is shaded where both are zero */
-      float sol = solidOf(vPhi, dist, vBeyond);
-      float line = (1.0 - smoothstep(0.0, uLineWidth * fw, min(t, 1.0 - t))) * uLineGain * exp(-dist / uLineFar) * (1.0 - sol);
-      float a = clamp(sol + line, 0.0, 1.0) * uVis;
+      /* material first (cheap): solid where the sheet has risen (and is neither too far, past the lip, nor too near the lens), crest lines on the flat sea */
+      float farK = 1.0 - smoothstep(uFarA, max(uFarA + 0.01, uFarB), dist), lipK = 1.0 - smoothstep(uLipLen, uLipLen + uLipSoft, vBeyond), nearK = smoothstep(uNearA, uNearB, dot(vW - uCam, uCamFwd));
+      float sol = smoothstep(uSolidA, max(uSolidA + 0.01, uSolidB), degrees(vPhi)) * farK * lipK * nearK * uVis;
+      float line = (1.0 - smoothstep(0.0, uLineWidth * fw, min(t, 1.0 - t))) * uLineGain * exp(-dist / uLineFar) * (1.0 - sol) * uLines;
+      float a = clamp(sol + line, 0.0, 1.0);
       if (a < 0.003) discard;
       vec3 V = normalize(uCam - vW); if (dot(N, V) < 0.0) N = -N;
       /* bands: bright at each band's leading edge, falling off across it (the Lottie's stepped copies) */
@@ -95,13 +96,17 @@ const SHEET_FS = `
       col *= mix(1.0, 0.55 + 0.75 * max(0.0, dot(N, normalize(vec3(-0.4, 0.75, 0.5)))), uLight);
       col += C * uSheen * pow(1.0 - abs(dot(N, V)), uSheenPow);
       col *= exp(-dist * uFarDark);
+      /* every edge of the wall fades into the page's own ground before it turns transparent: the far end, the lip and the part near the lens leave
+         no dark rim on a grey or light ground (on a dark one this is the lab's fade to dark) */
+      float edgeK = max(max(smoothstep(uFogA, uFarB, dist), smoothstep(uLipLen - 1.0, uLipLen + uLipSoft, vBeyond)), 1.0 - nearK);
+      col = mix(col, uGround, edgeK);
       vec3 rgb = (col * sol + mix(C, vec3(1.0), 0.25) * line) / max(sol + line, 1e-4);
       rgb += (hash12(gl_FragCoord.xy + fract(uTime * 7.0) * 100.0) - 0.5) * uGrain * 0.035;
       gl_FragColor = vec4(rgb, a);
-      gl_FragDepthEXT = sol * uVis > 0.5 ? gl_FragCoord.z : 1.0; }`;   /* only the risen sheet hides what is behind it (the field's stars); the lines never cut into the ship or its reflection */
+      gl_FragDepthEXT = sol > 0.5 ? gl_FragCoord.z : 1.0; }`;   /* only the risen sheet hides what is behind it (the field's stars); the lines never cut into the ship or its reflection */
 
 const DOTS_VS = SEA + `
-    uniform float uPx, uPR, uDotGain, uDotOnSolid, uDotFar, uBands, uBandPow, uHueDrift, uSpray, uSprayLen, uVis; uniform vec3 uColor, uCam;
+    uniform float uPx, uPR, uDotGain, uDotOnSolid, uDotFar, uBands, uBandPow, uHueDrift, uSpray, uSprayLen, uDots, uSolidA, uSolidB, uFarA, uFarB, uLipLen, uLipSoft; uniform vec3 uColor, uCam;
     attribute float aSeed; varying float vB; varying vec3 vC;
     void main(){
       vec3 p, n; float q, phi, across, beyond;
@@ -109,79 +114,93 @@ const DOTS_VS = SEA + `
       float band = pow(1.0 - fract(q * uBands), uBandPow);
       float past = max(0.0, beyond - uLipLen), r2 = fract(aSeed * 91.7), r3 = fract(aSeed * 417.3);   /* past the lip the sheet is spray: the dots lift off and thin out */
       p += (n * (0.3 + r2) + vec3(0.0, 0.6, 0.0)) * uSpray * past * (0.2 + r3) + vec3(sin(uTime * 0.7 + r2 * 40.0), cos(uTime * 0.5 + r3 * 40.0), 0.0) * 0.15 * min(past, 3.0) * uSpray;
-      float dist = length(uCam - p), sol = solidOf(phi, dist, beyond);
-      vB = uVis * uDotGain * (0.18 + 0.9 * band) * (0.45 + 1.1 * aSeed) * mix(1.0, uDotOnSolid, sol) * exp(-dist / uDotFar) * exp(-past / max(0.1, uSprayLen));
+      float dist = length(uCam - p);
+      float sol = smoothstep(uSolidA, max(uSolidA + 0.01, uSolidB), degrees(phi)) * (1.0 - smoothstep(uFarA, max(uFarA + 0.01, uFarB), dist)) * (1.0 - smoothstep(uLipLen, uLipLen + uLipSoft, beyond));
+      vB = uDots * uDotGain * (0.18 + 0.9 * band) * (0.45 + 1.1 * aSeed) * mix(1.0, uDotOnSolid, sol) * exp(-dist / uDotFar) * exp(-past / max(0.1, uSprayLen));
       vC = mix(hueShift(uColor, uHueDrift * phi), vec3(1.0), 0.3);
       vec4 mv = viewMatrix * vec4(toWorld(p), 1.0);
       gl_PointSize = uPx * uPR * (0.6 + 0.9 * aSeed) * 16.8 / max(1.0, -mv.z / uK);
-      gl_Position = projectionMatrix * mv; }`;
+      gl_Position = project(mv); }`;
 const DOTS_FS = `
     varying float vB; varying vec3 vC;
     void main(){ float d = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.1, d); if (a * vB < 0.004) discard; gl_FragColor = vec4(min(vC * vB, vec3(1.0)), a); }`;   /* additive: the colour times the disc */
 
-/* The sea in JS (the flat part: the ship never sails up the fold), for the ride. Lab units, the same clock as the shader. */
-export function seaHeight(o, x, z, t) {
+/* The sea in JS (the flat part: the ship never sails up the fold), for the ride. Lab units, the same clock and flow as the shader. */
+export function seaHeight(o, x, z, t, fx = 0, fz = 0) {
+    x += fx; z += fz;
     const a = o.axis * Math.PI / 180, across = -x * Math.sin(a) + z * Math.cos(a);
     const q = (x * Math.cos(a) + z * Math.sin(a) - o.bend * across * across * 0.1 + o.speed * t) / o.lambda;
     const a2 = o.dir2 * Math.PI / 180, q2 = (x * Math.cos(a2) + z * Math.sin(a2) + o.speed * 0.8 * t) / o.lambda2;
     return o.amp * Math.cos(2 * Math.PI * q) + o.amp2 * Math.cos(2 * Math.PI * q2);
 }
 
-export function createFold(THREE, { scene, pixelRatio = 1, light = false, opts = {} }) {
+/* the sheet's grid: fine (0.45 lab units a cell at full resolution) within 45 units of the lab's middle, where the fold, the ship and the near sea
+   are, then cells growing smoothly out to 260 units, so the far end and the horizon never show an edge */
+function sheetGeometry(THREE, seg) {
+    const g = new THREE.PlaneGeometry(2, 2, seg, seg), pos = g.attributes.position, U0 = 0.45, LIN = 100, C = (260 - LIN) / Math.pow(1 - U0, 3) - 0;
+    const warp = u => { const a = Math.abs(u), s = Math.sign(u); return s * (a <= U0 ? LIN * a : LIN * a + C * Math.pow(a - U0, 3)); };
+    for (let i = 0; i < pos.count; i++) pos.setXY(i, warp(pos.getX(i)), warp(pos.getY(i)));
+    g.rotateX(-Math.PI / 2); g.computeBoundingSphere();
+    return g;
+}
+
+export function createFold(THREE, { scene, pixelRatio = 1, light = false, dots: withDots = true, opts = {} }) {
     const o = Object.assign({}, DEFAULTS, opts), R = Math.PI / 180;
     const U = {
-        uTime: { value: 0 }, uFold: { value: 1 }, uVis: { value: 0 }, uAt: { value: new THREE.Vector3() }, uRot: { value: new THREE.Matrix3() }, uK: { value: 1 }, uS: { value: new THREE.Vector2(LAB.S[0], LAB.S[1]) }, uCam: { value: new THREE.Vector3() },
+        uTime: { value: 0 }, uFold: { value: 1 }, uVis: { value: 0 }, uLines: { value: 1 }, uDots: { value: 1 }, uFlow: { value: new THREE.Vector2() },
+        uAt: { value: new THREE.Vector3() }, uRot: { value: new THREE.Matrix3() }, uK: { value: 1 }, uS: { value: new THREE.Vector2(LAB.S[0], LAB.S[1]) }, uCam: { value: new THREE.Vector3() }, uCamFwd: { value: new THREE.Vector3(0, 0, -1) }, uGround: { value: new THREE.Vector3(0.26, 0.26, 0.26) },
         uX0: { value: o.x0 }, uR: { value: o.R }, uPhiMax: { value: o.phiMax * R }, uFan: { value: o.fan }, uAxis: { value: o.axis * R }, uBend: { value: o.bend }, uFoldDamp: { value: o.foldDamp },
         uAmp: { value: o.amp }, uLambda: { value: o.lambda }, uSpeed: { value: o.speed }, uAmp2: { value: o.amp2 }, uLambda2: { value: o.lambda2 }, uDir2: { value: o.dir2 * R },
         uColor: { value: new THREE.Color() }, uBands: { value: o.bands }, uBandPow: { value: o.bandPow }, uHueDrift: { value: o.hueDrift * R }, uEdge: { value: o.edge }, uFloor: { value: o.floor }, uBaseGlow: { value: o.baseGlow },
         uStrand: { value: o.strand }, uStrandFreq: { value: o.strandFreq }, uSheen: { value: o.sheen }, uSheenPow: { value: o.sheenPow }, uLight: { value: o.light }, uGrain: { value: o.grain },
-        uWallDark: { value: o.wallDark }, uFarDark: { value: o.farDark }, uSolidA: { value: o.solidA }, uSolidB: { value: o.solidB }, uFarA: { value: o.farA }, uFarB: { value: o.farB },
-        uLipLen: { value: o.lipLen }, uLipSoft: { value: o.lipSoft }, uSpray: { value: o.spray }, uSprayLen: { value: o.sprayLen },
+        uWallDark: { value: o.wallDark }, uFarDark: { value: o.farDark }, uSolidA: { value: o.solidA }, uSolidB: { value: o.solidB }, uFarA: { value: o.farA }, uFarB: { value: o.farB }, uFogA: { value: o.fogA },
+        uLipLen: { value: o.lipLen }, uLipSoft: { value: o.lipSoft }, uSpray: { value: o.spray }, uSprayLen: { value: o.sprayLen }, uNearA: { value: o.nearA }, uNearB: { value: o.nearB },
         uLineGain: { value: o.lineGain }, uLineWidth: { value: o.lineWidth }, uLineFar: { value: o.lineFar },
         uPx: { value: o.dotPx }, uPR: { value: pixelRatio }, uDotGain: { value: o.dotGain }, uDotOnSolid: { value: o.dotOnSolid }, uDotFar: { value: o.dotFar },
     };
-    // the sheet: 120 x 120 lab units round the lab's origin (the fold, the near sea and the far dissolve all lie inside it), a third of a unit per cell
-    const SIZE = 120, SEG = light ? 220 : 360;
-    const sheetGeo = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG); sheetGeo.rotateX(-Math.PI / 2);
-    const sheet = new THREE.Mesh(sheetGeo, new THREE.ShaderMaterial({ uniforms: U, vertexShader: SHEET_VS, fragmentShader: SHEET_FS, side: THREE.DoubleSide, transparent: true, depthWrite: true }));
-    sheet.frustumCulled = false; sheet.renderOrder = -2; sheet.visible = false;
-    // the sea's dots: a disc of the same sheet, denser near the middle of the lab's sea
-    const ND = light ? 26000 : 60000, dp = new Float32Array(ND * 3), ds = new Float32Array(ND);
-    for (let i = 0; i < ND; i++) { const r = 34 * Math.sqrt(Math.random()), a = Math.random() * Math.PI * 2; dp[i * 3] = Math.cos(a) * r; dp[i * 3 + 2] = Math.sin(a) * r; ds[i] = Math.pow(Math.random(), 2.2); }
-    const dotGeo = new THREE.BufferGeometry(); dotGeo.setAttribute('position', new THREE.BufferAttribute(dp, 3)); dotGeo.setAttribute('aSeed', new THREE.BufferAttribute(ds, 1));
-    // additive light that leaves the canvas's alpha alone: on the layer's transparent canvas an alpha written per dot would darken the page under
-    // every faint dot (dark specks); this way the dots only ever add light, as they did on the lab's opaque ground
-    const dots = new THREE.Points(dotGeo, new THREE.ShaderMaterial({ uniforms: U, vertexShader: DOTS_VS, fragmentShader: DOTS_FS, transparent: true, depthWrite: false,
-        blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneFactor, blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor }));
-    dots.frustumCulled = false; dots.renderOrder = -1; dots.visible = false;
-    scene.add(sheet); scene.add(dots);
-    const _rot = new THREE.Matrix3(), _rt = new THREE.Matrix3(), _ry = new THREE.Matrix3(), _v = new THREE.Vector3();
+    const sheet = new THREE.Mesh(sheetGeometry(THREE, light ? 240 : 440), new THREE.ShaderMaterial({ uniforms: U, vertexShader: SHEET_VS, fragmentShader: SHEET_FS, side: THREE.DoubleSide, transparent: true, depthWrite: true }));
+    sheet.frustumCulled = false; sheet.renderOrder = -2; sheet.visible = false; scene.add(sheet);
+    // the sea's dots: a disc of the same sheet, denser near the middle of the lab's sea (additive light that leaves the canvas's alpha alone: on a
+    // transparent canvas an alpha written per dot would darken the page under every faint dot into a dark speck)
+    let dots = null;
+    if (withDots) {
+        const ND = light ? 26000 : 60000, dp = new Float32Array(ND * 3), ds = new Float32Array(ND);
+        for (let i = 0; i < ND; i++) { const r = 34 * Math.sqrt(Math.random()), a = Math.random() * Math.PI * 2; dp[i * 3] = Math.cos(a) * r; dp[i * 3 + 2] = Math.sin(a) * r; ds[i] = Math.pow(Math.random(), 2.2); }
+        const dotGeo = new THREE.BufferGeometry(); dotGeo.setAttribute('position', new THREE.BufferAttribute(dp, 3)); dotGeo.setAttribute('aSeed', new THREE.BufferAttribute(ds, 1));
+        dots = new THREE.Points(dotGeo, new THREE.ShaderMaterial({ uniforms: U, vertexShader: DOTS_VS, fragmentShader: DOTS_FS, transparent: true, depthWrite: false,
+            blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneFactor, blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor }));
+        dots.frustumCulled = false; dots.renderOrder = -1; dots.visible = false; scene.add(dots);
+    }
+    const full = new THREE.Matrix3(), fullT = new THREE.Matrix3(), ry = new THREE.Matrix3(), v = new THREE.Vector3(), fwd = new THREE.Vector3();
     const ride = { heave: 0, pitch: 0, roll: 0 };
     return {
         opts: o, uniforms: U, sheet, dots,
-        // the picked colour's hue at the lab's saturation and lightness (raw sRGB into the shader, as the lab wrote it)
+        // the picked colour's hue at the lab's saturation and lightness (raw sRGB into the shader, as the lab wrote it); the page's ground (sRGB 0..1)
         setHue(h) { U.uColor.value.setHSL(h, o.sat, o.lum); },
-        // place the lab's sea: at = the ship's waterline centre, rotSea = the sea's pose (Matrix3), theta = the hero's course minus the lab camera's yaw (deg),
-        // k = world units per lab unit, cam = the layer camera's position; fold 1 up .. 0 flat; vis 0..1; t in seconds
-        place(at, rotSea, theta, k, cam, fold, vis, t) {
-            const c = Math.cos(theta * R), s = Math.sin(theta * R);
-            _ry.set(c, 0, s, 0, 1, 0, -s, 0, c);   // about the vertical
-            _rot.multiplyMatrices(rotSea, _ry);
-            U.uRot.value.copy(_rot); U.uAt.value.copy(at); U.uK.value = k;
-            _v.copy(cam).sub(at).applyMatrix3(_rt.copy(_rot).transpose()).multiplyScalar(1 / Math.max(1e-4, k));
-            U.uCam.value.set(_v.x + LAB.S[0], _v.y, _v.z + LAB.S[1]);
-            U.uFold.value = fold; U.uVis.value = vis; U.uTime.value = t;
-            sheet.visible = dots.visible = vis > 0.002;
+        setGround(r, g, b) { U.uGround.value.set(r, g, b); },
+        // the full rotation (lab -> world) for a sea pose (Matrix3: the sea's tilt and course) and theta (deg about the vertical: the hero's course minus the lab camera's yaw)
+        rotation(rotSea, theta, out) { const c = Math.cos(theta * R), s = Math.sin(theta * R); ry.set(c, 0, s, 0, 1, 0, -s, 0, c); return out.multiplyMatrices(rotSea, ry); },
+        // place the lab's sea: at = the ship's waterline centre, rotSea / theta as above, k = world units per lab unit, cam = the camera's position; fold 1 up .. 0 flat;
+        // vis: the risen sheet, lines: the silk lines, dots: the sea's dots (0..1 each); flow: the pattern's offset (lab units); t in seconds; zoom: how far the
+        // framing has pulled back from the hero's (k relative to the hero's): the lines keep their fade on screen and grow only a little fainter as they pack denser
+        place({ at, rotSea, theta, k, cam, fold, vis, lines, dots: dotsVis = 0, flowX = 0, flowZ = 0, t, zoom = 1 }) {
+            this.rotation(rotSea, theta, full); fullT.copy(full).transpose();
+            U.uRot.value.copy(full); U.uAt.value.copy(at); U.uK.value = k;
+            U.uLineFar.value = o.lineFar / Math.max(0.05, zoom); U.uLineGain.value = o.lineGain * Math.sqrt(Math.min(1, Math.max(0.1, zoom)));
+            v.copy(cam).sub(at).applyMatrix3(fullT).multiplyScalar(1 / Math.max(1e-4, k));
+            U.uCam.value.set(v.x + LAB.S[0], v.y, v.z + LAB.S[1]);
+            U.uCamFwd.value.copy(fwd.set(0, 0, -1).applyMatrix3(fullT));   // the layer's camera looks down -z
+            U.uFold.value = fold; U.uVis.value = vis; U.uLines.value = lines; U.uDots.value = dotsVis; U.uTime.value = t; U.uFlow.value.set(flowX, flowZ);
+            sheet.visible = vis > 0.002 || lines > 0.002;
+            if (dots) dots.visible = dotsVis > 0.002;
         },
         // the ship on this sea: the water's height under the bow, the stern and both sides, as heave (hull lengths), pitch (rad, bow up +) and roll
-        // (deg, the layer's heel sign), followed at `rate` per second. bow = the hull's x axis in the sea frame [x, z]; theta, k as in place; L = hull length (world)
-        ride(bow, theta, k, L, t, dt, rate = 4) {
-            const c = Math.cos(theta * R), s = Math.sin(theta * R);
-            const toLab = (x, z) => [c * x - s * z, s * x + c * z];   // the transpose of the rotation about the vertical, on (x, z)
-            const [bx, bz] = toLab(bow[0], bow[1]), [zx, zz] = toLab(-bow[1], bow[0]);   // the bow, and the hull's +z (toward the viewer at course 0) in the lab's sea
+        // (deg, the layer's heel sign), followed at `rate` per second. bowX / bowZ: the hull's course in the lab's sea (unit); k as in place; L = hull length (world)
+        ride({ bowX, bowZ, k, L, t, dt, flowX = 0, flowZ = 0, rate = 4 }) {
+            const zx = -bowZ, zz = bowX;   // the hull's +z (toward the viewer at course 0) in the lab's sea
             const Ll = L / Math.max(1e-4, k), B = 0.3 * Ll, S0 = LAB.S[0], S1 = LAB.S[1];
-            const hB = seaHeight(o, S0 + bx * Ll * 0.45, S1 + bz * Ll * 0.45, t), hS = seaHeight(o, S0 - bx * Ll * 0.45, S1 - bz * Ll * 0.45, t);
-            const hP = seaHeight(o, S0 + zx * B * 0.5, S1 + zz * B * 0.5, t), hM = seaHeight(o, S0 - zx * B * 0.5, S1 - zz * B * 0.5, t);
+            const hB = seaHeight(o, S0 + bowX * Ll * 0.45, S1 + bowZ * Ll * 0.45, t, flowX, flowZ), hS = seaHeight(o, S0 - bowX * Ll * 0.45, S1 - bowZ * Ll * 0.45, t, flowX, flowZ);
+            const hP = seaHeight(o, S0 + zx * B * 0.5, S1 + zz * B * 0.5, t, flowX, flowZ), hM = seaHeight(o, S0 - zx * B * 0.5, S1 - zz * B * 0.5, t, flowX, flowZ);
             const f = 1 - Math.exp(-rate * dt);
             ride.heave += ((hB + hS + hP + hM) / 4 / Ll - ride.heave) * f;
             ride.pitch += (Math.atan2(hB - hS, 0.9 * Ll) - ride.pitch) * f;
@@ -189,4 +208,40 @@ export function createFold(THREE, { scene, pixelRatio = 1, light = false, opts =
             return ride;
         },
     };
+}
+
+/* The silk sea as the animated ground of a page section (host): its own small canvas behind the section's content, a camera looking down over
+   the flat sheet at `tilt` degrees, the lines drifting slowly; the picked colour polled like the particle layer's, drawn only while on screen. */
+export function mountSilk(THREE, host, { colorVar = '--primary-color', tilt = 38, course = 80, scale = 0.45, drift = 0.25, strength = 1, pixelRatio = Math.min(devicePixelRatio || 1, 1.5), light = false } = {}) {   // course: the swell's heading across the view (deg); scale: world units per lab unit (smaller = finer lines)
+    if (!host || host.querySelector('.ws-silk')) return null;
+    const canvas = document.createElement('canvas');
+    canvas.className = 'ws-silk'; canvas.setAttribute('aria-hidden', 'true');
+    host.classList.add('ws-silk-host'); host.insertBefore(canvas, host.firstChild);
+    let gl;
+    try { gl = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'low-power' }); } catch (e) { canvas.remove(); host.classList.remove('ws-silk-host'); return null; }
+    gl.setPixelRatio(pixelRatio); gl.setClearColor(0x000000, 0);
+    const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(35, 1, 0.5, 60); camera.position.set(0, 0, 12);
+    const sea = createFold(THREE, { scene, pixelRatio, light, dots: false, opts: { lineGain: DEFAULTS.lineGain * strength } });
+    const rot = new THREE.Matrix3(), q = new THREE.Quaternion(), m4 = new THREE.Matrix4(), at = new THREE.Vector3(0, -1.2, 0);
+    q.setFromAxisAngle(new THREE.Vector3(1, 0, 0), tilt * Math.PI / 180); rot.setFromMatrix4(m4.makeRotationFromQuaternion(q));
+    let key = '', visible = false, raf = 0, t0 = performance.now(), flowX = 0, flowZ = 0, last = t0, polled = 0;
+    function color() {
+        let c = ''; try { c = getComputedStyle(document.documentElement).getPropertyValue(colorVar).trim(); } catch (e) {}
+        if (c === key) return; key = c;
+        const col = new THREE.Color(), hsl = { h: 0, s: 0, l: 0 }; try { col.setStyle(c || '#1466B8'); } catch (e) { col.set(0x1466b8); } col.getHSL(hsl, THREE.SRGBColorSpace); sea.setHue(hsl.h);
+    }
+    function size() { const w = host.clientWidth, h = host.clientHeight; if (!w || !h) return; gl.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+    function frame(now) {
+        raf = 0; if (!visible) return;
+        const dt = Math.min(0.05, (now - last) / 1000); last = now;
+        if (now - polled > 600) { polled = now; color(); }
+        flowX += dt * drift; flowZ -= dt * drift * 0.35;   // a slow drift, so the ground is alive between the swell's own passes
+        sea.place({ at, rotSea: rot, theta: course, k: scale, cam: camera.position, fold: 0, vis: 0, lines: 1, flowX, flowZ, t: (now - t0) / 1000, zoom: scale / 0.91 });   // (0.91: the hero's k on a wide screen)
+        gl.render(scene, camera);
+        raf = requestAnimationFrame(frame);
+    }
+    size(); color();
+    new ResizeObserver(size).observe(host);
+    new IntersectionObserver(entries => { visible = entries.some(e => e.isIntersecting); if (visible && !raf) { last = performance.now(); raf = requestAnimationFrame(frame); } }, { rootMargin: '10% 0px' }).observe(host);
+    return { canvas, sea };
 }
