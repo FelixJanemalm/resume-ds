@@ -192,11 +192,15 @@ export function createFold(THREE, { scene, pixelRatio = 1, light = false, dots: 
     }
     const full = new THREE.Matrix3(), fullT = new THREE.Matrix3(), ry = new THREE.Matrix3(), v = new THREE.Vector3(), fwd = new THREE.Vector3();
     const ride = { heave: 0, pitch: 0, roll: 0 };
-    return {
+    let hue = 0.58;
+    const DEG = ['axis', 'phiMax', 'dir2', 'hueDrift'], UKEY = { dotPx: 'uPx' };   // the keys the lab writes in degrees, and the one whose uniform is not named after it
+    const view = {
         opts: o, uniforms: U, sheet, dots,
         // the picked colour's hue at the lab's saturation and lightness (raw sRGB into the shader, as the lab wrote it); the page's ground (sRGB 0..1)
-        setHue(h) { U.uColor.value.setHSL(h, o.sat, o.lum); },
+        setHue(h) { hue = h; U.uColor.value.setHSL(h, o.sat, o.lum); },
         setGround(r, g, b) { U.uGround.value.set(r, g, b); },
+        // a dev aid: retune live from the console, by the same keys the look-dev lab's panel and its "Copy JSON" use (the keys of DEFAULTS)
+        set(p) { Object.assign(o, p); for (const k in p) { const u = U[UKEY[k] || ('u' + k[0].toUpperCase() + k.slice(1))]; if (u) u.value = DEG.indexOf(k) >= 0 ? p[k] * R : p[k]; } view.setHue(hue); },
         // the full rotation (lab -> world) for a sea pose (Matrix3: the sea's tilt and course) and theta (deg about the vertical: the hero's course minus the lab camera's yaw)
         rotation(rotSea, theta, out) { const c = Math.cos(theta * R), s = Math.sin(theta * R); ry.set(c, 0, s, 0, 1, 0, -s, 0, c); return out.multiplyMatrices(rotSea, ry); },
         // place the lab's sea: at = the ship's waterline centre, rotSea / theta as above, k = world units per lab unit, cam = the camera's position; fold 1 up .. 0 flat;
@@ -227,6 +231,7 @@ export function createFold(THREE, { scene, pixelRatio = 1, light = false, dots: 
             return ride;
         },
     };
+    return view;
 }
 
 /* a few motes drifting over the water, as the particle layer's field drifts over the hero's sea: depth-sorted into the view's frustum, each on its
@@ -384,95 +389,146 @@ export function mountSilk(THREE, host, { style = 'ribbon', colorVar = '--primary
 }
 
 /* Silk in the armada's ending (the particle layer's fleet frame: the copies' course along +x, across along z, the sea at y = 0; world units).
-   style 'wake': every ship trails a fan of silk from its transom (its width at the stern, opening at the wake's angle astern, its two arms raised a
-   little so they catch the sheen), light running aft along the threads, strongest at the stern; each wake grows in as its ship starts its loop and
-   is gone before the ship wraps. style 'weave': one broad band of silk laid along the course under the whole armada, its edges curling up into the
-   light, its threads flowing on into the distance with the ships riding it. Both read the fleet's live uniforms by reference (copies, rotation,
-   anchor, scroll lift), so they move exactly with the ships. */
+   Both styles are built the way the principles ribbon is — a centre line, and a cross direction turned about it — so the sheet has real form: its
+   normal sweeps as it bends, and colour, threads and sheen vary over it instead of reading as a flat streak.
+   style 'wake': behind every ship a sheet unfurls — a thin bright crease at the transom, rolling open into a wide silk fan astern and lifting off
+   the sea as it opens, ripples running aft along it: a ripple opening rather than foam. Each grows in as its ship starts its loop and is gone
+   before the ship wraps. style 'weave': one broad silk road laid along the course, climbing as it runs into the distance and banking a little, its
+   selvedges rolling up into the light outside the ships' own band — and the armada rides its surface (rideAt mirrors the same shape in JS, so the
+   ships are lifted and tilted by the silk they sail on). Both read the fleet's live uniforms by reference (copies, rotation, anchor, scroll lift),
+   so they move exactly with the ships. */
 function armadaFleetGLSL(count) {
     return `
     uniform vec4 uFleet[${count}]; uniform mat3 uFleetRot; uniform vec3 uFleetBoat; uniform float uFleetScale; uniform vec2 uFleetLift, uRun;
     vec4 fleetCopy(float k){ int i = int(k + 0.5); vec4 c = uFleet[0]; for (int j = 1; j < ${count}; j++) { if (j == i) c = uFleet[j]; } return c; }
-    vec3 fleetWorld(vec3 local){ vec3 W = uFleetBoat + uFleetRot * local * uFleetScale; W.y += uFleetLift.x * (uFleetLift.y - W.z) / uFleetLift.y; return W; }`;
+    vec3 fleetWorld(vec3 local){ vec3 W = uFleetBoat + uFleetRot * local * uFleetScale; W.y += uFleetLift.x * (uFleetLift.y - W.z) / uFleetLift.y; return W; }
+    vec3 across(vec3 T, float th){ vec3 B0 = normalize(cross(T, vec3(0.0, 1.0, 0.0))); return B0 * cos(th) + cross(B0, T) * sin(th); }`;   /* the sheet's cross direction, turned about its centre line: th = 0 lies flat on the sea, th = 1.57 stands edge-on to it */
 }
-const WAKE_VS = count => SNOISE2 + armadaFleetGLSL(count) + `
-    uniform float uTime, uLen, uHalf0, uSpread, uRidge;
-    attribute float aK; varying vec2 vUv; varying vec3 vW; varying float vFade, vDist;
+/* the road: its centre climbs as it runs away (held flat and still where the ships enter the frame, so none of them ever pops into view), breathing
+   and meandering on slow sines — sines, not noise, so rideAt can mirror it exactly — and the whole sheet banks over as it goes */
+const WEAVE_SHAPE = `
+    uniform float uTime, uZ0, uZ1, uClimb, uClimbA, uClimbB, uBank, uBankA, uAmp, uFreq, uSpeed, uMeander, uWave, uCurl, uCurlAt, uTaper, uFade0, uFade1;
+    vec3 weaveCentre(float u){
+      float g = smoothstep(0.0, 0.22, u);
+      return vec3(uRun.x + u * uRun.y,
+                  uClimb * smoothstep(uClimbA, uClimbB, u) + g * uAmp * sin(u * uFreq * 6.2831 + uTime * uSpeed),
+                  0.5 * (uZ0 + uZ1) + g * uMeander * sin(u * uFreq * 4.1 + uTime * uSpeed * 0.8 + 1.7)); }
+    float weaveHalf(float u){ return 0.5 * (uZ1 - uZ0) * mix(1.0, uTaper, smoothstep(0.4, 1.0, u)); }
+    vec3 weavePoint(float u, float v, out float e){
+      vec3 c = weaveCentre(u), T = normalize(weaveCentre(u + 0.004) - weaveCentre(u - 0.004));
+      vec3 B = across(T, uBank * smoothstep(uBankA, 1.0, u)), Nb = cross(B, T);
+      e = smoothstep(uCurlAt, 1.0, abs(v));                                                  /* the selvedge: only the margin outside the ships' band rolls up */
+      return c + B * (v * weaveHalf(u) - sign(v) * 0.45 * uCurl * e * e) + Nb * (uCurl * e * e + uWave * sin(u * 9.0 - uTime * 0.5 + v * 1.2) * (1.0 - e)); }`;
+const WEAVE_VS = count => SNOISE2 + armadaFleetGLSL(count) + WEAVE_SHAPE + `
+    varying vec2 vUv; varying vec3 vW; varying float vFade, vDist, vCurl;
     void main(){
-      vec4 c = fleetCopy(aK); float L = c.w, u = uv.x, v = uv.y * 2.0 - 1.0;
-      float d = u * uLen * L;                                                                 /* distance astern of the transom */
-      float hw = L * uHalf0 + uSpread * d;                                                    /* the fan opens at the wake's angle */
-      float ridge = uRidge * L * exp(-pow((abs(v) - 0.8) / 0.18, 2.0)) * (1.0 - u);            /* the arms: raised rims, lower astern */
-      float ripple = 0.025 * L * sin(d * 2.6 - uTime * 1.6 + aK * 1.7) * (1.0 - 0.6 * u);       /* transverse ripples running aft */
-      vec3 W = fleetWorld(vec3(c.x - 0.48 * L - d, c.y + ridge + ripple, c.z + v * hw));
+      float u = uv.x, v = uv.y * 2.0 - 1.0, e;
+      vec3 p = weavePoint(u, v, e); vW = fleetWorld(p);
+      vFade = smoothstep(0.0, uFade0, u) * (1.0 - smoothstep(uFade1, 1.0, u));               /* fading at both ends of the run: it comes out of the dark and leads on into it */
+      vUv = vec2(u, v); vDist = p.x; vCurl = e;
+      gl_Position = projectionMatrix * viewMatrix * vec4(vW, 1.0); }`;
+const WAKE_VS = count => SNOISE2 + armadaFleetGLSL(count) + `
+    uniform float uTime, uLen, uHalf0, uSpread, uArc, uRollA, uRollB, uTwistAt, uTwistSpan, uRipple, uSwirl;
+    attribute float aK; varying vec2 vUv; varying vec3 vW; varying float vFade, vDist, vCurl;
+    vec3 wakeCentre(float u, vec4 c){ float L = c.w, d = u * uLen * L;
+      return vec3(c.x - 0.48 * L - d, c.y + uArc * L * u * u, c.z + uSwirl * L * u * sin(d * 0.55 - uTime * 0.6 + aK * 2.1)); }   /* astern of the transom, lifting off the sea as it opens and swinging a little */
+    void main(){
+      vec4 c = fleetCopy(aK); float L = c.w, u = uv.x, v = uv.y * 2.0 - 1.0, d = u * uLen * L;
+      vec3 p0 = wakeCentre(u, c), T = normalize(wakeCentre(min(u + 0.005, 1.0), c) - wakeCentre(max(u - 0.005, 0.0), c));
+      float th = mix(uRollA, uRollB, smoothstep(uTwistAt - uTwistSpan, uTwistAt + uTwistSpan, u));   /* edge-on at the stern, rolling open astern */
+      vec3 B = across(T, th), Nb = cross(B, T);
+      float hw = L * uHalf0 + uSpread * d;                                                    /* and widening at the wake's angle as it opens */
+      vec3 p = p0 + B * (v * hw) + Nb * uRipple * L * sin(d * 2.2 - uTime * 1.8 + aK * 1.7) * (1.0 - 0.5 * u);
+      vW = fleetWorld(p);
       float runPos = (c.x - uRun.x) / max(1.0, uRun.y);
       vFade = smoothstep(0.02, 0.12, runPos) * (1.0 - smoothstep(0.8, 0.97, runPos)) * step(0.01, L);   /* grows in as the ship starts its loop, gone before it wraps */
-      vUv = vec2(u, v); vW = W; vDist = d / max(L, 0.001);
-      gl_Position = projectionMatrix * viewMatrix * vec4(W, 1.0); }`;
-const WEAVE_VS = count => SNOISE2 + armadaFleetGLSL(count) + `
-    uniform float uTime, uZ0, uZ1, uCurl, uWave, uTaper;
-    varying vec2 vUv; varying vec3 vW; varying float vFade, vDist;
-    void main(){
-      float u = uv.x, v = uv.y * 2.0 - 1.0, x = uRun.x + u * uRun.y;
-      float mid = 0.5 * (uZ0 + uZ1), hw = 0.5 * (uZ1 - uZ0) * mix(1.0, uTaper, smoothstep(0.35, 1.0, u)), e = smoothstep(0.55, 1.0, abs(v));
-      float y = uWave * sin(x * 0.33 - uTime * 0.35 + v * 1.7) * (1.0 - e) + uCurl * e * e;     /* long low swells under the ships; the edges curl up */
-      float z = mid + v * hw - sign(v) * 0.45 * uCurl * e * e;                                  /* ... and in, like a ribbon's selvedge */
-      vW = fleetWorld(vec3(x, y, z));
-      vFade = smoothstep(0.0, 0.08, u) * (1.0 - smoothstep(0.75, 1.0, u));                    /* fading at both ends of the run: it leads on into the distance */
-      vUv = vec2(u, v); vDist = x;
+      vUv = vec2(u, v); vDist = d / max(L, 0.001); vCurl = 1.0 - abs(cos(th));                 /* how far it still stands on edge: the bright crease */
       gl_Position = projectionMatrix * viewMatrix * vec4(vW, 1.0); }`;
 const ARMADA_SILK_FS = SNOISE2 + `
-    uniform vec3 uColA, uColB, uColC; uniform float uTime, uThreadFreq, uThreads, uSheen, uGain, uClipTop, uFlow, uWeave;
-    varying vec2 vUv; varying vec3 vW; varying float vFade, vDist;
+    uniform vec3 uColA, uColB, uColC; uniform float uTime, uThreadFreq, uThreads, uSheen, uGain, uClipTop, uFlow, uWeave, uGrain, uEdge, uShade;
+    varying vec2 vUv; varying vec3 vW; varying float vFade, vDist, vCurl;
     float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
     void main(){
       if (gl_FragCoord.y > uClipTop) discard;
       float u = vUv.x, av = abs(vUv.y);
-      vec3 col = mix(uColB, uColA, smoothstep(0.5, 0.95, av));                                   /* the light at the edges, the deep colour inside */
-      col = mix(col, uColC, smoothstep(0.15, 1.0, u) * 0.6);
-      /* threads along the silk, their pattern flowing (aft for a wake, on with the ships for the weave), eased to their mean where they would alias */
-      vec2 sc = vec2(vUv.y * uThreadFreq, vDist * 0.9 - uTime * uFlow);
+      /* the colour: a gradient across the sheet, fanned out from the picked hue, deepening along the run */
+      vec3 col = mix(uColB, uColA, smoothstep(0.3, 1.0, av));
+      col = mix(col, uColC, smoothstep(0.1, 1.0, u) * uShade);
+      /* silk threads along it, their spacing wandering slowly, their pattern flowing (aft for a wake, on with the ships for the road), eased to their mean where they would alias */
+      float n0 = snoise(vec2(u * 0.8 + uTime * 0.01, vUv.y * 0.5));
+      vec2 sc = vec2(vUv.y * uThreadFreq * (1.0 + 0.35 * n0), vDist * 0.8 - uTime * uFlow);
       float th = 0.5 + 0.5 * snoise(sc), aa = 1.0 - smoothstep(0.3, 0.9, fwidth(sc.x));
       col *= 1.0 + uThreads * (mix(0.5, th, aa) - 0.5) * 1.6;
-      col *= 0.82 + 0.36 * (0.5 + 0.5 * sin(vDist * 1.9 - uTime * uFlow * 2.2));                /* light running along it */
+      col *= 0.86 + 0.28 * (0.5 + 0.5 * sin(vDist * 1.6 - uTime * uFlow * 2.0));               /* light running along it */
+      /* light from its own shape: toward white where the sheet turns edge-on to the eye */
       vec3 N = normalize(cross(dFdx(vW), dFdy(vW))), V = normalize(cameraPosition - vW);
       col = mix(col, mix(col, vec3(1.0), 0.65), clamp(uSheen * pow(1.0 - abs(dot(N, V)), 3.0), 0.0, 1.0));
-      col += (hash12(gl_FragCoord.xy + fract(uTime * 7.0) * 100.0) - 0.5) * 0.03;
-      float ends = mix(pow(1.0 - u, 2.2) * smoothstep(0.0, 0.03, u), 1.0, uWeave);               /* a wake: strongest at the stern, fading astern */
-      float wakeShape = 0.1 + 0.95 * exp(-pow((av - 0.84) / 0.12, 2.0)) + 0.75 * exp(-pow(av / 0.15, 2.0)) * pow(1.0 - u, 0.5);   /* a wake: two silk arms and the churned trail between them, calm water inside */
-      float a = uGain * vFade * ends * mix(wakeShape, 1.0, uWeave) * (1.0 - smoothstep(mix(0.94, 0.82, uWeave), 1.0, av));
+      col += (hash12(gl_FragCoord.xy + fract(uTime * 7.0) * 100.0) - 0.5) * uGrain * 0.04;
+      float ends = mix(pow(1.0 - u, 1.5) * smoothstep(0.0, 0.05, u), 1.0, uWeave);             /* a wake thins astern; the road runs on */
+      float form = mix(0.45 + 0.9 * vCurl + 0.5 * exp(-pow(av / 0.22, 2.0)), 0.4 + 1.2 * vCurl, uWeave);   /* the turned parts carry the light: a wake's crease and the churn straight astern, the road's selvedges — and the road stays quiet down its middle, where the ships sail */
+      float a = uGain * vFade * ends * form * smoothstep(0.0, uEdge, 1.0 - av);                /* soft along both selvedges */
       if (a < 0.003) discard;
       gl_FragColor = vec4(col, a); }`;
 
-export const ARMADA_SILK = {
-    wake: { len: 6, half0: 0.1, spread: 0.34, ridge: 0.08, threadFreq: 34, threads: 0.6, sheen: 1.1, gain: 0.6, flow: 0.55 },
-    weave: { curl: 0.7, wave: 0.08, taper: 0.55, threadFreq: 55, threads: 0.6, sheen: 1.5, gain: 0.3, flow: 0.25 },
+export const ARMADA_SILK = {   // world units and radians in the fleet's frame (a hull is about one unit long); the wake's lengths are in hull lengths
+    wake: { len: 9, half0: 0.12, spread: 0.42, arc: 0.3, rollA: 1.1, rollB: 0.06, twistAt: 0.34, twistSpan: 0.3, ripple: 0.05, swirl: 0.08,
+        threadFreq: 34, threads: 0.7, sheen: 1.15, gain: 0.42, flow: 0.55, grain: 1, edge: 0.06, shade: 0.55 },
+    weave: { climb: 4, climbA: 0.12, climbB: 0.92, bank: 1.05, bankA: 0.1, amp: 0.1, freq: 0.9, speed: 0.5, meander: 0.35, wave: 0.12, curl: 3, margin: 2.4, taper: 1, fade0: 0.03, fade1: 0.92,
+        gather: 0.2, ride: 1, rideBank: 0.4, threadFreq: 55, threads: 0.6, sheen: 1.5, gain: 0.24, flow: 0.25, grain: 1, edge: 0.05, shade: 0.5 },   // gather: how far the armada's scatter closes up across the course, so the fleet sails the road in procession and the road can be a band with edges instead of a sea; ride: how much of its lie the ships take; rideBank: how much of its bank in particular (the road can twist far more than a fleet can lean)
 };
+const ss = (e0, e1, x) => { const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
 
 export function createArmadaSilk(THREE, { scene, style = 'wake', count, copies, rot, at, lift, light = false, opts = {} }) {
     const weave = style === 'weave', o = Object.assign({}, ARMADA_SILK[weave ? 'weave' : 'wake'], opts);
     const U = {
         uFleet: { value: copies }, uFleetRot: { value: rot }, uFleetBoat: { value: at }, uFleetLift: { value: lift }, uFleetScale: { value: 1 }, uRun: { value: new THREE.Vector2(0, 48) },
         uTime: { value: 0 }, uClipTop: { value: 1e9 }, uColA: { value: new THREE.Color() }, uColB: { value: new THREE.Color() }, uColC: { value: new THREE.Color() }, uWeave: { value: weave ? 1 : 0 },
-        uLen: { value: o.len || 0 }, uHalf0: { value: o.half0 || 0 }, uSpread: { value: o.spread || 0 }, uRidge: { value: o.ridge || 0 }, uZ0: { value: -6 }, uZ1: { value: 3.4 }, uCurl: { value: o.curl || 0 }, uWave: { value: o.wave || 0 }, uTaper: { value: o.taper || 1 },
-        uThreadFreq: { value: o.threadFreq }, uThreads: { value: o.threads }, uSheen: { value: o.sheen }, uGain: { value: o.gain }, uFlow: { value: o.flow },
+        uZ0: { value: -6 }, uZ1: { value: 3.4 }, uCurlAt: { value: 0.6 },
+        uThreadFreq: { value: o.threadFreq }, uThreads: { value: o.threads }, uSheen: { value: o.sheen }, uGain: { value: o.gain }, uFlow: { value: o.flow }, uGrain: { value: o.grain }, uEdge: { value: o.edge }, uShade: { value: o.shade },
     };
+    for (const k of weave ? ['climb', 'climbA', 'climbB', 'bank', 'bankA', 'amp', 'freq', 'speed', 'meander', 'wave', 'curl', 'taper', 'fade0', 'fade1'] : ['len', 'half0', 'spread', 'arc', 'rollA', 'rollB', 'twistAt', 'twistSpan', 'ripple', 'swirl']) U['u' + k[0].toUpperCase() + k.slice(1)] = { value: o[k] };
     let geo;
-    if (weave) geo = new THREE.PlaneGeometry(1, 1, light ? 160 : 320, light ? 24 : 48);
-    else {   // one strip per ship, drawn as instances of the same grid
-        const base = new THREE.PlaneGeometry(1, 1, light ? 40 : 80, light ? 10 : 18);
+    if (weave) geo = new THREE.PlaneGeometry(1, 1, light ? 200 : 380, light ? 28 : 56);
+    else {   // one sheet per ship, drawn as instances of the same grid
+        const base = new THREE.PlaneGeometry(1, 1, light ? 48 : 96, light ? 14 : 26);
         geo = new THREE.InstancedBufferGeometry(); geo.index = base.index; geo.setAttribute('position', base.attributes.position); geo.setAttribute('uv', base.attributes.uv);
         geo.setAttribute('aK', new THREE.InstancedBufferAttribute(Float32Array.from({ length: count }, (_, i) => i), 1)); geo.instanceCount = count;
     }
     const mesh = new THREE.Mesh(geo, new THREE.ShaderMaterial({ uniforms: U, vertexShader: (weave ? WEAVE_VS : WAKE_VS)(count), fragmentShader: ARMADA_SILK_FS, side: THREE.DoubleSide, transparent: true, depthWrite: false, depthTest: false }));
     mesh.frustumCulled = false; mesh.renderOrder = -1; mesh.visible = false; scene.add(mesh);
-    return {
-        mesh, uniforms: U, style: weave ? 'weave' : 'wake',
-        setHue(h) { U.uColA.value.setHSL((h - 0.07 + 1) % 1, 0.95, 0.66); U.uColB.value.setHSL(h, 0.95, 0.52); U.uColC.value.setHSL((h + 0.09) % 1, 0.9, 0.4); },
-        // per frame: visible (the ending is on), t, the fleet's scale, the overlay clip, the run (start and length along the course), the scatter's reach across the course
-        update({ visible, t, scale, clipTop, run0, runLen, zMin, zMax }) {
+    let hue = 0.58;
+    const view = {
+        mesh, uniforms: U, style: weave ? 'weave' : 'wake', opts: o,
+        setHue(h) { hue = h; U.uColA.value.setHSL((h - 0.07 + 1) % 1, 0.95, 0.66); U.uColB.value.setHSL(h, 0.95, 0.52); U.uColC.value.setHSL((h + 0.09) % 1, 0.9, 0.4); },
+        // a dev aid: retune live (the keys of ARMADA_SILK[style])
+        set(p) { Object.assign(o, p); for (const k in p) { const u = U['u' + k[0].toUpperCase() + k.slice(1)]; if (u) u.value = p[k]; } view.setHue(hue); },
+        // the run (start and length along the course) and the ARMADA scatter's reach across it: the road is laid a margin wider on both sides, so its
+        // selvedges roll up outside the ships' own band and no ship is ever carried up one
+        setRun(run0, runLen, zMin, zMax) {
+            U.uRun.value.set(run0, runLen);
+            const m = weave ? o.margin : 0; U.uZ0.value = zMin - m; U.uZ1.value = zMax + m;
+            U.uCurlAt.value = Math.max(0.05, Math.min(0.95, (zMax - zMin) / Math.max(0.001, zMax - zMin + 2 * m)));
+        },
+        // where the road's surface is under a ship at (x, z) along the course, and how it lies there (the WEAVE_SHAPE above, mirrored: sines only, so
+        // the two agree exactly); the slopes come by difference, so every term of the shape is in them
+        rideY(x, z, t) {
+            if (!weave) return 0;
+            const run = U.uRun.value, u = Math.min(1, Math.max(0, (x - run.x) / Math.max(1, run.y))), g = ss(0, 0.22, u);
+            const cy = o.climb * ss(o.climbA, o.climbB, u) + g * o.amp * Math.sin(u * o.freq * 6.2831 + t * o.speed);
+            const cz = 0.5 * (U.uZ0.value + U.uZ1.value) + g * o.meander * Math.sin(u * o.freq * 4.1 + t * o.speed * 0.8 + 1.7);
+            const th = o.bank * ss(o.bankA, 1, u), hw = 0.5 * (U.uZ1.value - U.uZ0.value) * (1 + (o.taper - 1) * ss(0.4, 1, u));
+            const v = Math.min(1, Math.max(-1, (z - cz) / Math.max(0.001, hw * Math.cos(th))));
+            return o.ride * (cy + o.rideBank * v * hw * Math.sin(th) + o.wave * Math.sin(u * 9 - t * 0.5 + v * 1.2));
+        },
+        rideAt(x, z, t) {
+            const y = view.rideY(x, z, t), d = 0.5;
+            return { y, pitch: Math.atan2(view.rideY(x + d, z, t) - view.rideY(x - d, z, t), 2 * d), bank: -Math.atan2(view.rideY(x, z + d, t) - view.rideY(x, z - d, t), 2 * d) };
+        },
+        // per frame: visible (the ending is on), t, the fleet's scale, the overlay clip
+        update({ visible, t, scale, clipTop }) {
             mesh.visible = !!visible; if (!visible) return;
-            U.uTime.value = t; U.uFleetScale.value = scale; U.uClipTop.value = clipTop; U.uRun.value.set(run0, runLen); U.uZ0.value = zMin - 1.2; U.uZ1.value = zMax + 1.2;
+            U.uTime.value = t; U.uFleetScale.value = scale; U.uClipTop.value = clipTop;
         },
     };
+    return view;
 }
