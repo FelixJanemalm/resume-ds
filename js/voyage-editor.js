@@ -14,7 +14,7 @@ export function mountRouteEditor(api) {
     const FIELDS = [
         ['x', -1.3, 1.3, 0.005], ['y', -1.1, 1.1, 0.005], ['size', 0.03, 0.7, 0.005], ['turn', -720, 720, 1], ['tilt', 0, 90, 1],   // turn: any angle; the box beside the slider takes what the slider cannot
         ['heel', -25, 25, 0.5], ['level', 0, 3, 0.05], ['wake', 0, 1, 0.02], ['cam', 0, 1, 0.05],
-        ['storm', 0, 1, 0.05], ['fleet', 0, 1, 0.05],   // the passage through weather; the small copies of the ship in formation
+        ['storm', 0, 1, 0.05], ['fleet', 0, 3, 0.05],   // the passage through weather; the small copies of the ship in formation
     ];
     const esc = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     const clamp = (v, a, b) => Math.min(b, Math.max(a, v));

@@ -98,7 +98,8 @@ const SIM_SHARED = `
     uniform sampler2D tBoatA, tBoatB, tMetaA, tMetaB; uniform vec2 uDrift; uniform float uW, uRocket, uSoft, uLoose; uniform vec3 uSqN; uniform float uMix, uForm, uScroll, uH, uBoatScale, uTime, uRipple, uFlow, uSettle, uWay, uReflect, uN, uStarForm, uSnap, uSnapBoat; uniform vec3 uBoat; uniform mat3 uRot; uniform vec4 uStarT[12];
     uniform vec4 uWave, uSea, uMotion, uSail, uClock, uHull, uMisc, uSail2; uniform float uBeam[17];   // uSail2: (spare, billow amplitude, billow phase, spare)
     uniform mat3 uRot0; uniform vec3 uBoat0; uniform float uScale0; uniform vec4 uSwell; uniform mat3 uRotSea; uniform vec2 uSeaD; uniform float uSoftLane; uniform float uTrail, uTrailClk, uTrailClk0;
-    uniform sampler2D tFleet; uniform vec4 uFleet[3]; uniform float uFleetForm;
+    uniform sampler2D tFleet; uniform vec4 uFleet[9]; uniform float uFleetForm;   // nine copies in three waves; the form runs 0..3
+    vec4 fleetCopy(float k){ int i = int(k + 0.5); vec4 c = uFleet[0]; for (int j = 1; j < 9; j++) { if (j == i) c = uFleet[j]; } return c; }
     uniform float uSmoke, uSmokeClk, uPaddle, uAnchor; uniform vec4 uFunnel;   // uAnchor: 0 the anchor stowed at the hawse .. 1 down   // funnel smoke (0..1, a share of the foam), its clock (1 per lifetime), the paddle wheels' angle; the funnels: first top (x, y), spacing (x), count
     float isSmoke(vec4 md){ return step(hash1(md.w * 13.7), 0.6 * uSmoke); }   // which foam particles are smoke (60% of them at full smoke)   // the fleet: per particle (source ref u, v, copy 1..3 or 0, recruit threshold); per copy (x aft, lift, z across in hull lengths, size); the form 0..1   // the wake trail: on/off, its age clock (1 per lifetime) now and at the previous sim step   // uRotSea: the sea's pose (its course follows the hull's slowly at rest, tightly under way); uSeaD: (cos, sin) of sea course - hull course; uSoftLane: at rest the water is spring-held like the hull (1), under way placed (0)   // uSwell: the swell's direction in the hull frame (cos, sin), spare
     // a solid ship particle's position was last written relative to the pose of the last sim step (uRot0, uBoat0, uScale0); carried into
@@ -263,12 +264,12 @@ const SIM_SHARED = `
       return uBoat + q * uBoatScale; }
     // the fleet: a field particle recruited (its threshold passed by uFleetForm) takes the place of its source ship particle in a small copy
     // of the ship, scaled about the big ship's waterline centre and set out on the sea (the sea's pose) in formation. fl.z = 0: not a member
-    float fleetOn(vec4 fl){ return fl.z > 0.5 ? step(fl.w, uFleetForm) : 0.0; }
+    float fleetOn(vec4 fl){ return fl.z > 0.5 ? step(fl.w + floor((fl.z - 1.0) / 3.0), uFleetForm) : 0.0; }
     vec3 fleetTarget(vec4 fl, out float fade, out float shade, out vec4 mdOut){
       vec4 sA = texture2D(tBoatA, fl.xy), sB = texture2D(tBoatB, fl.xy), sMA = texture2D(tMetaA, fl.xy), sMB = texture2D(tMetaB, fl.xy);
       float pres = max(step(0.01, sA.w), step(0.01, sB.w)), m = boatMixT(sA, sB); shade = clamp(mix(sA.w, sB.w, m), 0.0, 1.0) * pres; mdOut = mix(sMA, sMB, m);
       vec3 bt = boatTarget(sA, sB, sMA, sMB, fade); fade *= pres;
-      int k = int(fl.z - 0.5); vec4 c = uFleet[0]; if (k == 1) c = uFleet[1]; if (k == 2) c = uFleet[2];
+      vec4 c = fleetCopy(fl.z - 1.0);
       return uBoat + uRotSea * c.xyz * uBoatScale + (bt - uBoat) * c.w; }`;
 const SIM_VEL = SIM_NOISE + SIM_SHARED + `
     uniform sampler2D tHome; uniform float uDelta, uCurl, uReturn, uDamp, uPull, uRadius; uniform vec3 uCam, uDir;
@@ -323,7 +324,7 @@ const PTS_VS = SIM_SHARED + `
       vec4 fl=texture2D(tFleet,ref); float ff=fleetOn(fl);
       if (ff > 0.5) {   // the fleet: drawn where the sim put it; the source's shade, role and lane fade; arrives dark and lights up in place
         float fsh; vec4 fmd; vec3 ft=fleetTarget(fl,fd,fsh,fmd); ff*=step(0.001,fsh); pw=p.xyz; vShade=fsh; role=floor(fmd.x+0.5); laneR=step(5.5,role)*step(role,7.5); vShade=mix(vShade,0.5,laneR);
-        int k=int(fl.z-0.5); float fs=uFleet[0].w; if (k==1) fs=uFleet[1].w; if (k==2) fs=uFleet[2].w;
+        float fs=fleetCopy(fl.z-1.0).w;
         nearT=1.0-smoothstep(0.12,0.5,distance(pw,ft)/max(0.05,uBoatScale*fs)); bf=0.85*ff; vBoat=bf; fd=mix(1.0,fd,laneR)*mix(1.0,uReflect,step(7.5,role)*step(role,8.5)); }
       else if (bf > 0.5 && laneR > 0.5) { pw=mix(boatTarget(bA,bB,mA,mB,fd), p.xyz, uSoftLane);          // water and foam: drawn from the lane under way (position and fade from ONE evaluation); at rest from the spring-held position, the lane's fade kept
         if (uTrail > 0.5 && role > 6.5 && role < 7.5 && isSmoke(md) < 0.5) { float age = fract(hash1(md.z * 13.1) + uTrailClk); pw = drawPos(p.xyz, 0.0); pw.xy += (vec2(hash1(md.z * 3.1), hash1(md.z * 7.9)) - 0.5) * age * 0.3 * uBoatScale; } }   // the trail: where it fell in the sea, dispersing slowly
@@ -523,13 +524,17 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
     // the fleet: three small copies of the ship, each a strided 40% sample of the ship's particles, formed by field particles (the first
     // ones after the ship). Per member: the source particle's texture coordinates, the copy (1..3) and a recruit threshold, so the copies
     // form a few particles at a time as the route's fleet key rises, and dissolve the same way
-    const FLEET_K = 3, fleetM = Math.min(Math.floor(boatCount * 0.4), Math.max(0, Math.floor((COUNT - STAR_N - boatCount) / FLEET_K)));
+    const FLEET_K = 9, fieldN = Math.max(0, COUNT - STAR_N - boatCount), fleetShare = Math.min(1, fieldN / (boatCount * (3 * 0.4 + 6 * 0.22) * 1.05));   // three waves: the near copies 40% samples, the far ones 22% (scaled down if the field is small)
     const fleetData = new Float32Array(COUNT * 4);
-    for (let f = 0; f < FLEET_K * fleetM; f++) {
-        const i = STAR_N + boatCount + f, k = Math.floor(f / fleetM), src = STAR_N + Math.floor((f % fleetM) * boatCount / fleetM);
-        fleetData.set([((src % N) + 0.5) / N, (Math.floor(src / N) + 0.5) / N, k + 1, Math.random()], i * 4);
+    let f = 0;
+    for (let k = 0; k < FLEET_K; k++) {
+        const M = Math.floor(boatCount * (k < 3 ? 0.4 : 0.22) * fleetShare);
+        for (let j = 0; j < M; j++, f++) { const i = STAR_N + boatCount + f, src = STAR_N + Math.floor(j * boatCount / M); fleetData.set([((src % N) + 0.5) / N, (Math.floor(src / N) + 0.5) / N, k + 1, Math.random()], i * 4); }
     }
-    const fleetTex = dataTex(fleetData), fleetU = [0, 1, 2].map(() => new THREE.Vector4(0, 0, 0, 0.3));
+    // the formation on the sea per copy (x aft, lift, z across, size in hull lengths) and the launch swarm (phase, speed in L/s, z across, size)
+    const FLEET_POS = [[-1.1, 0.30, -0.8, 0.30], [-1.2, 0.55, 0.8, 0.24], [0.9, 0.45, 0.9, 0.26], [-2.3, 0.80, -1.4, 0.18], [-0.4, 0.95, 1.9, 0.16], [2.0, 0.85, -1.2, 0.17], [-3.2, 1.10, 0.4, 0.13], [1.2, 1.20, 2.6, 0.12], [3.1, 1.15, 1.6, 0.12]];
+    const ROCKET_POS = [[0.5, 1.6, -2.6, 0.45], [3.2, 2.1, 2.4, 0.38], [6.1, 1.3, -1.3, 0.55], [1.7, 2.6, 3.4, 0.3], [4.6, 1.9, -3.6, 0.34], [7.2, 2.3, 1.2, 0.28], [2.9, 1.5, -0.7, 0.24], [5.5, 2.8, 4.2, 0.22], [0.2, 2.0, -4.4, 0.26]];
+    const fleetTex = dataTex(fleetData), fleetU = Array.from({ length: FLEET_K }, () => new THREE.Vector4(0, 0, 0, 0.3));
     const shipRot = new THREE.Matrix3(), shipAt = new THREE.Vector3(), shipRot0 = new THREE.Matrix3(), shipAt0 = new THREE.Vector3();
     const shipRotSea = new THREE.Matrix3();   // the sea's pose: the hull's tilt, the sea's own course (lags the hull's at rest)
     const shipU = { sail2: new THREE.Vector4(0, 0, 0, 0), wave: new THREE.Vector4(0, 0.3, 0, 0.15), sea: new THREE.Vector4(0, 2.618, 0, 0), motion: new THREE.Vector4(0, 0, 0, 0), sail: new THREE.Vector4(1, 0, 0, 0), clock: new THREE.Vector4(0, 0, 0, 0), hull: new THREE.Vector4(0.5, -0.5, 1, 0.02), misc: new THREE.Vector4(-0.02, 0, 0, 1.6), beam: new Float32Array(17), swell: new THREE.Vector4(1, 0, 0, 0), funnel: new THREE.Vector4(0, 0, 0, 1) };
@@ -639,7 +644,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
        drawn pose trails that target through a critically damped follower (pcfg.shipLag*), so a fast scroll parks the target
        ahead and the ship catches up over about a second, like a camera operator following a mark. */
     const POSE_KEYS = ['x', 'y', 'size', 'turn', 'tilt', 'heel', 'level', 'wake', 'cam', 'storm', 'fleet'];
-    const POSE_DEFAULTS = { storm: 0, fleet: 0 };   // keys a waypoint may leave out: storm (0 calm .. 1 the passage through weather), fleet (0 .. 1: the small copies of the ship sailing in formation)
+    const POSE_DEFAULTS = { storm: 0, fleet: 0 };   // keys a waypoint may leave out: storm (0 calm .. 1 the passage through weather), fleet (0 .. 3: three waves of small copies of the ship in formation; at the launch a swarm of rockets)
     /* The route. Waypoints carry a position (NDC, the waterline centre) and the pose at that point: size (hull length as a fraction of
        the visible width), turn (course: 0 bow to the right, 90 toward the viewer, 180 bow left), tilt (0 seen from the side, 90 from
        straight above), heel, level (0 dinghy .. 3 tall ship), wake (0 at rest .. 1 under way) and cam (0..1: how far the course should
@@ -688,13 +693,14 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
                 { at: 'stage-release+1600', x: -0.08, y: -0.625, size: 0.2, turn: 360, tilt: 0, heel: 18.5, level: L4, wake: 1, cam: 1 },
                 { at: 'stage-release+1700', x: -0.08, y: -0.625, size: 0.2, turn: 360, tilt: 0, heel: 18.5, level: L5, wake: 1, cam: 1, fleet: 0 },     // the clipper
                 { at: 'stage-release+1850', x: -0.08, y: -0.625, size: 0.19, turn: 360, tilt: 0, heel: 18.5, level: L6, wake: 1, cam: 1, fleet: 1 },    // the yacht; "teams to scale": the fleet forms out of the field
+                { at: '#scalability:top@0.75', x: -0.08, y: -0.625, size: 0.19, turn: 360, tilt: 0, heel: 18.5, level: L6, wake: 1, cam: 1, fleet: 2 },   // and grows in two more waves as the principles that scale arrive
                 // the launch: the clipper holds until the principles have covered it, becomes the rocket out of sight, and the rocket rises with the
                 // footer (the canvas flips above the page at shipOverlayAt), standing over the footer's edge nose-up (turn -90 / tilt 90), plume down
                 ...(RK < 0 ? [] : [
-                    { at: '#scalability:top@0.55', x: -0.08, y: -0.625, size: 0.19, turn: 360, tilt: 0, heel: 18.5, level: L6, wake: 1, cam: 1, fleet: 1 },
-                    { at: '#scalability:top@0.25', x: -0.45, y: -0.9, size: 0.15, turn: 270, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1, fleet: 0 },   // the fleet rejoins the field before the launch
-                    { at: 'footer:top@1', x: -0.45, y: -0.77, size: 0.15, turn: 270, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1 },
-                    { at: 'end', x: -0.45, y: -0.5, size: 0.15, turn: 270, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1 },
+                    { at: '#scalability:top@0.55', x: -0.08, y: -0.625, size: 0.19, turn: 360, tilt: 0, heel: 18.5, level: L6, wake: 1, cam: 1, fleet: 3 },
+                    { at: '#scalability:top@0.25', x: -0.45, y: -0.9, size: 0.15, turn: 270, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1, fleet: 3 },   // the fleet launches with it: a swarm of rockets across the footer
+                    { at: 'footer:top@1', x: -0.45, y: -0.77, size: 0.15, turn: 270, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1, fleet: 3 },
+                    { at: 'end', x: -0.45, y: -0.5, size: 0.15, turn: 270, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1, fleet: 3 },
                 ]),
             ],
             portrait: [   // phones: the same voyage, sized for a narrow screen (size is a fraction of the visible WIDTH, so ~2x the desktop values read alike).
@@ -713,11 +719,12 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
                 { at: '#read:top@0+360', x: -0.05, y: -0.82, size: 0.22, turn: 0, tilt: 0, heel: 3, level: L4, wake: 0.95, cam: 1 },
                 { at: '#read:top@0+540', x: -0.05, y: -0.82, size: 0.22, turn: 0, tilt: 0, heel: 3, level: L5, wake: 1, cam: 1, fleet: 0 },
                 { at: '#read:top@0+720', x: -0.05, y: -0.82, size: 0.21, turn: 0, tilt: 0, heel: 3, level: L6, wake: 1, cam: 1, fleet: 1 },
+                { at: '#scalability:top@0.75', x: -0.05, y: -0.82, size: 0.21, turn: 0, tilt: 0, heel: 3, level: L6, wake: 1, cam: 1, fleet: 2 },
                 ...(RK < 0 ? [] : [
-                    { at: '#scalability:top@0.55', x: -0.05, y: -0.82, size: 0.21, turn: 0, tilt: 0, heel: 3, level: L6, wake: 1, cam: 1, fleet: 1 },
-                    { at: '#scalability:top@0.25', x: 0.5, y: -0.95, size: 0.3, turn: -90, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1, fleet: 0 },
-                    { at: 'footer:top@1', x: 0.5, y: -0.95, size: 0.3, turn: -90, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1 },
-                    { at: 'end', x: 0.5, y: -0.6, size: 0.3, turn: -90, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1 },
+                    { at: '#scalability:top@0.55', x: -0.05, y: -0.82, size: 0.21, turn: 0, tilt: 0, heel: 3, level: L6, wake: 1, cam: 1, fleet: 3 },
+                    { at: '#scalability:top@0.25', x: 0.5, y: -0.95, size: 0.3, turn: -90, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1, fleet: 3 },
+                    { at: 'footer:top@1', x: 0.5, y: -0.95, size: 0.3, turn: -90, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1, fleet: 3 },
+                    { at: 'end', x: 0.5, y: -0.6, size: 0.3, turn: -90, tilt: 90, heel: 0, level: RK, wake: 1, cam: 1, fleet: 3 },
                 ]),
             ],
         };
@@ -1118,11 +1125,17 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         velU.uDrift.value.set(ship.driftX, ship.driftY); U.uDrift.value.set(ship.driftX, ship.driftY); posU.uDrift.value.set(ship.driftX, ship.driftY);
         // the fleet in formation on the sea, in hull lengths: two astern on either quarter, one ahead, the far ones smaller and lifted (in the side view
         // the lift is distance toward the horizon; from above it is depth, invisible); each wanders a little so they are not glued to the ship
+        // three waves (the route's fleet key 0..3): the first close round the ship, the next two farther out and higher toward the horizon, smaller
         const fsz = pcfg.shipFleetSize;
-        fleetU[0].set(-1.1 + 0.06 * Math.sin(t * 0.31), 0.30 + 0.015 * Math.sin(t * 0.23 + 1.0), -0.8 + 0.05 * Math.sin(t * 0.19), 0.30 * fsz);
-        fleetU[1].set(-1.2 + 0.06 * Math.sin(t * 0.27 + 2.0), 0.55 + 0.015 * Math.sin(t * 0.21 + 2.5), 0.8 + 0.05 * Math.sin(t * 0.17 + 1.0), 0.24 * fsz);
-        fleetU[2].set(0.9 + 0.06 * Math.sin(t * 0.29 + 4.0), 0.45 + 0.015 * Math.sin(t * 0.25 + 0.5), 0.9 + 0.05 * Math.sin(t * 0.23 + 2.0), 0.26 * fsz);
-        const fleetForm = M.clamp(P.fleet, 0, 1) * M.clamp(pcfg.shipFleet, 0, 1) * (1 - rocketMix);
+        for (let k = 0; k < FLEET_K; k++) {
+            const F = FLEET_POS[k], wob = 0.06 * Math.sin(t * (0.19 + 0.02 * k) + k);
+            fleetU[k].set(F[0] + wob, F[1] + 0.015 * Math.sin(t * 0.23 + k), F[2] + 0.05 * Math.sin(t * 0.17 + 2 * k), F[3] * fsz);
+            if (rocketMix > 0.001) {   // at the launch the copies are a swarm of rockets spread across the width, each rising on its own speed (wrapping far off the screen: 8 hull lengths of travel) and swaying as it goes
+                const R = ROCKET_POS[k], rise = -2 + ((R[0] + t * R[1]) % 8 + 8) % 8, sway = 0.12 * Math.sin(t * (2.2 + 0.3 * k) + k * 1.7) * R[3];
+                fleetU[k].x = M.lerp(fleetU[k].x, rise, rocketMix); fleetU[k].y = M.lerp(fleetU[k].y, 0.25, rocketMix); fleetU[k].z = M.lerp(fleetU[k].z, R[2] + sway, rocketMix); fleetU[k].w = M.lerp(fleetU[k].w, R[3] * fsz, rocketMix);
+            }
+        }
+        const fleetForm = M.clamp(P.fleet, 0, 3) * M.clamp(pcfg.shipFleet, 0, 1);
         for (const u of ALLU) u.uFleetForm.value = fleetForm;
         const smoke = BOAT && BOAT.SMOKE ? tbl(BOAT.SMOKE) * (1 - rocketMix) : 0, FN = BOAT && BOAT.FUNNELS;   // funnel smoke and the funnels' tops, mixed between the two levels
         if (FN) shipU.funnel.set(FN[lo][0] + (FN[hi][0] - FN[lo][0]) * mix, FN[lo][1] + (FN[hi][1] - FN[lo][1]) * mix, FN[lo][2] + (FN[hi][2] - FN[lo][2]) * mix, FN[lo][3] + (FN[hi][3] - FN[lo][3]) * mix);
@@ -1461,7 +1474,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         const velVar = gpu.addVariable('tVel', SIM_VEL, vel0), posVar = gpu.addVariable('tPos', SIM_POS, pos0);
         gpu.setVariableDependencies(velVar, [posVar, velVar]); gpu.setVariableDependencies(posVar, [posVar, velVar]);
         const velU = velVar.material.uniforms, posU = posVar.material.uniforms;
-        const noBoat = () => ({ tBoatA: { value: home }, tBoatB: { value: home }, tMetaA: { value: home }, tMetaB: { value: home }, uMix: { value: 0 }, uForm: { value: 0 }, uBoatScale: { value: 1 }, uBoat: { value: new THREE.Vector3() }, uRot: { value: new THREE.Matrix3() }, uTime: { value: 0 }, uRipple: { value: 0 }, uFlow: { value: 0 }, uSettle: { value: 0 }, uWay: { value: 0 }, uReflect: { value: 1 }, uStarT: { value: Array.from({ length: 12 }, () => new THREE.Vector4()) }, uN: { value: N }, uStarForm: { value: 0 }, uSnap: { value: 1.2 }, uSnapBoat: { value: 0 }, uSoft: { value: 0 }, uLoose: { value: 0 }, uSoftLane: { value: 0 }, uRotSea: { value: new THREE.Matrix3() }, uSeaD: { value: new THREE.Vector2(1, 0) }, uSqN: { value: new THREE.Vector3(0.970, 0, 0.242) }, uTrail: { value: 0 }, uTrailClk: { value: 0 }, uTrailClk0: { value: 0 }, tFleet: { value: home }, uFleet: { value: [0, 1, 2].map(() => new THREE.Vector4()) }, uFleetForm: { value: 0 }, uSmoke: { value: 0 }, uSmokeClk: { value: 0 }, uPaddle: { value: 0 }, uAnchor: { value: 0 }, uFunnel: { value: new THREE.Vector4(0, 0, 0, 1) },
+        const noBoat = () => ({ tBoatA: { value: home }, tBoatB: { value: home }, tMetaA: { value: home }, tMetaB: { value: home }, uMix: { value: 0 }, uForm: { value: 0 }, uBoatScale: { value: 1 }, uBoat: { value: new THREE.Vector3() }, uRot: { value: new THREE.Matrix3() }, uTime: { value: 0 }, uRipple: { value: 0 }, uFlow: { value: 0 }, uSettle: { value: 0 }, uWay: { value: 0 }, uReflect: { value: 1 }, uStarT: { value: Array.from({ length: 12 }, () => new THREE.Vector4()) }, uN: { value: N }, uStarForm: { value: 0 }, uSnap: { value: 1.2 }, uSnapBoat: { value: 0 }, uSoft: { value: 0 }, uLoose: { value: 0 }, uSoftLane: { value: 0 }, uRotSea: { value: new THREE.Matrix3() }, uSeaD: { value: new THREE.Vector2(1, 0) }, uSqN: { value: new THREE.Vector3(0.970, 0, 0.242) }, uTrail: { value: 0 }, uTrailClk: { value: 0 }, uTrailClk0: { value: 0 }, tFleet: { value: home }, uFleet: { value: Array.from({ length: 9 }, () => new THREE.Vector4()) }, uFleetForm: { value: 0 }, uSmoke: { value: 0 }, uSmokeClk: { value: 0 }, uPaddle: { value: 0 }, uAnchor: { value: 0 }, uFunnel: { value: new THREE.Vector4(0, 0, 0, 1) },
             uWave: { value: new THREE.Vector4(0, 0.3, 0, 0.15) }, uSea: { value: new THREE.Vector4(0, 2.618, 0, 0) }, uMotion: { value: new THREE.Vector4() }, uSail: { value: new THREE.Vector4(1, 0, 0, 0) }, uClock: { value: new THREE.Vector4() }, uHull: { value: new THREE.Vector4(0.5, -0.5, 1, 0.02) }, uMisc: { value: new THREE.Vector4(-0.02, 0, 0, 1.6) }, uSail2: { value: new THREE.Vector4() }, uBeam: { value: new Float32Array(17) }, uRot0: { value: new THREE.Matrix3() }, uBoat0: { value: new THREE.Vector3() }, uScale0: { value: 1 }, uSwell: { value: new THREE.Vector4(1, 0, 0, 0) } });
         Object.assign(velU, { tHome: { value: home }, uDelta: { value: 0 }, uCurl: { value: cfg.pCurl }, uReturn: { value: cfg.pReturn }, uDamp: { value: cfg.pDamp }, uPull: { value: cfg.pPull }, uRadius: { value: cfg.pRadius }, uScroll: { value: 0 }, uH: { value: 1e5 }, uW: { value: 1e5 }, uDrift: { value: new THREE.Vector2() }, uRocket: { value: 0 }, uCam: { value: new THREE.Vector3() }, uDir: { value: new THREE.Vector3(0, 0, -1) } }, noBoat());
         Object.assign(posU, { tHome: { value: home }, uDelta: { value: 0 }, uScroll: { value: 0 }, uH: { value: 1e5 }, uW: { value: 1e5 }, uDrift: { value: new THREE.Vector2() } }, noBoat());
