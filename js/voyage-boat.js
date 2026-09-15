@@ -100,15 +100,25 @@ function transomPt(H, v, w) {   // the flat stern face: w across (-1..1)
     return [hullX(H, 0, v) - 0.004, S.y, w * b * S.hw, shadeN([-1, 0.25, 0.2 * w])];
 }
 
-/* a hull's anchor: a chain of RIGGING particles from the hawse at the bow (t = 0) to the anchor (t = 1), stowed at the hawse; the shader
-   lowers it by uAnchor (the layer's anchor state) along the chain fraction, kept in meta.z with meta.y = 2 as the marker */
+/* a hull's anchor: RIGGING particles with the marker meta.y = 2. Baked where they sit stowed: the anchor hanging at the hawse on the bow,
+   outboard (z > 0; the layer flips it to whichever side faces the camera), and its chain at the hawse. meta.z: 0 chain, 1 the anchor;
+   meta.w: a chain particle's place along the chain from the anchor's end (0) to its inboard end (1). The shader pays the chain out:
+   the part already out hangs from the hawse, the rest lies along the deck, and the anchor hangs from the chain's end. The anchor is
+   drawn as the anchor icon reads: a ring, the shank, a stock across it, two curved arms ending in flukes, in the hull's side plane */
 function anchorPt(L, t, q, w) {
-    const H = HULL[L], hx = hullX(H, 0.94, 1) - 0.015, hy = deckX(H, 0.44) - 0.012, hz = 0.8 * railHB(H, 0.44);
-    if (q < 0.55) return [hx + (w - 0.5) * 0.004, hy - 0.004 * t, hz + (w - 0.5) * 0.004, 0.6, 2, t, 0];                          // the chain (a knot at the hawse until it runs out)
-    const u = (q - 0.55) / 0.45, k = 0.8;   // the anchor, hanging from the chain's end: shank, arms, stock
-    if (u < 0.5) return [hx, hy - 0.05 * k * u * 2, hz + 0.004, 0.75, 2, 1, 0];
-    if (u < 0.82) { const a = (u - 0.5) / 0.32 * 2 - 1; return [hx + a * 0.03 * k, hy - 0.05 * k + 0.012 * k * a * a, hz + 0.004, 0.75, 2, 1, 0]; }
-    return [hx, hy - 0.012 * k, hz + 0.004 + ((u - 0.82) / 0.18 - 0.5) * 0.04 * k, 0.75, 2, 1, 0];
+    const H = HULL[L], hx = hullX(H, 0.94, 1) - 0.02, hy = deckX(H, hx) - 0.012, hz = railHB(H, hx) + 0.02, j = (w - 0.5) * 0.003;
+    if (q < 0.45) return [hx + j, hy + j, hz, 0.75, 2, t, 0];                                                                    // the chain
+    const A = Math.min(0.11, 0.85 * (hy - WL)), u = (q - 0.45) / 0.55, sh = 0.95, R = 0.42 * A, cy = hy - A + R;                // the anchor: A tall, arms of radius R about (hx, cy)
+    const at = (x, y) => [x, y, hz + j, sh, 2, 0, 1];
+    if (u < 0.10) { const a = u / 0.10 * 2 * PI, r = 0.085 * A; return at(hx + r * Math.cos(a), hy - r + r * Math.sin(a)); }   // the ring
+    if (u < 0.32) return at(hx, lerp(hy - 0.17 * A, hy - A, (u - 0.10) / 0.22));                                               // the shank
+    if (u < 0.46) return at(hx + lerp(-0.3, 0.3, (u - 0.32) / 0.14) * A, hy - 0.27 * A);                                       // the stock
+    if (u < 0.82) { const a = (200 + 140 * (u - 0.46) / 0.36) * PI / 180; return at(hx + R * Math.cos(a), cy + R * Math.sin(a)); }   // the arms
+    const side = u < 0.91 ? -1 : 1, v = (u < 0.91 ? u - 0.82 : u - 0.91) / 0.09, a = (side < 0 ? 200 : 340) * PI / 180;       // the flukes: an arrowhead at each arm's end, pointing up and out
+    const ex = hx + R * Math.cos(a), ey = cy + R * Math.sin(a), ty = 0.94, rx = Math.cos(a), ry = Math.sin(a);
+    const b = frac(v * 7.31), c = frac(v * 3.17), k = b + c > 1 ? [1 - b, 1 - c] : [b, c], wd = 0.11 * A, len = 0.2 * A;         // a point in the triangle (base across the arm, apex along it)
+    const bx = ex - rx * wd, by = ey - ry * wd, cx2 = ex + rx * wd, cy2 = ey + ry * wd, px = ex + (side < 0 ? -0.342 : 0.342) * len, py = ey + ty * len;
+    return at(bx + k[0] * (cx2 - bx) + k[1] * (px - bx), by + k[0] * (cy2 - by) + k[1] * (py - by));
 }
 /* ---------------------------------------------------------------- masts and sails
    MAST[key][L]: [x, foot y, top y]. Fore-and-aft sails are quads tack/clew/throat/peak (a triangle when throat = peak):
@@ -381,8 +391,8 @@ export function wakePt(rand) {
 /* ---------------------------------------------------------------- allocation */
 const SAIL_W = { burgee: 40, main: 520, mizzen: 330, jib: 260, stay: 220, flying: 180, jib4: 120, topA: 380, topB: 150, foreG: 260, foreR: 170, mainC: 560, mainT: 400, mainG: 280, mainR: 180, mainSky: 100, mizG: 200, mizR: 130 };
 const SPAR_W = { mastA: 120, mastB: 110, mastC: 120, boomA: 45, gaffA: 40, boomB: 35, gaffB: 30, bowsprit: 55, yard_foreG: 32, yard_mainC: 40, yard_mainT: 36, yard_mainG: 32, yard_foreR: 24, yard_mainR: 26, yard_mainSky: 18, yard_mizT: 32, yard_mizG: 26, yard_mizR: 20 };
-const RIG_W = { anchor: 110, shroudsA: 130, shroudsB: 110, shroudsC: 130, ratA: 190, ratB: 150, ratC: 200, foreStay: 60, jibStay: 50, flyingStay: 45, jib4Stay: 35, stays: 80, backstay: 50, backstays: 90, running: 100, braces: 170, footropes: 110 };
-const ROLE_W = [[ROLE.HULL, 0.17], [ROLE.DECK, 0.04], [ROLE.SAIL, 0.28], [ROLE.SPAR, 0.05], [ROLE.RIGGING, 0.05], [ROLE.WATER, 0.22], [ROLE.WAKE, 0.07], [ROLE.REFLECTION, 0.12]];   // the Sept-10 sailboat's mix: sails 39, hull 18, water 18, reflection 16 (with the rigging on the hull at the first two levels)
+const RIG_W = { anchor: 600, shroudsA: 130, shroudsB: 110, shroudsC: 130, ratA: 190, ratB: 150, ratC: 200, foreStay: 60, jibStay: 50, flyingStay: 45, jib4Stay: 35, stays: 80, backstay: 50, backstays: 90, running: 100, braces: 170, footropes: 110 };
+const ROLE_W = [[ROLE.HULL, 0.17], [ROLE.DECK, 0.04], [ROLE.SAIL, 0.28], [ROLE.SPAR, 0.05], [ROLE.RIGGING, 0.065], [ROLE.WATER, 0.22], [ROLE.WAKE, 0.07], [ROLE.REFLECTION, 0.105]];   /* (rigging +0.015 from the reflection: the anchor's ~220 particles) */   // the Sept-10 sailboat's mix: sails 39, hull 18, water 18, reflection 16 (with the rigging on the hull at the first two levels)
 const PARTS = { [ROLE.SAIL]: SAIL_W, [ROLE.SPAR]: SPAR_W, [ROLE.RIGGING]: RIG_W };
 const REFL_SAILS = Object.fromEntries(Object.entries(SAIL_W).filter(([k]) => k !== 'burgee'));
 
