@@ -57,26 +57,26 @@ const SEA = `
     vec4 project(vec4 mv){ vec4 c = projectionMatrix * mv; c.z = min(c.z, c.w * 0.9999); return c; }
     vec3 hueShift(vec3 c, float a){ vec3 g = vec3(0.57735); vec3 pr = g * dot(g, c); vec3 U = c - pr; vec3 V = cross(g, U); return U * cos(a) + V * sin(a) + pr; }`;
 
-/* the flat sea's normal from the swell's slope (finite differences), for the sun's glitter: smooth across the grid's triangles, where the
+/* the flat sea's normal from the swell's slope (finite differences), for the sun catching the lines and dots: smooth across the grid's triangles, where the
    derivatives of the drawn surface would light whole facets */
 const SWELL_NORMAL = `
     vec3 swellNormal(vec2 xz){ float e = 0.08, qq; float hx = swellH(xz + vec2(e, 0.0), uTime, qq) - swellH(xz - vec2(e, 0.0), uTime, qq), hz = swellH(xz + vec2(0.0, e), uTime, qq) - swellH(xz - vec2(0.0, e), uTime, qq);
       return normalize(vec3(-hx / (2.0 * e), 1.0, -hz / (2.0 * e))); }`;
 
 const SHEET_VS = SEA + SWELL_NORMAL + `
-    uniform float uGlint, uGlitter; varying vec3 vW, vN; varying float vQ, vPhi, vAcross, vBeyond;
+    uniform float uGlint; varying vec3 vW, vN; varying float vQ, vPhi, vAcross, vBeyond;
     void main(){
       vec3 p, n; float q, phi, across, beyond;
       deform(position, p, n, q, phi, across, beyond);
       vW = p; vQ = q; vPhi = phi; vAcross = across; vBeyond = beyond;
-      vN = uGlint + uGlitter > 0.0 ? swellNormal(position.xz) : n;
+      vN = uGlint > 0.0 ? swellNormal(position.xz) : n;
       gl_Position = project(viewMatrix * vec4(toWorld(p), 1.0)); }`;
 
 /* shaded in the lab's own space (uCam, uCamFwd: the layer's camera mapped into it), so the light, the sheen and every fade are the lab's */
 const SHEET_FS = `
     uniform vec3 uColor, uCam, uCamFwd, uGround; uniform float uTime, uBands, uBandPow, uHueDrift, uEdge, uFloor, uStrand, uStrandFreq, uSheen, uSheenPow, uLight, uGrain;
     uniform float uLineGain, uLineWidth, uLineFar, uWallDark, uFarDark, uPhiMax, uFold, uBaseGlow, uVis, uLines, uSolidA, uSolidB, uFarA, uFarB, uFogA, uLipLen, uLipSoft, uNearA, uNearB;
-    uniform float uGlint, uGlitter; uniform vec3 uSun;
+    uniform float uGlint; uniform vec3 uSun;
     varying vec3 vW, vN; varying float vQ, vPhi, vAcross, vBeyond;
     vec3 hueShift(vec3 c, float a){ vec3 g = vec3(0.57735); vec3 pr = g * dot(g, c); vec3 U = c - pr; vec3 V = cross(g, U); return U * cos(a) + V * sin(a) + pr; }
     float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
@@ -90,16 +90,12 @@ const SHEET_FS = `
       /* material first (cheap): solid where the sheet has risen (and is neither too far, past the lip, nor too near the lens), crest lines on the flat sea */
       float farK = 1.0 - smoothstep(uFarA, max(uFarA + 0.01, uFarB), dist), lipK = 1.0 - smoothstep(uLipLen, uLipLen + uLipSoft, vBeyond), nearK = smoothstep(uNearA, uNearB, dot(vW - uCam, uCamFwd));
       float sol = smoothstep(uSolidA, max(uSolidA + 0.01, uSolidB), degrees(vPhi)) * farK * lipK * nearK * uVis;
-      /* the sun's glitter (off unless uGlint / uGlitter): where the swell tilts the water to mirror a low sun (uSun: toward it) into the eye, the lines
-         flare toward white and sparks catch between them, drifting as the swell rolls through, as light glints on a real sea */
-      float spec = 0.0, glit = 0.0;
-      if (uGlint + uGlitter > 0.0) {
-        vec3 Vg = normalize(uCam - vW), Ng = normalize(vN);
-        spec = pow(max(dot(reflect(-uSun, Ng), Vg), 0.0), 90.0) * exp(-dist / (uLineFar * 1.5));   /* a narrow mirror: glints gather in a path under the sun */
-        glit = uGlitter * spec * pow(vnoise(vW.xz * 8.0 + uTime * vec2(0.6, -0.4)), 10.0) * 14.0 * smoothstep(4.0, 14.0, dist) * uLines;   /* pinpoint sparks, none smeared across the foreground */
-      }
+      /* the sun catching the lines (off unless uGlint): where the swell tilts the water to mirror a low sun (uSun: toward it) into the eye, a line flares
+         toward white, drifting along it as the swell rolls through, as light glints on a real sea; nothing is drawn between the lines */
+      float spec = 0.0;
+      if (uGlint > 0.0) spec = pow(max(dot(reflect(-uSun, normalize(vN)), normalize(uCam - vW)), 0.0), 90.0) * exp(-dist / (uLineFar * 1.5));   /* a narrow mirror: the catches gather in a path under the sun */
       float line = (1.0 - smoothstep(0.0, uLineWidth * fw, min(t, 1.0 - t))) * uLineGain * exp(-dist / uLineFar) * (1.0 - sol) * uLines * (1.0 + 4.0 * uGlint * spec);
-      float a = clamp(sol + line + glit, 0.0, 1.0);
+      float a = clamp(sol + line, 0.0, 1.0);
       if (a < 0.003) discard;
       vec3 V = normalize(uCam - vW); if (dot(N, V) < 0.0) N = -N;
       /* bands: bright at each band's leading edge, falling off across it (the Lottie's stepped copies) */
@@ -116,8 +112,8 @@ const SHEET_FS = `
          no dark rim on a grey or light ground (on a dark one this is the lab's fade to dark) */
       float edgeK = max(max(smoothstep(uFogA, uFarB, dist), smoothstep(uLipLen - 1.0, uLipLen + uLipSoft, vBeyond)), 1.0 - nearK);
       col = mix(col, uGround, edgeK);
-      vec3 lineCol = mix(mix(C, vec3(1.0), 0.25), vec3(1.0), min(1.0, uGlint * spec * 1.5)), glitCol = mix(C, vec3(1.0), 0.75);
-      vec3 rgb = (col * sol + lineCol * line + glitCol * glit) / max(sol + line + glit, 1e-4);
+      vec3 lineCol = mix(mix(C, vec3(1.0), 0.25), vec3(1.0), min(1.0, uGlint * spec * 1.5));
+      vec3 rgb = (col * sol + lineCol * line) / max(sol + line, 1e-4);
       rgb += (hash12(gl_FragCoord.xy + fract(uTime * 7.0) * 100.0) - 0.5) * uGrain * 0.035;
       gl_FragColor = vec4(rgb, a);
       gl_FragDepthEXT = sol > 0.5 ? gl_FragCoord.z : 1.0; }`;   /* only the risen sheet hides what is behind it (the field's stars); the lines never cut into the ship or its reflection */
@@ -135,7 +131,7 @@ const DOTS_VS = SEA + SWELL_NORMAL + `
       float dist = length(uCam - p);
       float sol = smoothstep(uSolidA, max(uSolidA + 0.01, uSolidB), degrees(phi)) * (1.0 - smoothstep(uFarA, max(uFarA + 0.01, uFarB), dist)) * (1.0 - smoothstep(uLipLen, uLipLen + uLipSoft, beyond));
       vB = uDots * uDotGain * (0.18 + 0.9 * band) * (0.45 + 1.1 * aSeed) * mix(1.0, uDotOnSolid, sol) * exp(-dist / uDotFar) * exp(-past / max(0.1, uSprayLen));
-      /* glitter (off unless uGlint / uTwinkle): a dot where the water mirrors the sun flares; every dot breathes on its own slow clock */
+      /* the sun on the dots (off unless uGlint / uTwinkle): a dot where the water mirrors the sun flares; every dot breathes on its own slow clock */
       float flare = 0.0;
       if (uGlint > 0.0) flare = uGlint * pow(max(dot(reflect(-uSun, swellNormal(position.xz)), normalize(uCam - p)), 0.0), 60.0);
       vB *= (1.0 + 6.0 * flare) * mix(1.0, 0.25 + 1.5 * pow(0.5 + 0.5 * sin(uTime * (1.2 + 2.8 * r2) + r3 * 60.0), 3.0), uTwinkle);
@@ -179,7 +175,7 @@ export function createFold(THREE, { scene, pixelRatio = 1, light = false, dots: 
         uLipLen: { value: o.lipLen }, uLipSoft: { value: o.lipSoft }, uSpray: { value: o.spray }, uSprayLen: { value: o.sprayLen }, uNearA: { value: o.nearA }, uNearB: { value: o.nearB },
         uLineGain: { value: o.lineGain }, uLineWidth: { value: o.lineWidth }, uLineFar: { value: o.lineFar },
         uPx: { value: o.dotPx }, uPR: { value: pixelRatio }, uDotGain: { value: o.dotGain }, uDotOnSolid: { value: o.dotOnSolid }, uDotFar: { value: o.dotFar },
-        uGlint: { value: 0 }, uGlitter: { value: 0 }, uTwinkle: { value: 0 }, uSun: { value: new THREE.Vector3(0.3, 0.1, -1).normalize() },   // the sun's glitter: off in the layer
+        uGlint: { value: 0 }, uTwinkle: { value: 0 }, uSun: { value: new THREE.Vector3(0.3, 0.1, -1).normalize() },   // the sun catching the lines and dots, the dots' twinkle: off in the layer
     };
     const sheet = new THREE.Mesh(sheetGeometry(THREE, light ? 240 : 440), new THREE.ShaderMaterial({ uniforms: U, vertexShader: SHEET_VS, fragmentShader: SHEET_FS, side: THREE.DoubleSide, transparent: true, depthWrite: true }));
     sheet.frustumCulled = false; sheet.renderOrder = -2; sheet.visible = false; scene.add(sheet);
@@ -249,10 +245,10 @@ const MOTES_VS = `
 
 /* The silk sea as the animated ground of a page section (host): its own small canvas behind the section's content, seen as if standing on a beach
    looking out to sea. Straight crests roll in toward the viewer below a horizon near the top (horizon: its height in the canvas, -1 bottom .. 1 top;
-   eye: the eye's height over the water in lab units), a low sun ahead glints on the swell (sun: [across, up] toward it; glint on the lines and dots,
-   glitter between them), the dots twinkle and a few motes drift over the water. The picked colour is polled like the particle layer's; it draws only
+   eye: the eye's height over the water in lab units), a low sun ahead catches the lines and the dots where the swell mirrors it (sun: [across, up] toward it;
+   glint: how strongly), the dots twinkle and a few motes drift over the water. The picked colour is polled like the particle layer's; it draws only
    while the section is on screen. */
-export function mountSilk(THREE, host, { colorVar = '--primary-color', horizon = 0.62, eye = 2.6, scale = 0.45, sun = [0.28, 0.07], glint = 1, glitter = 1, twinkle = 1, motes = 900, strength = 1, pixelRatio = Math.min(devicePixelRatio || 1, 1.5), light = false } = {}) {   // scale: world units per lab unit (smaller = finer lines)
+export function mountSilk(THREE, host, { colorVar = '--primary-color', horizon = 0.62, eye = 2.6, scale = 0.45, sun = [0.28, 0.07], glint = 1, twinkle = 1, motes = 900, strength = 1, pixelRatio = Math.min(devicePixelRatio || 1, 1.5), light = false } = {}) {   // scale: world units per lab unit (smaller = finer lines)
     if (!host || host.querySelector('.ws-silk')) return null;
     const canvas = document.createElement('canvas');
     canvas.className = 'ws-silk'; canvas.setAttribute('aria-hidden', 'true');
@@ -264,7 +260,7 @@ export function mountSilk(THREE, host, { colorVar = '--primary-color', horizon =
     // the beach: crests straight (no crescent) and running in toward the camera (the swell's run points away from it, down -z), the dots spread over
     // the sea in front of the viewer (the camera stands ~27 lab units up the lab's z axis from the lab ship's spot)
     const sea = createFold(THREE, { scene, pixelRatio, light, dotsAt: [LAB.S[0], LAB.S[1] - 18], dotsRadius: 46, opts: { lineGain: DEFAULTS.lineGain * strength, bend: 0, axis: -90, dotGain: DEFAULTS.dotGain * strength } });
-    sea.uniforms.uGlint.value = glint; sea.uniforms.uGlitter.value = glitter; sea.uniforms.uTwinkle.value = twinkle; sea.uniforms.uSun.value.set(sun[0], sun[1], -1).normalize();
+    sea.uniforms.uGlint.value = glint; sea.uniforms.uTwinkle.value = twinkle; sea.uniforms.uSun.value.set(sun[0], sun[1], -1).normalize();
     // the view: tilted so the horizon sits at `horizon`, the water `eye` lab units below the eye
     const tilt = Math.atan(horizon * Math.tan(17.5 * Math.PI / 180)), planeY = (12 * Math.sin(tilt) - eye * scale) / Math.cos(tilt);
     const rot = new THREE.Matrix3(), q = new THREE.Quaternion(), m4 = new THREE.Matrix4(), at = new THREE.Vector3(0, planeY, 0);
