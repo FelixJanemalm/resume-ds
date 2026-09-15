@@ -1010,7 +1010,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
         const overlay = scrollY > ship.overlayY, z = overlay ? '12' : scrollY < ship.heroY ? '1' : '-1';
         if (z === ship.layerZ || ship.flipping) return;
         const apply = () => { ship.layerZ = z; ship.overlay = overlay; canvas.style.zIndex = z; canvas.style.mixBlendMode = overlay ? (isLight() || groundLum() > 0.2 ? 'multiply' : 'screen') : ''; };
-        if (!shown || overlay !== ship.overlay) { apply(); return; }   // the first frame, and the flip above the page at the block's edge (fully clipped then): no dip
+        if (true) { apply(); return; }   // every switch is instant now: the hero's happens once the hero is off screen, the footer's under its clip (the dip below is kept for reference, unused)   // the first frame, and the flip above the page at the block's edge (fully clipped then): no dip
         ship.flipping = true; const prev = canvas.style.transition; canvas.style.transition = 'opacity 0.22s ease'; canvas.style.opacity = '0';
         setTimeout(() => { apply(); canvas.style.opacity = '1'; setTimeout(() => { ship.flipping = false; canvas.style.transition = prev; }, 240); }, 240);
     }
@@ -1030,7 +1030,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES) {
             const RKq = BOAT && BOAT.ROCKET !== undefined ? BOAT.ROCKET : Infinity, sail = keys.map(e => e.k.level).filter(l => l < RKq - 0.01);
             ship.fleetLevel = sail.length ? Math.round(Math.max(...sail)) : 0;   // the fleet is the ship the route ends on (its last level before the launch)
             const oy = pcfg.shipGrounds === 'overlay' ? resolveAt('#scalability:top@0.55') : pcfg.shipGrounds === 'opaque' && pcfg.shipOverlayAt ? resolveAt(pcfg.shipOverlayAt) : null; ship.overlayY = oy === null ? Infinity : oy;   // 'overlay': from the principles down; 'opaque': from shipOverlayAt (the rocket over the footer)
-            const hy = resolveAt('.hero-wrapper:bottom@0.6'); ship.heroY = hy === null ? -1 : hy;
+            const hy = Math.max(resolveAt('.hero-wrapper:bottom@0') ?? -1, resolveAt('.hero-wrapper dotlottie-player:bottom@0') ?? -1); ship.heroY = hy;   // the layer goes behind the page once the hero and its swell (which overhangs the hero's bottom) have left the screen: nothing it could change is visible then, so the switch needs no dip (the dip was the ship's blink)
         } catch (e) { console.warn('work-spine: route', e); }
     }
     function shipFrame(t, dt, now) {
