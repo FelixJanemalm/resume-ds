@@ -372,7 +372,7 @@ const PTS_VS = SIM_SHARED + `
       if (ff > 0.5) {   // the fleet: drawn where the sim put it; the source's shade, role and lane fade; arrives dark and lights up in place
         float fsh; vec4 fmd; vec3 ft=fleetTarget(fl,fd,fsh,fmd); ff*=step(0.001,fsh); pw=p.xyz; vShade=fsh; role=floor(fmd.x+0.5); laneR=step(5.5,role)*step(role,7.5); vShade=mix(vShade,0.5,laneR);
         float fs=fleetCopy(fl.z-1.0).w;
-        nearT=1.0-smoothstep(0.12,0.5,distance(pw,ft)/max(0.05,uFleetScale*fs)); bf=0.85*ff; vBoat=bf; fd*=mix(1.0,mix(1.25,1.4,laneR),uRocket); fd=mix(1.0,fd,laneR)*mix(1.0,uReflect,step(7.5,role)*step(role,8.5)); }
+        nearT=1.0-smoothstep(0.12,0.5,distance(pw,ft)/max(0.05,uFleetScale*fs)); bf=0.85*ff; vBoat=bf; fd*=mix(1.0,mix(1.25,1.75,laneR),uRocket);   /* at the launch the copies' water and foam are lifted (1.75, was 1.4): the armada's wakes read far fainter than the fleet's at the quote */ fd=mix(1.0,fd,laneR)*mix(1.0,uReflect,step(7.5,role)*step(role,8.5)); }
       else if (bf > 0.5 && laneR > 0.5) { pw=mix(boatTarget(bA,bB,mA,mB,fd), p.xyz, uSoftLane);          // water and foam: drawn from the lane under way (position and fade from ONE evaluation); at rest from the spring-held position, the lane's fade kept
         if (uTrail > 0.5 && role > 6.5 && role < 7.5 && isSmoke(md) < 0.5) { float age = fract(hash1(md.z * 13.1) + uTrailClk); pw = drawPos(p.xyz, 0.0); pw.xy += (vec2(hash1(md.z * 3.1), hash1(md.z * 7.9)) - 0.5) * age * 0.3 * uBoatScale; } }   // the trail: where it fell in the sea, dispersing slowly
       else if (bf > 0.5) { pw=carry(p.xyz); float fdn; vec3 bt=boatTarget(bA,bB,mA,mB,fdn); float rec=1.0-step(0.01,bA.w)*step(0.01,bB.w); nearT=mix(1.0, 1.0-smoothstep(0.12,0.5,distance(pw,bt)/uBoatScale), rec); }   // solids ride the pose; a recruit (absent at one of the two levels) arrives dark and lights up in place
@@ -381,8 +381,9 @@ const PTS_VS = SIM_SHARED + `
       vFade=min(uMisc.w, mix(1.0, fd, max(bf*laneR, ff))*mix(1.0, uReflect, bf*refl)*mix(1.0, nearT, max(bf*(1.0-laneR), ff*(1.0-laneR))))*mix(uFieldDim, 1.0, max(max(bf, sf), ff))*mix(1.0, uFlag, flagR)*mix(nearT, 1.0, max(max(bf, sf), ff))*mix(1.0, smoothstep(0.03, 0.25, uAnchor), bf*step(4.5,role)*step(role,5.5)*step(1.5,md.y));   /* the anchor and its chain only show once it is being lowered: hidden while the ship is under way */   // the field (not the ship, not a star) dims a little under way; the burgee can be switched off
       vec3 rel=pw-uCam; float along=dot(rel,uDir); vec3 perp=rel-uDir*along; float d=length(perp);
       vLit=(1.0-smoothstep(0.0,uRadius,d))*step(0.5,along)*(1.0-bf*laneR)*(1.0-0.65*bf); vRand=p.w; vSpeed=length(v);   // the light barely touches the ship and not the sea
-      vec4 mv=modelViewMatrix*vec4(pw,1.0);
-      gl_PointSize=uSize*uDPR*aSize*(1.0+0.9*vLit+bf*(uBoatPx-1.0)+2.4*sf+0.25*bf*laneR*clamp(fd-1.0,0.0,1.5)+0.5*bf*laneR*uTrail*step(6.5,role)*step(role,7.5)+bf*laneR*uSwell.z*(0.8*hash1(md.z*7.7)-0.2)+0.3*vFlag+0.15*ff*uRocket+0.4*bf*step(4.5,role)*step(role,5.5)*step(1.5,md.y))*uP/max(-mv.z,1.0)*uIntro;   // the rest disc's specks vary in size (0.7x .. 1.8x)
+      vec4 mv=modelViewMatrix*vec4(pw,1.0); float pz=max(-mv.z,1.0);
+      pz=mix(pz, max(-(modelViewMatrix*vec4(uFleetBoat,1.0)).z, 1.0), ff*(1.0-uRocket));   // a fleet copy's dots are sized at the fleet's anchor depth: the copies set toward the camera drew their hulls bigger and their dots bigger with them, and read as coarse beside the rest (at the launch the armada keeps true perspective: its far ranks are meant to draw smaller)
+      gl_PointSize=uSize*uDPR*aSize*(1.0+0.9*vLit+bf*(uBoatPx-1.0)+2.4*sf+0.25*bf*laneR*clamp(fd-1.0,0.0,1.5)+0.5*bf*laneR*uTrail*step(6.5,role)*step(role,7.5)+bf*laneR*uSwell.z*(0.8*hash1(md.z*7.7)-0.2)+0.3*vFlag+0.15*ff*uRocket+0.4*bf*step(4.5,role)*step(role,5.5)*step(1.5,md.y))*uP/pz*uIntro;   // the rest disc's specks vary in size (0.7x .. 1.8x)
       gl_Position=projectionMatrix*mv; }`;
 const PTS_FS = `
     uniform vec3 uColorA, uColorB, uColorLit, uColorFlag; uniform float uGlow, uClipTop; varying float vLit, vRand, vSpeed, vBoat, vShade, vStar, vFade, vFlag;
