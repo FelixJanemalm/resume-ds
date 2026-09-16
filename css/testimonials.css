@@ -85,6 +85,11 @@ button {
 	}
 }
 
+/* the page still scrolls vertically through the carousel; sideways drags are ours to read as swipes */
+[data-carousel] {
+	touch-action: pan-y;
+}
+
 .slide__item {
 	width: 100%;
 	height: 100%;
