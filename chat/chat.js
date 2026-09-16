@@ -170,7 +170,7 @@
   // glyph inside it, which left an unrotated ghost copy under the ink.) Nothing
   // takes layout space, so the heading never re-wraps; the ink shrinks to fit the
   // hero column and keeps clear of the colour picker.
-  var stampAnchor = null, stampInk = null;
+  var stampAnchor = null, stampInk = null, stampPre = null;
   function markFor(company) {
     var h1 = document.querySelector(".hero h1");
     if (!h1 || !company || stampAnchor) return;
@@ -179,6 +179,9 @@
     h1.appendChild(stampAnchor);
     stampInk = el("span", { "class": "fjc-for__ink", "aria-hidden": "true", text: "at " + company + "?" });
     host.appendChild(stampInk);
+    // "Wanna" above the heading, same hand: reads "Wanna ship better products faster at <Company>?"
+    stampPre = el("span", { "class": "fjc-for__ink fjc-for__ink--pre", "aria-hidden": "true", text: "Wanna" });
+    host.appendChild(stampPre);
     fitStamp();
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitStamp);
     window.addEventListener("resize", fitStamp);
@@ -189,16 +192,20 @@
     if (!stampAnchor || !stampInk) return;
     var h1 = stampAnchor.closest("h1"), host = stampInk.parentElement;
     var hostRect = host.getBoundingClientRect(), a = stampAnchor.getBoundingClientRect();
-    var size = parseFloat(getComputedStyle(h1).fontSize) * 0.72;
+    var h1Rect = h1.getBoundingClientRect();
+    var base = parseFloat(getComputedStyle(h1).fontSize);
+    var size = base * 0.72;
     stampInk.style.fontSize = size + "px";
     var col = (h1.closest(".hero-left") || h1).getBoundingClientRect();
-    var limit = Math.min(col.right, window.innerWidth - 12);
+    var limit = Math.min(col.right, window.innerWidth - 12, hostRect.right - 8);
     var picker = document.getElementById("color-picker-container");
+    var r;
     for (var i = 0; i < 8; i++) {
       var gap = size * 0.25;
       stampInk.style.left = (a.left - hostRect.left + gap) + "px";
-      stampInk.style.top = (a.top - hostRect.top - size * 0.95) + "px";   // anchor sits on the baseline
-      var r = stampInk.getBoundingClientRect(), lim = limit;
+      stampInk.style.top = (a.top - hostRect.top - size * 0.95) + "px";   // the anchor sits on the baseline
+      r = stampInk.getBoundingClientRect();
+      var lim = limit;
       if (picker) {
         var pr = picker.getBoundingClientRect();
         if (pr.width && pr.top < r.bottom && pr.bottom > r.top && pr.left > r.left) lim = Math.min(lim, pr.left - 12);
@@ -206,6 +213,28 @@
       if (r.right <= lim || size <= 12) break;
       size = Math.max(12, size * Math.max(0.55, (lim - r.left) / r.width));
       stampInk.style.fontSize = size + "px";
+    }
+    // Shrinking stops at 12px: if the tail would still be clipped, slide the ink
+    // left so the whole question mark stays on screen.
+    r = stampInk.getBoundingClientRect();
+    if (r.right > limit) {
+      stampInk.style.left = (parseFloat(stampInk.style.left) - (r.right - limit)) + "px";
+    }
+    if (stampPre) {
+      // "Wanna" sits just above the heading's first line, below the site header.
+      var pre = base * 0.6;
+      stampPre.style.fontSize = pre + "px";
+      stampPre.style.left = (h1Rect.left - hostRect.left + base * 0.06) + "px";
+      stampPre.style.visibility = "";
+      stampPre.style.top = (h1Rect.top - hostRect.top - pre * 0.95) + "px";
+      var preH = stampPre.getBoundingClientRect().height || pre;
+      var header = document.querySelector("header");
+      var floor = (header ? header.getBoundingClientRect().bottom : 0) + 4;   // never under the header
+      var wantV = h1Rect.top - preH * 0.95;
+      if (wantV < floor) wantV = floor;
+      stampPre.style.top = (wantV - hostRect.top) + "px";
+      // Hide only if it would actually land on the heading.
+      stampPre.style.visibility = wantV + preH > h1Rect.top + preH * 0.35 ? "hidden" : "";
     }
   }
   // Lead with the case studies that matter for the visitor's track (what the

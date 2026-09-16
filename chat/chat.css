@@ -75,6 +75,7 @@
    painted a ghost copy of the letters). Pen font, ink-coloured, slight tilt.
    The font is loaded by the @import at the top of this sheet. */
 .fjc-for { display: inline-block; width: 0; height: 0; overflow: hidden; vertical-align: baseline; }
+.fjc-for__ink--pre { transform: rotate(-3deg); opacity: 0.95; }
 .fjc-for__ink {
   position: absolute; z-index: 3; white-space: nowrap; pointer-events: none;
   font-family: 'Caveat', 'Permanent Marker', cursive; font-weight: 600; letter-spacing: 0.01em;
@@ -187,6 +188,11 @@
   .fjc[data-state="docked"] .fjc-form textarea { border-radius: 16px; }
   .fjc[data-state="docked"] button.fjc-send { border-radius: 16px; }
   .fjc[data-state="docked"][data-open="1"] .fjc-thread { max-height: 60vh; }
+  /* Compact when closed: just the field and send. The preview line, the AI chip
+     and the toggle are desktop affordances; on a phone they cost screen for
+     little. Tapping the field opens the conversation. */
+  .fjc[data-state="docked"][data-open="0"] .fjc-bar { display: none; }
+  .fjc[data-state="docked"][data-open="0"] { padding: 0.5em 0.55em; border-radius: 22px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .fjc button.fjc-toggle { transition: none !important; }
