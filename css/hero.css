@@ -213,7 +213,9 @@ cursor: grabbing;
     width: calc(100% + 90px);
     position: absolute;
     background: linear-gradient(90deg, var(--bgMedium-opacity) 1px, transparent 1px var(--size)) 50% 50% / var(--size) var(--size), linear-gradient(var(--bgMedium-opacity) 1px, transparent 1px var(--size)) 50% 50% / var(--size) var(--size);
-    mask: linear-gradient(-25deg, transparent 40%, white);
+    /* fades out fast from the top-left corner, so the grid ends before the water's haze reaches across the top */
+    mask: linear-gradient(-25deg, transparent 72%, white);
+    -webkit-mask: linear-gradient(-25deg, transparent 72%, white);
     left: 0;
     top: 0;
     transform-style: flat;
@@ -296,7 +298,8 @@ cursor: grabbing;
     width: auto;
     height: 110%;
     position: absolute;
-    z-index: 0;
+    z-index: 0; /* same layer as #grid, which comes first in the markup, so the water paints over the grid */
+    pointer-events: none; /* the grid underneath still gets mousemove for its distortion */
     top:0;
     right: 0;
  }
