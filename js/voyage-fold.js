@@ -409,4 +409,4 @@ export function mountSilk(THREE, host, { style = 'ribbon', colorVar = '--primary
 /* the same sea shaped for a tall hero: the wide one's wall fills a phone's frame from edge to edge, and the headline ends up reading against the
    bands. A shallower curl (R, phiMax) set further from the ship (x0) keeps the swell just as big a piece of the picked colour while its mass sits
    low and to one side, the way the wide hero's does. Applied over DEFAULTS by the layer whenever the orientation changes. */
-export const PORTRAIT = { R: 3, phiMax: 110, x0: 14 };
+export const PORTRAIT = { R: 3, phiMax: 110, x0: 14, lipLen: 14, lipSoft: 10 };   // the lip, sized for the portrait curl: R * phiMax is 5.8 lab units of arc here against landscape's 9.1, so at the landscape lip (4 + 5) nearly everything a tall screen shows above the curl is already dissolving and the wall fades out before the top of the phone
