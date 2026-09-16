@@ -81,6 +81,8 @@ const pcfg = section ? {
     silkBgStyle: section.dataset.silkBgStyle || 'ribbon',                  // that ground: 'ribbon' (the Stripe-style silk ribbon) | 'beach' (the silk sea seen from the shore)
     silkShip: numAttr(section.dataset.silkShip, 0),                        // TEST: the voyage ship's sails as Stripe-style silk cloth (threads, the fold sheen, the picked hue's fan, grain), opaque at every level; its strength 0..1 (0 = off: nothing changes). Read at load (?silkShip=1)
     silkShipHull: numAttr(section.dataset.silkShipHull, 1),                // with silkShip: the hull as silk too (0 = the hull keeps its dots -> lines -> solid surface)
+    silkArmadaShips: numAttr(section.dataset.silkArmadaShips, 0),          // TEST: the armada's ships at the ending made of that same silk (the fleet's own cloth, posed through the fleet transform with the copies): its strength 0..1 (0 = off: the ending is unchanged). Read at load (?silkArmadaShips=1)
+    silkArmadaHull: numAttr(section.dataset.silkArmadaHull, 1),            // with silkArmadaShips: the copies' hulls as silk too (0 = only their sails; the hulls keep their dots)
 } : null;
 if (pcfg) for (const [k, v] of new URLSearchParams(location.search)) if (k in pcfg && v !== '') pcfg[k] = Number.isNaN(+v) ? v : +v;   // dev aid: ?shipWorkTilt=45&boat=off
 let layer = null;
@@ -413,6 +415,20 @@ const SILK_SHIP = {
     depthBias: 0.03,                            // hull lengths
     hueA: -0.07, hueC: 0.09,                    // the fan's hues round the picked one (the ribbon's): light at the head, deep at the foot
 };
+/* TEST (pcfg.silkArmadaShips): the armada's ships made of the same cloth. One cloth per grid, instanced ARMADA_K times (a copy index per instance),
+   every vertex posed through fleetTarget's own path — the fleet level's particle, the ship's shape animation, the copy's roll, its hull length and its
+   place in the fleet frame — so the cloth sits exactly where that copy's dots are placed and moves with them. The copies are small on screen (a hull is
+   under 200 px), so the look is retuned rather than shared: a coarser cloth, finer threads, and less of the big ship's edge-on sheen (at that size every
+   sail would read as white). The colours and the thread noise are SILK_SHIP's: the fleet is the same silk as the ship the reader followed here. */
+const SILK_ARMADA = {
+    K: 2, hullK: 1,                             // the subdivision of a grid cell (sails, hull); rebuild settings, and the whole vertex budget: 32 copies of everything
+    alpha: 0.95, hullAlpha: 0.95,               // the cloth's opacity (x silkArmadaShips); under the ending's screen blend a little of the page still shows through the sails
+    threadPx: 2.2,                              // CSS px per noise unit on a copy's cloth (finer than the big ship's: the threads have far less room)
+    sheen: 0.5, satin: 0.28, light: 0.9,        // the edge-on sheen and the satin band, both pulled back (a small sail turns through the whole range in a few pixels and flares white); the plain directional light carries the form instead, which is what makes a ship this size read as a ship
+    fan: 0.3, deep: 0.65, threads: 0.6,         // the colour fanned per sail rather than over the whole rig (at this size a rig-wide fan washes every topsail pale and the sails stop telling themselves apart), the feet deepened, the weave a touch stronger
+    paleAlpha: 0.6,                             // the opacity on a fully pale ground: there the canvas is multiplied over the page, where opaque cloth would print 32 solid ships over the testimonials; thinned, they lie under the words like a watermark
+    depthBias: 0.04,                            // hull lengths (of a copy): the copy's own dots stay in front of its cloth, the ones behind it are hidden
+};
 /* 2D simplex noise (Ashima Arts / Stefan Gustavson, MIT licence), as voyage-fold.js's SNOISE2 (that module loads only with the hero's sea) */
 const SILK_NOISE = `
     vec3 mod289(vec3 x){ return x - floor(x * (1.0 / 289.0)) * 289.0; } vec2 mod289(vec2 x){ return x - floor(x * (1.0 / 289.0)) * 289.0; }
@@ -428,9 +444,12 @@ const SILK_NOISE = `
 /* per vertex: aI0..aI3 the 4 x 4 particles' indices in the position texture (rows up, columns across), aWs / aWt the Catmull-Rom weights across and
    up, aDs / aDt their derivatives, aCell (s, t in the cell, the height in the rig 0..1, whether its sail exists at the level before (1) and after (2)),
    aUV (u across, v up: 0..1 on the grid; the same as arc lengths along the grid lines, in hull lengths). uHiMesh: this mesh is the level pair's upper one */
-const SILK_VS = SIM_SHARED + `
+/* fleet: the armada's variant (pcfg.silkArmadaShips). The same cloth, but every control particle comes from the FLEET's level texture and goes through
+   fleetTarget's own path instead of the live simulation: the ship's shape animation (the sail's fill and flutter, the hull's motion) evaluated for that
+   particle, the ship's pose undone, then the copy's roll, its hull length and its place in the fleet frame. The copy is aK, one instance per ship. */
+const SILK_VS = fleet => SIM_SHARED + `
     uniform sampler2D tPos; uniform float uDepthBias, uHiMesh;
-    attribute vec4 aI0, aI1, aI2, aI3, aWs, aWt, aDs, aDt, aCell, aUV;
+    attribute vec4 aI0, aI1, aI2, aI3, aWs, aWt, aDs, aDt, aCell, aUV;` + (fleet ? ` attribute float aK;` : '') + `
     varying vec3 vW, vN, vT; varying vec4 vUV; varying float vA, vY;
     vec2 refI(float i){ return vec2((mod(i, uN) + 0.5) / uN, (floor(i / uN) + 0.5) / uN); }
     vec4 rowI(int r){ return r == 0 ? aI0 : r == 1 ? aI1 : r == 2 ? aI2 : aI3; }
@@ -439,9 +458,12 @@ const SILK_VS = SIM_SHARED + `
       for (int r = 0; r < 4; r++) {
         vec4 I = rowI(r);
         for (int c = 0; c < 4; c++) {
-          vec2 rf = refI(I[c]); vec4 p = texture2D(tPos, rf); vec3 q = carry(p.xyz);
-          P += aWs[c] * aWt[r] * q; Ds += aDs[c] * aWt[r] * q; Dt += aWs[c] * aDt[r] * q;
-          if (r == 1) Db += aDs[c] * q;
+          vec2 rf = refI(I[c]);` + (fleet ? `
+          vec4 sp = texture2D(tFleetPos, rf), sm = texture2D(tFleetMeta, rf);
+          float sfd; ROCK = 0.0; TRAIL = 0.0; vec3 bt = boatTarget(sp, sp, sm, sm, sfd); ROCK = uRocket; TRAIL = uTrail;   /* a ship, whatever the main ship is (fleetTarget does the same) */
+          vec3 rl = (bt - uBoat) / uBoatScale, q = vec3(dot(uRot[0], rl), dot(uRot[1], rl), dot(uRot[2], rl));   /* the ship's own pose undone (uRot is orthonormal: its columns dotted) */
+          if ((r == 1 || r == 2) && (c == 1 || c == 2)) A += (c == 1 ? 1.0 - aCell.x : aCell.x) * (r == 1 ? 1.0 - aCell.y : aCell.y) * step(0.01, sp.w);   /* the cell's corners: a particle the fleet's level does not have takes its corner of the cloth with it (there is no morph here: one level, one cloth) */` : `
+          vec4 p = texture2D(tPos, rf); vec3 q = carry(p.xyz);
           if ((r == 1 || r == 2) && (c == 1 || c == 2)) {
             vec4 bA = texture2D(tBoatA, rf), bB = texture2D(tBoatB, rf), mA = texture2D(tMetaA, rf), mB = texture2D(tMetaB, rf);
             float fd; vec3 bt = boatTarget(bA, bB, mA, mB, fd);
@@ -450,10 +472,22 @@ const SILK_VS = SIM_SHARED + `
             float other = uHiMesh > 0.5 ? mod(aCell.w, 2.0) : floor(aCell.w / 2.0), dAB = distance(bA.xyz, bB.xyz);   /* other: this sail exists at the other level too (its cloth only changes shape) */
             float flight = mix(smoothstep(0.03, 0.1, dAB), smoothstep(0.15, 0.4, dAB), other) * smoothstep(0.05, 0.3, uMix) * (1.0 - smoothstep(0.7, 0.95, uMix));   /* a sail forming out of others (its particles hosted on the main or the jib, split at random), or one swinging far: the cloth would crumple, so it waits and the dots carry the change */
             A += w * near * (1.0 - flight) * boatFlag(bA, bB, p.w) * uForm * step(0.01, mix(bA.w, bB.w, boatMixT(bA, bB)));
-          }
+          }`) + `
+          P += aWs[c] * aWt[r] * q; Ds += aDs[c] * aWt[r] * q; Dt += aWs[c] * aDt[r] * q;
+          if (r == 1) Db += aDs[c] * q;
         }
       }
-      vec3 Du = mix(Db, Ds, smoothstep(0.1, 0.4, length(Ds) / max(length(Db), 1e-6)));   /* at a triangle's head its row is one point: the row below gives the way across */
+      vec3 Du = mix(Db, Ds, smoothstep(0.1, 0.4, length(Ds) / max(length(Db), 1e-6)));   /* at a triangle's head its row is one point: the row below gives the way across */` + (fleet ? `
+      /* the copy, exactly as fleetTarget places its dots: its own slow roll about the keel line (the cloth is never a water lane, so that roll always
+         applies), then the copy's hull length and its place in the formation, mapped to the world by the fleet's frame and the ending's page lift.
+         The two ways across the cloth are turned by the same rotations (the uniform scale and the lift's shear drop out of a normal) */
+      vec4 cp = fleetCopy(aK); float kq = aK + 1.0;
+      float ro = 0.045 * sin(uTime * (0.61 + 0.043 * kq) + kq * 2.1) + 0.02 * sin(uTime * (1.13 + 0.031 * kq) + kq * 4.7), cro = cos(ro), sro = sin(ro);
+      P = vec3(P.x, (P.y - (${WATERLINE})) * cro - P.z * sro + (${WATERLINE}), (P.y - (${WATERLINE})) * sro + P.z * cro);
+      Du = vec3(Du.x, Du.y * cro - Du.z * sro, Du.y * sro + Du.z * cro); Dt = vec3(Dt.x, Dt.y * cro - Dt.z * sro, Dt.y * sro + Dt.z * cro);
+      P = uFleetBoat + uFleetRot * (P * cp.w + cp.xyz) * uFleetScale; P.y += uFleetLift.x * (uFleetLift.y - P.z) / uFleetLift.y;
+      Du = uFleetRot * Du; Dt = uFleetRot * Dt;
+      A *= step(0.02, cp.w);   /* a slot no ship sails in (the scatter's spares are 0.001 long) */` : '') + `
       vec3 n = cross(Du, Dt); vN = n / max(length(n), 1e-9); vT = Du / max(length(Du), 1e-9);   /* vT: the threads' direction (across a sail, along the hull) */
       vW = P; vUV = aUV; vY = aCell.z; vA = A;
       vec3 E = P - cameraPosition;
@@ -602,7 +636,9 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
     // dots -> lines -> solid: the wireframe (an edge list per level from the module) and the surfaces (the hull's grid, one mesh at every
     // level since its vertices simply morph; a sail mesh per level, of the sails that level has). Empty for a module without them
     const wire = { lines: [], sails: [], hull: null, empty: new THREE.BufferGeometry() };
-    const silkGeos = { sails: [], hull: null };   // TEST (pcfg.silkShip): the silk cloth's geometries (a sail mesh per level, the hull), built only with the flag
+    const silkGeos = { sails: [], hull: null, fleetSails: [], fleetHull: null };   // TEST: the silk cloth's geometries (a sail mesh per level, the hull), built only with the flags; the fleet's are the armada's own, coarser copies of the same grids (SILK_ARMADA.K)
+    const silkShipOn = shipOn && pcfg.silkShip > 0, silkFleetOn = shipOn && pcfg.silkArmadaShips > 0;
+    const armadaSilkGeos = new Map();   // TEST (pcfg.silkArmadaShips): a fleet cloth -> the same vertices as an instanced geometry, one instance per copy of the armada (built on demand, dropped with the geometries on a theme swap)
     const refOf = i => [(((STAR_N + i) % N) + 0.5) / N, (Math.floor((STAR_N + i) / N) + 0.5) / N];
     function lineGeo(e) {
         const n = e.idx.length, pos = new Float32Array(n * 3), ref = new Float32Array(n * 2), w = new Float32Array(n);
@@ -631,7 +667,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
             wire.sails.push(parts.length ? gridGeo(parts.map(sd => ({ idx: sd.idx, nu: sd.na, nv: sd.nup }))) : wire.empty);
         }
         if (built.mesh && built.mesh.hull) wire.hull = gridGeo([{ idx: built.mesh.hull.idx, nu: built.mesh.hull.nu, nv: built.mesh.hull.nv, sides: 2 }]);
-        if (pcfg.silkShip > 0) buildSilk(mod, built);
+        if (silkShipOn || silkFleetOn) buildSilk(mod, built);
     }
     // TEST (pcfg.silkShip): the silk cloth over the same grids (see SILK_VS). Each grid cell is subdivided K x K; per vertex the indices of the 4 x 4
     // particles round its cell (clamped at the grid's edges), the Catmull-Rom weights and their derivatives, the cell's local coordinates, the height in
@@ -667,19 +703,26 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         for (const k in A) g.setAttribute(k, new THREE.BufferAttribute(new Float32Array(A[k]), 4));
         g.setIndex(tris); return g;
     }
+    const armadaK = Math.max(1, SILK_ARMADA.K - (coarse ? 1 : 0));   // a phone's copies are half the size again: one step coarser, which at that size is the grid itself and cannot be told apart
     function buildSilk(mod, built) {
-        for (const g of silkGeos.sails) if (g !== wire.empty) g.dispose(); if (silkGeos.hull) silkGeos.hull.dispose();
-        silkGeos.sails = []; silkGeos.hull = null;
+        for (const g of [...silkGeos.sails, ...silkGeos.fleetSails]) if (g !== wire.empty) g.dispose(); if (silkGeos.hull) silkGeos.hull.dispose(); if (silkGeos.fleetHull) silkGeos.fleetHull.dispose();
+        silkGeos.sails = []; silkGeos.hull = null; silkGeos.fleetSails = []; silkGeos.fleetHull = null; armadaSilkGeos.clear();   // (the instanced wrappers only borrow those attributes: they go with them)
         if (!built.mesh) return;
         const tops = [];
         for (let L = 0; L < mod.LEVELS.length; L++) {
             const pos = built.pos[L], parts = built.mesh.sails.filter(sd => sd.levels[L]); let top = -Infinity;
             for (const sd of parts) for (const i of sd.idx) top = Math.max(top, pos[i * 4 + 1]);
             tops.push(Number.isFinite(top) ? top : 0.3);
-            silkGeos.sails.push(parts.length ? silkGeo(parts.map(sd => ({ idx: sd.idx, nu: sd.na, nv: sd.nup, flags: (L > 0 && sd.levels[L - 1] ? 1 : 0) + (sd.levels[L + 1] ? 2 : 0) })), SILK_SHIP.K, pos, tops[L]) : wire.empty);
+            const grids = parts.map(sd => ({ idx: sd.idx, nu: sd.na, nv: sd.nup, flags: (L > 0 && sd.levels[L - 1] ? 1 : 0) + (sd.levels[L + 1] ? 2 : 0) }));
+            silkGeos.sails.push(silkShipOn && parts.length ? silkGeo(grids, SILK_SHIP.K, pos, tops[L]) : wire.empty);
+            silkGeos.fleetSails.push(silkFleetOn && parts.length ? silkGeo(grids, armadaK, pos, tops[L]) : wire.empty);   // the armada draws one of these (the fleet's level), 32 times over
         }
         const Lh = Math.min(2, mod.LEVELS.length - 1);   // the hull's one mesh morphs through every level: its thread spacing and heights from the ketch's
-        if (built.mesh.hull) silkGeos.hull = silkGeo([{ idx: built.mesh.hull.idx, nu: built.mesh.hull.nu, nv: built.mesh.hull.nv, sides: 2 }], SILK_SHIP.hullK, built.pos[Lh], tops[Lh]);
+        if (built.mesh.hull) {
+            const hg = [{ idx: built.mesh.hull.idx, nu: built.mesh.hull.nu, nv: built.mesh.hull.nv, sides: 2 }];
+            if (silkShipOn) silkGeos.hull = silkGeo(hg, SILK_SHIP.hullK, built.pos[Lh], tops[Lh]);
+            if (silkFleetOn) silkGeos.fleetHull = silkGeo(hg, Math.max(1, SILK_ARMADA.hullK - (coarse ? 1 : 0)), built.pos[Lh], tops[Lh]);
+        }
     }
     let LEVEL_HEEL = (shipOn && BOAT.LEVEL_HEEL) || [0.58, 1.0, 1.3, 1.1], LEVEL_PIVOT = (shipOn && BOAT.LEVEL_PIVOT) || [-0.03, -0.02, -0.01, -0.04];   // per level; the four-level module predates these exports
     // the level textures for a lineage module (a theme): built at init and again when the picker's icon row swaps the theme; the same
@@ -798,17 +841,31 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
     const WIRES = [wireLo, wireHi, hullMesh, sailLo, sailHi];
     for (const o of WIRES) { o.frustumCulled = false; scene.add(o); }
     // TEST (pcfg.silkShip): the silk cloth, a sail mesh per level pair (crossfaded like the surfaces) and the hull; none of it exists without the flag
-    const silkMat = () => new THREE.ShaderMaterial({
+    const silkMat = fleet => new THREE.ShaderMaterial({
         uniforms: Object.assign({ tPos: { value: null }, uAlpha: { value: 0 }, uClipTop: { value: 1e9 }, uDepthBias: { value: 0 }, uHiMesh: { value: 0 }, uColA: { value: new THREE.Color() }, uColB: { value: new THREE.Color() }, uColC: { value: new THREE.Color() }, uPale: { value: 0 },
-            uThreads: { value: SILK_SHIP.threads }, uThreadF0: { value: 64 }, uThreadF1: { value: 128 }, uThreadMix: { value: 0 }, uStretch: { value: SILK_SHIP.stretch }, uWander: { value: SILK_SHIP.wander }, uRidge: { value: SILK_SHIP.ridge }, uSheen: { value: SILK_SHIP.sheen }, uSheenPow: { value: SILK_SHIP.sheenPow },
-            uSatin: { value: SILK_SHIP.satin }, uSatinPow: { value: SILK_SHIP.satinPow }, uLight: { value: SILK_SHIP.light }, uDeep: { value: SILK_SHIP.deep }, uGrain: { value: SILK_SHIP.grain }, uEdge: { value: SILK_SHIP.edge }, uFan: { value: SILK_SHIP.fan } }, boatU()),
-        vertexShader: SILK_VS, fragmentShader: SILK_FS, transparent: true, depthWrite: true, depthTest: true, blending: THREE.NormalBlending, side: THREE.DoubleSide });
-    const silkOn = shipOn && pcfg.silkShip > 0;
-    const silkLo = silkOn ? new THREE.Mesh(wire.empty, silkMat()) : null, silkHi = silkOn ? new THREE.Mesh(wire.empty, silkMat()) : null, silkHull = silkOn && pcfg.silkShipHull > 0 ? new THREE.Mesh(silkGeos.hull || wire.empty, silkMat()) : null;
+            uThreads: { value: fleet ? SILK_ARMADA.threads : SILK_SHIP.threads }, uThreadF0: { value: 64 }, uThreadF1: { value: 128 }, uThreadMix: { value: 0 }, uStretch: { value: SILK_SHIP.stretch }, uWander: { value: SILK_SHIP.wander }, uRidge: { value: SILK_SHIP.ridge }, uSheen: { value: fleet ? SILK_ARMADA.sheen : SILK_SHIP.sheen }, uSheenPow: { value: SILK_SHIP.sheenPow },
+            uSatin: { value: fleet ? SILK_ARMADA.satin : SILK_SHIP.satin }, uSatinPow: { value: SILK_SHIP.satinPow }, uLight: { value: fleet ? SILK_ARMADA.light : SILK_SHIP.light }, uDeep: { value: fleet ? SILK_ARMADA.deep : SILK_SHIP.deep }, uGrain: { value: SILK_SHIP.grain }, uEdge: { value: SILK_SHIP.edge }, uFan: { value: fleet ? SILK_ARMADA.fan : SILK_SHIP.fan } }, boatU()),
+        vertexShader: SILK_VS(!!fleet), fragmentShader: SILK_FS, transparent: true, depthWrite: true, depthTest: true, blending: THREE.NormalBlending, side: THREE.DoubleSide });
+    const silkLo = silkShipOn ? new THREE.Mesh(wire.empty, silkMat()) : null, silkHi = silkShipOn ? new THREE.Mesh(wire.empty, silkMat()) : null, silkHull = silkShipOn && pcfg.silkShipHull > 0 ? new THREE.Mesh(silkGeos.hull || wire.empty, silkMat()) : null;
     if (silkHi) silkHi.material.uniforms.uHiMesh.value = 1;
     const SILKS = [silkLo, silkHi, silkHull].filter(Boolean);
-    for (const o of SILKS) { o.frustumCulled = false; o.visible = false; o.renderOrder = -0.5; scene.add(o); }   // after the hero sea (its risen sheet hides what is behind it), before the dots, which are drawn over the cloth
-    const ALLU = [velU, posU, U, ...WIRES.map(o => o.material.uniforms), ...SILKS.map(o => o.material.uniforms)];   // every material that reads the ship's uniforms
+    // TEST (pcfg.silkArmadaShips): the armada's ships in the same cloth: the fleet's own sail mesh and hull, each drawn once per copy (ARMADA_K instances,
+    // the copy index in aK) and posed through the fleet transform in the vertex shader, so the whole fleet rides with the copies' dots
+    const aSilkSails = silkFleetOn ? new THREE.Mesh(wire.empty, silkMat(true)) : null, aSilkHull = silkFleetOn && pcfg.silkArmadaHull > 0 ? new THREE.Mesh(wire.empty, silkMat(true)) : null;
+    const ASILKS = [aSilkSails, aSilkHull].filter(Boolean), SILKS_ALL = [...SILKS, ...ASILKS];
+    for (const o of SILKS_ALL) { o.frustumCulled = false; o.visible = false; o.renderOrder = -0.5; scene.add(o); }   // after the hero sea (its risen sheet hides what is behind it), before the dots, which are drawn over the cloth
+    const ALLU = [velU, posU, U, ...WIRES.map(o => o.material.uniforms), ...SILKS_ALL.map(o => o.material.uniforms)];   // every material that reads the ship's uniforms
+    // the same cloth drawn once per ship of the armada: an instanced geometry that BORROWS the fleet cloth's attributes and index (no second copy of any
+    // of it, on the CPU or the GPU) and adds one float per instance, that copy's index into uFleet. Cached per cloth; dropped when the cloths are rebuilt
+    const aKAttr = silkFleetOn ? new THREE.InstancedBufferAttribute(Float32Array.from({ length: ARMADA_K }, (_, i) => i), 1) : null;
+    function armadaSilkGeo(base) {
+        if (!base || base === wire.empty) return wire.empty;
+        let g = armadaSilkGeos.get(base); if (g) return g;
+        g = new THREE.InstancedBufferGeometry(); g.index = base.index;
+        for (const k in base.attributes) g.setAttribute(k, base.attributes[k]);
+        g.setAttribute('aK', aKAttr); g.instanceCount = ARMADA_K;
+        armadaSilkGeos.set(base, g); return g;
+    }
     // the hero's sea (js/voyage-fold.js): drawn before the particles; its risen sheet hides the field's stars behind it
     const fold = FOLD && shipOn ? FOLD.createFold(THREE, { scene, pixelRatio: Math.min(devicePixelRatio || 1, 2), light: coarse }) : null;
     const lottieHost = document.querySelector('.hero-wrapper dotlottie-player');
@@ -1311,7 +1368,8 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         const L = M.clamp(P.level, 0, levels.length - 1), lo = Math.min(levels.length - 1, Math.floor(L)), hi = Math.min(levels.length - 1, lo + 1), mix = L - lo;
         const mixRate = Math.abs(mix - ship.lastMix) / Math.max(dt, 1e-3); ship.lastMix = mix;   // wraps of mix at a level boundary count as a morph too, which is right
         ship.settleGain += (0.3 + 0.7 * Math.min(1, mixRate * 2) - ship.settleGain) * Math.min(1, dt / (mixRate > 0.1 ? 0.05 : 0.6));   // the settle holds at full rate through a morph and relaxes after it
-        const FL = M.clamp(ship.fleetLevel, 0, levels.length - 1); if (FL !== ship.fleetLo) { ship.fleetLo = FL; for (const u of ALLU) { u.tFleetPos.value = levels[FL].pos; u.tFleetMeta.value = levels[FL].meta; } }
+        const FL = M.clamp(ship.fleetLevel, 0, levels.length - 1); if (FL !== ship.fleetLo) { ship.fleetLo = FL; for (const u of ALLU) { u.tFleetPos.value = levels[FL].pos; u.tFleetMeta.value = levels[FL].meta; }
+            if (aSilkSails) aSilkSails.geometry = armadaSilkGeo(silkGeos.fleetSails[FL]); if (aSilkHull) aSilkHull.geometry = armadaSilkGeo(silkGeos.fleetHull); }   // TEST (silkArmadaShips): the copies' cloth is the fleet's one level, so it only changes when that does
         if (lo !== ship.lo) { ship.lo = lo; for (const u of ALLU) { u.tBoatA.value = levels[lo].pos; u.tMetaA.value = levels[lo].meta; u.tBoatB.value = levels[hi].pos; u.tMetaB.value = levels[hi].meta; }
             wireLo.geometry = wire.lines[lo] || wire.empty; wireHi.geometry = wire.lines[hi] || wire.empty; sailLo.geometry = wire.sails[lo] || wire.empty; sailHi.geometry = wire.sails[hi] || wire.empty; hullMesh.geometry = wire.hull || wire.empty;
             if (silkLo) { silkLo.geometry = silkGeos.sails[lo] || wire.empty; silkHi.geometry = silkGeos.sails[hi] || wire.empty; } if (silkHull) silkHull.geometry = silkGeos.hull || wire.empty; }
@@ -1514,7 +1572,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         for (const u of ALLU) u.uFleetScale.value = U.uFleetScale.value;
         let clipTop = 1e9;   // above the page the canvas draws only from the block's top edge down (below it the block's own ground; above it the page covers the canvas anyway)
         if (ship.overlay) { const sel = /^(.+):(top|center|bottom)@/.exec(pcfg.shipOverlayAt || ''), el = sel ? document.querySelector(sel[1]) : null; if (el) { const cTop = canvas.getBoundingClientRect().top, eTop = el.getBoundingClientRect().top, cssH = VH + pinnedExtra; clipTop = Math.max(0, cssH - (eTop - cTop)) * (canvas.height / Math.max(1, cssH)); } }   // the block's top edge in the canvas's own coordinates (both rects from the same layout, so it holds still while scrolling)
-        U.uClipTop.value = clipTop; for (const o of WIRES) o.material.uniforms.uClipTop.value = clipTop; for (const o of SILKS) o.material.uniforms.uClipTop.value = clipTop;
+        U.uClipTop.value = clipTop; for (const o of WIRES) o.material.uniforms.uClipTop.value = clipTop; for (const o of SILKS_ALL) o.material.uniforms.uClipTop.value = clipTop;
         const fleetForm = M.clamp(P.fleet, 0, 4) * M.clamp(pcfg.shipFleet, 0, 1);
         for (const u of ALLU) u.uFleetForm.value = fleetForm;
         const smoke = BOAT && BOAT.SMOKE ? tbl(BOAT.SMOKE) * (1 - rocketMix) : 0, FN = BOAT && BOAT.FUNNELS;   // funnel smoke and the funnels' tops, mixed between the two levels
@@ -1540,6 +1598,16 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
             if (silkHull) { silkHull.material.uniforms.uAlpha.value = SILK_SHIP.hullAlpha * sk; if (sk > 0) hullMesh.visible = false; }
             for (const o of SILKS) o.visible = o.material.uniforms.uAlpha.value > 0.002;
         }
+        if (ASILKS.length) {   // TEST (silkArmadaShips): the armada's ships in that same cloth, drawn only at the ending (off the ending uFleet holds the quote's
+            // three waves, which are the ship's own particles and carry no cloth). Their threads are sized from a copy's hull length on screen, not the big
+            // ship's, so a little boat's silk is woven as finely as the clipper's was; the depth bias likewise, so it only pushes the cloth behind its own dots
+            const ak = launch ? M.clamp(pcfg.silkArmadaShips, 0, 1) * M.lerp(1, SILK_ARMADA.paleAlpha, silkPale) : 0, aScale = unit * fsz;
+            const aLod = Math.log2(Math.max(2, aScale * innerWidth / Math.max(1e-4, visW) / SILK_ARMADA.threadPx)), af0 = Math.pow(2, Math.floor(aLod));
+            for (const o of ASILKS) { const u = o.material.uniforms; u.uThreadF0.value = af0; u.uThreadF1.value = 2 * af0; u.uThreadMix.value = M.smoothstep(aLod - Math.floor(aLod), 0.2, 0.8); u.uDepthBias.value = SILK_ARMADA.depthBias * aScale; }
+            if (aSilkSails) aSilkSails.material.uniforms.uAlpha.value = SILK_ARMADA.alpha * ak;
+            if (aSilkHull) aSilkHull.material.uniforms.uAlpha.value = SILK_ARMADA.hullAlpha * ak;
+            for (const o of ASILKS) o.visible = o.material.uniforms.uAlpha.value > 0.002 && o.geometry !== wire.empty;
+        }
         const trailOn = pcfg.shipTrail > 0 && rocketMix < 0.5 ? 1 : 0;   // the rocket's plume is the strip
         for (const u of ALLU) { u.uTrail.value = trailOn; u.uTrailClk.value = ship.trail; }
         const fieldGone = Number.isFinite(ship.overlayY) ? M.smoothstep(scrollY, ship.overlayY - 0.8 * VH, ship.overlayY) : 0;   // the field is gone by the overlay mark (the footer): the rocket stands alone
@@ -1562,10 +1630,10 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
     // the ground (pale: 0 at luminance 0.06 .. 1 at 0.4) the dots turn into dark, opaque, normally blended ink of the same hue, a
     // little bigger and denser, so the ship and the field stay readable on every colour the picker can produce. Re-applied on a class
     // change and whenever the body's background changes (polled in frame(): the picker sets variables, not classes, within a mode).
-    let groundKey = '', fieldTheme = 1, glowBase = pcfg.pGlow;
+    let groundKey = '', fieldTheme = 1, glowBase = pcfg.pGlow, silkPale = 0;   // silkPale: how pale the ground is (0 dark .. 1), which the armada's cloth thins with (see SILK_ARMADA.paleAlpha)
     function applyTheme() {
         const cls = document.body.classList.contains('default-light') || document.body.classList.contains('default-light-colorblind');
-        const lum = groundLum(), pale = M.smoothstep(lum, 0.06, 0.4), light = cls || pale > 0.5;
+        const lum = groundLum(), pale = M.smoothstep(lum, 0.06, 0.4), light = cls || pale > 0.5; silkPale = pale;
         const v = vividAccent(THREE, light, 0.6 - 0.38 * pale);   // the hue kept, the lightness from 0.6 (dark ground) to 0.22 (pale ground)
         U.uColorA.value.copy(v);
         U.uColorB.value.copy(v).lerp(new THREE.Color(0xffffff), 0.2 * (1 - pale)).lerp(new THREE.Color(0x000000), 0.25 * pale);
@@ -1583,13 +1651,13 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
             let m = null; try { m = /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/.exec(getComputedStyle(document.body).backgroundColor || ''); } catch (e) {}
             if (m) fold.setGround(+m[1] / 255, +m[2] / 255, +m[3] / 255);
         }
-        if (SILKS.length) {   // TEST (silkShip): the silk's fan from the picked hue, as voyage-fold.js's ribbon sets it (raw into the shader); a little deeper on a pale ground
+        if (SILKS_ALL.length) {   // TEST (silkShip / silkArmadaShips): the silk's fan from the picked hue, as voyage-fold.js's ribbon sets it (raw into the shader); a little deeper on a pale ground
             const c = new THREE.Color(), hsl = { h: 0, s: 0, l: 0 }; try { c.setStyle(foldColorKey() || '#1466B8'); } catch (e) { c.set(0x1466b8); } c.getHSL(hsl, THREE.SRGBColorSpace);
-            for (const o of SILKS) { const u = o.material.uniforms; u.uColA.value.setHSL((hsl.h + SILK_SHIP.hueA + 1) % 1, 0.95, 0.66); u.uColB.value.setHSL(hsl.h, 0.95, 0.52); u.uColC.value.setHSL((hsl.h + SILK_SHIP.hueC + 1) % 1, 0.9, 0.4); u.uPale.value = pale; }
+            for (const o of SILKS_ALL) { const u = o.material.uniforms; u.uColA.value.setHSL((hsl.h + SILK_SHIP.hueA + 1) % 1, 0.95, 0.66); u.uColB.value.setHSL(hsl.h, 0.95, 0.52); u.uColC.value.setHSL((hsl.h + SILK_SHIP.hueC + 1) % 1, 0.9, 0.4); u.uPale.value = pale; }
         }
         try { groundKey = getComputedStyle(document.body).backgroundColor + foldColorKey(); } catch (e) {}
     }
-    function foldColorKey() { try { return fold || SILKS.length ? getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim() : ''; } catch (e) { return ''; } }
+    function foldColorKey() { try { return fold || SILKS_ALL.length ? getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim() : ''; } catch (e) { return ''; } }
     applyTheme();
     new MutationObserver(applyTheme).observe(document.body, { attributes: true, attributeFilter: ['class'] });
     let groundAt = 0;
@@ -1618,7 +1686,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         if (!qual.half || (qual.tick++ % 2 === 0)) { velU.uDelta.value = qual.simDt; posU.uDelta.value = qual.simDt; posU.uSettle.value = shipOn ? 1 - Math.exp(-qual.simDt * pcfg.shipSettle * ship.settleGain) : 0; qual.simDt = 0; gpu.compute();
             shipRot0.copy(shipRot); shipAt0.copy(shipAt); for (const u of ALLU) u.uScale0.value = U.uBoatScale.value; posU.uTrailClk0.value = posU.uTrailClk.value; }   // solids were just written against this pose; the trail's clock as this step saw it
         U.tPos.value = gpu.getCurrentRenderTarget(posVar).texture; U.tVel.value = gpu.getCurrentRenderTarget(velVar).texture;
-        for (const o of WIRES) o.material.uniforms.tPos.value = U.tPos.value; for (const o of SILKS) o.material.uniforms.tPos.value = U.tPos.value;
+        for (const o of WIRES) o.material.uniforms.tPos.value = U.tPos.value; for (const o of SILKS_ALL) o.material.uniforms.tPos.value = U.tPos.value;
         U.uIntro.value = Math.min(1, U.uIntro.value + dt * 0.5);
         gl.render(scene, camera);
         if (!shown) { shown = true; canvas.style.opacity = '1'; }
@@ -1663,6 +1731,14 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         fold,   // the hero's sea (its uniforms are live: a dev aid for tuning in the console)
         // TEST (silkShip): retune the silk cloth live, e.g. section.wsLayer.silkShip.set({ threads: 0.6, sheen: 1.5 }) (the keys of SILK_SHIP; K and hullK need a reload)
         silkShip: SILKS.length ? { opts: SILK_SHIP, set(p) { Object.assign(SILK_SHIP, p); for (const o of SILKS) for (const k in p) { const u = o.material.uniforms['u' + k[0].toUpperCase() + k.slice(1)]; if (u && typeof p[k] === 'number') u.value = p[k]; } applyTheme(); } } : null,
+        // TEST (silkArmadaShips): the armada's cloth, retuned live, e.g. section.wsLayer.silkArmada.set({ alpha: 1, sheen: 1.2 }) (the keys of SILK_ARMADA
+        // and of SILK_SHIP, which the copies share; K and hullK need a reload); info() reports what it costs
+        silkArmada: ASILKS.length ? {
+            opts: SILK_ARMADA, meshes: ASILKS,
+            set(p) { Object.assign(SILK_ARMADA, p); for (const o of ASILKS) for (const k in p) { const u = o.material.uniforms['u' + k[0].toUpperCase() + k.slice(1)]; if (u && typeof p[k] === 'number') u.value = p[k]; } applyTheme(); },
+            info() { const per = ASILKS.reduce((n, o) => n + (o.geometry.attributes.position ? o.geometry.attributes.position.count : 0), 0);
+                return { level: ship.fleetLo, copies: ARMADA_K, vertsPerCopy: per, vertsDrawn: per * ARMADA_K, visible: ASILKS.map(o => o.visible), alpha: ASILKS.map(o => +o.material.uniforms.uAlpha.value.toFixed(3)) }; },
+        } : null,
         // the path editor's window on the route (js/voyage-editor.js, ?route=1)
         routeApi: {
             orientation: () => VH > innerWidth ? 'portrait' : 'landscape',
