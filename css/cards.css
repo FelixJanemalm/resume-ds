@@ -55,9 +55,13 @@
   background: #343434 no-repeat center center / cover;
   border-radius: 16px;
   overflow: hidden;
+  isolation: isolate; /* Safari: keeps the video clipped to the radius while the card scales */
   position: relative;
-  transition: all 0.4s ease-in-out;
-  -webkit-transition: all 0.4s ease-in-out;
+  transition:
+    width 0.4s ease-in-out,
+    margin 0.4s ease-in-out,
+    box-shadow 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
   cursor: pointer;
     .item-desc {
       z-index: 20;
@@ -99,6 +103,7 @@
 .card-wrapper .item-desc p {
   opacity: 0;
   max-height: 0;
+  overflow: hidden;
   margin: 0;
   transform: translateY(20px);
   -webkit-transform: translateY(20px);
@@ -131,7 +136,8 @@
   border-right: 1.5px solid rgba(255, 255, 255, 0.55);
   border-bottom: 1.5px solid rgba(255, 255, 255, 0.55);
   transform: rotate(45deg);
-  transition: opacity 0.3s ease, height 0.3s ease, margin 0.3s ease;
+  transition: opacity 0.3s ease, height 0.3s ease, margin 0.3s ease,
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.3s ease;
 }
 .card-wrapper .item.active .item-desc h3::after {
   opacity: 0;
@@ -144,6 +150,63 @@
 @media (hover: hover) {
   .card-wrapper .item:hover::after {
     box-shadow: inset 0 0 0 2px var(--primary-color, hsl(200, 100%, 50%));
+  }
+}
+
+/* Hover preview of the click. A collapsed card lifts, parts its neighbours
+   (a small version of the room it takes when it opens) and lets the first
+   line of its text rise into view. The open card only lifts: clicking it
+   closes it. Transforms only, so neither the stage nor the page reflows. */
+@media (hover: hover) and (pointer: fine) {
+  .card-wrapper .item:not(.active):hover {
+    transform: translateY(-4px) scale(1.035);
+    box-shadow: 0 22px 40px -12px rgba(0, 0, 0, 0.45);
+  }
+  .card-wrapper .item.active:hover {
+    transform: translateY(-3px);
+  }
+
+  .card-wrapper .owl-item:has(.item:not(.active):hover) ~ .owl-item .item {
+    transform: translateX(10px);
+  }
+  .card-wrapper .owl-item:has(.item:not(.active):hover) + .owl-item .item {
+    transform: translateX(14px);
+  }
+  .card-wrapper .owl-item:has(~ .owl-item .item:not(.active):hover) .item {
+    transform: translateX(-10px);
+  }
+  .card-wrapper .owl-item:has(+ .owl-item .item:not(.active):hover) .item {
+    transform: translateX(-14px);
+  }
+
+  .card-wrapper .item:not(.active):hover .item-desc p {
+    opacity: 0.6;
+    max-height: 1.6em;
+    max-height: 1lh;
+    margin-top: 2px;
+    transform: translateY(0);
+    transition:
+      opacity 0.45s ease 0.08s,
+      max-height 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+      margin 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .card-wrapper .item:not(.active):hover .item-desc h3::after {
+    transform: translateY(2px) rotate(45deg);
+    border-color: rgba(255, 255, 255, 0.9);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-wrapper .item,
+  .card-wrapper .item-desc p,
+  .card-wrapper .item-desc h3::after {
+    transition-duration: 0.01s !important;
+    transition-delay: 0s !important;
+  }
+  .card-wrapper .item:hover,
+  .card-wrapper .owl-item .item {
+    transform: none !important;
   }
 }
 

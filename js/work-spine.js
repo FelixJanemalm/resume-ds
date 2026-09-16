@@ -79,8 +79,6 @@ const pcfg = section ? {
     foldSway: numAttr(section.dataset.foldSway, 0.3),                      // the share of the scene's slow sway (at anchor) the hero sea takes; the ship always takes all of it
     silk: numAttr(section.dataset.silk, 0),                                // 1 = the fold's silk lines stay as the sea the ship sails on down the page (streaming past it with its way); 0 = they fade out into the work section (Felix, 2026-09-15)
     silkGoneAt: section.dataset.silkGoneAt || 'stage-pin',                 // the scroll mark by which the silk lines have faded out (from foldFadeAt), as the work section pins
-    silkArmada: section.dataset.silkArmada || 'off',                       // silk sheets in the armada's ending, over the ships' own particle wakes: 'off' (Felix, 2026-09-15: the plain wake) | 'wake' (every ship trails a silk wake, the ripple it opens) | 'weave' (the armada rides one band of silk into the distance)
-    silkRide: numAttr(section.dataset.silkRide, 1),                        // with 'weave': how much of the silk road's lie the ships take (1 = they sit on its surface and tilt with it, sailing up it into the distance; 0 = they sail the flat sea under it)
     silkBg: numAttr(section.dataset.silkBg, 1),                            // the animated silk ground of the principles section (#scalability): its strength (1 = full); 0 = none
     silkBgStyle: section.dataset.silkBgStyle || 'ribbon',                  // that ground: 'ribbon' (the Stripe-style silk ribbon) | 'beach' (the silk sea seen from the shore)
     silkShip: numAttr(section.dataset.silkShip, 0),                        // A TEST, off: the voyage ship's sails as Stripe-style silk cloth (threads, the fold sheen, the picked hue's fan, grain), opaque at every level; its strength 0..1 (0 = off: nothing changes). Read at load (?silkShip=1)
@@ -91,7 +89,7 @@ const pcfg = section ? {
 if (pcfg) for (const [k, v] of new URLSearchParams(location.search)) if (k in pcfg && v !== '') pcfg[k] = Number.isNaN(+v) ? v : +v;   // dev aid: ?shipWorkTilt=45&boat=off
 let layer = null;
 const THEME_ROW = false;   // the ship-style icon row under the colour picker (and the stored choice it writes): off for now
-const MOD_V = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '?t=' + Date.now() : '?v=2026-09-15k';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache): never cached on a local server, versioned elsewhere (bump when they change)
+const MOD_V = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '?t=' + Date.now() : '?v=2026-09-15l';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache): never cached on a local server, versioned elsewhere (bump when they change)
 import('./ink-cursor.js' + MOD_V).catch(e => console.warn('ink cursor', e));   // the pointer as a trail of ink in the picked colour (it checks for a real mouse and reduced motion itself)
 
 const SIM_NOISE = `
@@ -119,9 +117,7 @@ const SIM_SHARED = `
     uniform vec4 uWave, uSea, uMotion, uSail, uClock, uHull, uMisc, uSail2; uniform float uBeam[17];   // uSail2: (spare, billow amplitude, billow phase, spare)
     uniform mat3 uRot0; uniform vec3 uBoat0; uniform float uScale0; uniform vec4 uSwell; uniform mat3 uRotSea; uniform vec2 uSeaD; uniform float uSoftLane; uniform float uTrail, uTrailClk, uTrailClk0;
     uniform vec2 uFleetLift; /* x: the page offset of the ending in world units at the z = 0 plane, y: the camera's z */ uniform sampler2D tFleet, tFleetPos, tFleetMeta; uniform vec4 uFleet[32]; uniform float uFleetForm, uFleetScale; uniform vec3 uFleetBoat; uniform mat3 uFleetRot;   // nine copies in three waves; the form runs 0..3; the copies are built from the fleet's own level textures (the lineage's last ship) and posed in the fleet's own frame
-    uniform vec4 uFleetTilt[32];   // per copy, the lie of the silk road it rides (x: bank about the course, y: pitch bow-up, radians); all zero when there is none
-    vec4 fleetCopy(float k, out vec4 tilt){ int i = int(k + 0.5); vec4 c = uFleet[0]; tilt = uFleetTilt[0]; for (int j = 1; j < 32; j++) { if (j == i) { c = uFleet[j]; tilt = uFleetTilt[j]; } } return c; }
-    vec4 fleetCopy(float k){ vec4 tl; return fleetCopy(k, tl); }
+    vec4 fleetCopy(float k){ int i = int(k + 0.5); vec4 c = uFleet[0]; for (int j = 1; j < 32; j++) { if (j == i) c = uFleet[j]; } return c; }
     uniform float uDepart, uFlowDep, uDepOn, uWaterFade; /* the departure from rest: water flowed since the ship left rest (hull lengths, unwrapped), the flow clock when it left, 1 while that departure lasts */
     uniform float uSmoke, uSmokeClk, uPaddle, uAnchor, uAnchorSide; uniform vec4 uFunnel;   // uAnchor: 0 the anchor stowed at the hawse .. 1 down   // funnel smoke (0..1, a share of the foam), its clock (1 per lifetime), the paddle wheels' angle; the funnels: first top (x, y), spacing (x), count
     float isSmoke(vec4 md){ return step(hash1(md.w * 13.7), 0.6 * uSmoke); }   // which foam particles are smoke (60% of them at full smoke)   // the fleet: per particle (source ref u, v, copy 1..3 or 0, recruit threshold); per copy (x aft, lift, z across in hull lengths, size); the form 0..1   // the wake trail: on/off, its age clock (1 per lifetime) now and at the previous sim step   // uRotSea: the sea's pose (its course follows the hull's slowly at rest, tightly under way); uSeaD: (cos, sin) of sea course - hull course; uSoftLane: at rest the water is spring-held like the hull (1), under way placed (0)   // uSwell: the swell's direction in the hull frame (cos, sin), spare
@@ -312,11 +308,9 @@ const SIM_SHARED = `
       ROCK = 0.0; TRAIL = 0.0; vec3 bt = boatTarget(sA, sA, sMA, sMA, fade); ROCK = uRocket; TRAIL = uTrail; fade *= pres;   // a ship, whatever the main ship is
       vec3 rel = (bt - uBoat) / uBoatScale; rel = vec3(dot(uRot[0], rel), dot(uRot[1], rel), dot(uRot[2], rel));   // the ship's own pose undone (uRot is orthonormal: its columns dotted)
       float kq = fl.z, solidQ = 1.0 - step(5.5, floor(sMA.x + 0.5)) * step(floor(sMA.x + 0.5), 7.5);
-      vec4 tl; vec4 c = fleetCopy(fl.z - 1.0, tl);
-      float ro = solidQ * (0.045 * sin(uTime * (0.61 + 0.043 * kq) + kq * 2.1) + 0.02 * sin(uTime * (1.13 + 0.031 * kq) + kq * 4.7)) + tl.x, cr = cos(ro), sr = sin(ro);   /* a roll of its own per copy, about the keel line, over the bank of whatever it rides */
+      vec4 c = fleetCopy(fl.z - 1.0);
+      float ro = solidQ * (0.045 * sin(uTime * (0.61 + 0.043 * kq) + kq * 2.1) + 0.02 * sin(uTime * (1.13 + 0.031 * kq) + kq * 4.7)), cr = cos(ro), sr = sin(ro);   /* a roll of its own per copy, about the keel line */
       rel = vec3(rel.x, (rel.y - (${WATERLINE})) * cr - rel.z * sr + (${WATERLINE}), (rel.y - (${WATERLINE})) * sr + rel.z * cr);
-      float cp = cos(tl.y), sp = sin(tl.y);   /* and pitched to its climb, about the same point on the waterline */
-      rel = vec3(rel.x * cp - (rel.y - (${WATERLINE})) * sp, rel.x * sp + (rel.y - (${WATERLINE})) * cp + (${WATERLINE}), rel.z);
       vec3 W = uFleetBoat + uFleetRot * (rel * c.w + c.xyz) * uFleetScale; W.y += uFleetLift.x * (uFleetLift.y - W.z) / uFleetLift.y;   /* the ending scrolls with the page: the same pixel shift at every depth */
       return W; }`;
 const SIM_VEL = SIM_NOISE + SIM_SHARED + `
@@ -568,8 +562,8 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
     canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100vh;height:100lvh;z-index:-1;pointer-events:none;opacity:0;transition:opacity 1.6s ease';   // the LARGE viewport's height: a phone's address bar sliding in and out never resizes the layer (it only covers or uncovers its bottom edge)
     document.body.appendChild(canvas);   // appended last: z-index does the layering, and nothing else on the page sees it as the first canvas
     let gl;
-    try { gl = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: 'high-performance' }); } catch (e) { canvas.remove(); return; }
-    if (!gl.capabilities.isWebGL2) { gl.dispose(); canvas.remove(); return; }
+    try { gl = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: 'high-performance' }); } catch (e) { canvas.remove(); lottieFallback(); return; }
+    if (!gl.capabilities.isWebGL2) { gl.dispose(); canvas.remove(); lottieFallback(); return; }
     gl.setPixelRatio(Math.min(devicePixelRatio || 1, 2)); gl.setClearColor(0x000000, 0);
     const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(35, 1, 0.5, 60);
     camera.position.set(0, 0, 12);
@@ -819,20 +813,19 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
     }
     let armadaTex = buildArmadaTex();
     const fleetTex = dataTex(fleetData), fleetU = Array.from({ length: ARMADA_K }, () => new THREE.Vector4(0, 0, 0, 0.001));
-    const fleetTilt = Array.from({ length: ARMADA_K }, () => new THREE.Vector4(0, 0, 0, 0));   // per copy the lie of the silk it rides (bank, pitch): all zero unless the armada rides the weave
     const shipRot = new THREE.Matrix3(), shipAt = new THREE.Vector3(), shipRot0 = new THREE.Matrix3(), shipAt0 = new THREE.Vector3();
     const shipRotSea = new THREE.Matrix3();   // the sea's pose: the hull's tilt, the sea's own course (lags the hull's at rest)
     const foldSea = new THREE.Matrix3(), foldT = new THREE.Matrix3(), foldD = new THREE.Vector3();   // the hero sea's pose (the hull's tilt, the calm course) and two scratch values
     const fleetRot = new THREE.Matrix3(), fleetAt = new THREE.Vector3();   // the fleet's frame: the ship's while it sails, its own at the launch (the yachts stay on the sea as the backdrop while the ship is the rocket)
     const shipU = { sail2: new THREE.Vector4(0, 0, 0, 0), wave: new THREE.Vector4(0, 0.3, 0, 0.15), sea: new THREE.Vector4(0, 2.618, 0, 0), motion: new THREE.Vector4(0, 0, 0, 0), sail: new THREE.Vector4(1, 0, 0, 0), clock: new THREE.Vector4(0, 0, 0, 0), hull: new THREE.Vector4(0.5, -0.5, 1, 0.02), misc: new THREE.Vector4(-0.02, 0, 0, 1.6), beam: new Float32Array(17), swell: new THREE.Vector4(1, 0, 0, 0), funnel: new THREE.Vector4(0, 0, 0, 1) };
-    const boatU = () => ({ tBoatA: { value: levels[0].pos }, tBoatB: { value: levels[0].pos }, tMetaA: { value: levels[0].meta }, tMetaB: { value: levels[0].meta }, uMix: { value: 0 }, uForm: { value: shipOn ? 1 : 0 }, uBoatScale: { value: 1 }, uBoat: { value: shipAt }, uRot: { value: shipRot }, uTime: { value: 0 }, uRipple: { value: 0 }, uFlow: { value: 0 }, uSettle: { value: 0 }, uWay: { value: 0 }, uReflect: { value: 1 }, uStarT: { value: starT }, uN: { value: N }, uStarForm: { value: 0 }, uSnap: { value: 1.2 }, uSnapBoat: { value: 0.02 }, uRocket: { value: 0 }, uSoft: { value: 0 }, uLoose: { value: 0 }, uSoftLane: { value: 0 }, uRotSea: { value: shipRotSea }, uSeaD: { value: new THREE.Vector2(1, 0) }, uSqN: { value: new THREE.Vector3().fromArray((shipOn && BOAT.SQUARE_NORMAL) || [0.970, 0, 0.242]) }, uTrail: { value: 0 }, uTrailClk: { value: 0 }, uTrailClk0: { value: 0 }, tFleet: { value: fleetTex }, tFleetPos: { value: levels[0].pos }, tFleetMeta: { value: levels[0].meta }, uFleet: { value: fleetU }, uFleetTilt: { value: fleetTilt }, uFleetForm: { value: 0 }, uFleetScale: { value: 1 }, uFleetBoat: { value: fleetAt }, uFleetRot: { value: fleetRot }, uFleetLift: { value: new THREE.Vector2(0, 12) }, uSmoke: { value: 0 }, uSmokeClk: { value: 0 }, uPaddle: { value: 0 }, uAnchor: { value: 0 }, uAnchorSide: { value: 1 }, uDepart: { value: 0 }, uFlowDep: { value: 0 }, uDepOn: { value: 0 }, uWaterFade: { value: 1 }, uFunnel: { value: shipU.funnel },
+    const boatU = () => ({ tBoatA: { value: levels[0].pos }, tBoatB: { value: levels[0].pos }, tMetaA: { value: levels[0].meta }, tMetaB: { value: levels[0].meta }, uMix: { value: 0 }, uForm: { value: shipOn ? 1 : 0 }, uBoatScale: { value: 1 }, uBoat: { value: shipAt }, uRot: { value: shipRot }, uTime: { value: 0 }, uRipple: { value: 0 }, uFlow: { value: 0 }, uSettle: { value: 0 }, uWay: { value: 0 }, uReflect: { value: 1 }, uStarT: { value: starT }, uN: { value: N }, uStarForm: { value: 0 }, uSnap: { value: 1.2 }, uSnapBoat: { value: 0.02 }, uRocket: { value: 0 }, uSoft: { value: 0 }, uLoose: { value: 0 }, uSoftLane: { value: 0 }, uRotSea: { value: shipRotSea }, uSeaD: { value: new THREE.Vector2(1, 0) }, uSqN: { value: new THREE.Vector3().fromArray((shipOn && BOAT.SQUARE_NORMAL) || [0.970, 0, 0.242]) }, uTrail: { value: 0 }, uTrailClk: { value: 0 }, uTrailClk0: { value: 0 }, tFleet: { value: fleetTex }, tFleetPos: { value: levels[0].pos }, tFleetMeta: { value: levels[0].meta }, uFleet: { value: fleetU }, uFleetForm: { value: 0 }, uFleetScale: { value: 1 }, uFleetBoat: { value: fleetAt }, uFleetRot: { value: fleetRot }, uFleetLift: { value: new THREE.Vector2(0, 12) }, uSmoke: { value: 0 }, uSmokeClk: { value: 0 }, uPaddle: { value: 0 }, uAnchor: { value: 0 }, uAnchorSide: { value: 1 }, uDepart: { value: 0 }, uFlowDep: { value: 0 }, uDepOn: { value: 0 }, uWaterFade: { value: 1 }, uFunnel: { value: shipU.funnel },
         uWave: { value: shipU.wave }, uSea: { value: shipU.sea }, uMotion: { value: shipU.motion }, uSail: { value: shipU.sail }, uClock: { value: shipU.clock }, uHull: { value: shipU.hull }, uMisc: { value: shipU.misc }, uSail2: { value: shipU.sail2 }, uBeam: { value: shipU.beam }, uRot0: { value: shipRot0 }, uBoat0: { value: shipAt0 }, uScale0: { value: 1 }, uSwell: { value: shipU.swell } });
     const velVar = gpu.addVariable('tVel', SIM_VEL, vel0), posVar = gpu.addVariable('tPos', SIM_POS, pos0);
     gpu.setVariableDependencies(velVar, [posVar, velVar]); gpu.setVariableDependencies(posVar, [posVar, velVar]);
     const velU = velVar.material.uniforms, posU = posVar.material.uniforms;
     Object.assign(velU, { tHome: { value: home }, uDelta: { value: 0 }, uCurl: { value: pcfg.pCurl }, uReturn: { value: pcfg.pReturn }, uDamp: { value: pcfg.pDamp }, uPull: { value: pcfg.pPull }, uRadius: { value: pcfg.pRadius }, uScroll: { value: 0 }, uH: { value: H }, uW: { value: 20 }, uDrift: { value: new THREE.Vector2() }, uRocket: { value: 0 }, uCam: { value: new THREE.Vector3() }, uDir: { value: new THREE.Vector3(0, 0, -1) } }, boatU());
     Object.assign(posU, { tHome: { value: home }, uDelta: { value: 0 }, uScroll: { value: 0 }, uH: { value: H }, uW: { value: 20 }, uDrift: { value: new THREE.Vector2() } }, boatU());   // the position step needs the field's offset for the wake trail
-    const err = gpu.init(); if (err) { console.warn('work-spine: particle layer', err); gl.dispose(); canvas.remove(); return; }
+    const err = gpu.init(); if (err) { console.warn('work-spine: particle layer', err); gl.dispose(); canvas.remove(); lottieFallback(); return; }
     const geo = new THREE.BufferGeometry(), ref = new Float32Array(COUNT * 2), sz = new Float32Array(COUNT);
     for (let i = 0; i < COUNT; i++) { ref[i * 2] = ((i % N) + 0.5) / N; ref[i * 2 + 1] = (Math.floor(i / N) + 0.5) / N; sz[i] = Math.random() < 0.015 ? 1.4 + Math.random() * 0.5 : 0.5 + Math.random() * 0.5; }
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(COUNT * 3), 3));
@@ -877,8 +870,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
     }
     // the hero's sea (js/voyage-fold.js): drawn before the particles; its risen sheet hides the field's stars behind it
     const fold = FOLD && shipOn ? FOLD.createFold(THREE, { scene, pixelRatio: Math.min(devicePixelRatio || 1, 2), light: coarse }) : null;
-    // silk in the armada's ending: the ships' wakes, or the band of silk they ride (reads the fleet's uniforms by reference)
-    const armadaSilk = FOLD && FOLD.createArmadaSilk && shipOn && pcfg.silkArmada !== 'off' ? FOLD.createArmadaSilk(THREE, { scene, style: pcfg.silkArmada, count: ARMADA_K, copies: fleetU, rot: fleetRot, at: fleetAt, lift: U.uFleetLift.value, light: coarse }) : null;
+    if (!fold) lottieFallback();   // no sea to replace the hero's animation: fetch it after all
     const lottieHost = document.querySelector('.hero-wrapper dotlottie-player');
     let visW = 1, visH = 1;
     // constellation lines between recruited stars: vertices sample the live position texture, so the lines follow the particles
@@ -1407,6 +1399,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         let foldW = 0, foldAmt = 1, foldK = 1, foldTheta = 0, silkW = 0;
         if (fold) {
             const portrait = VH > innerWidth, on = !portrait || pcfg.foldPortrait > 0, h0 = ship.keys[0].k;
+            if (!on) lottieFallback();   // this frame keeps the Lottie (a phone with data-fold-portrait="0"), so it has to exist
             if (portrait !== ship.foldPortraitNow) {   // the sea reshaped for the frame it is in (FOLD.PORTRAIT), and back if the phone is turned
                 ship.foldPortraitNow = portrait;
                 const PF = FOLD.PORTRAIT, o = {}; for (const k in PF) o[k] = portrait ? PF[k] : FOLD.DEFAULTS[k];   // (PF, not P: P is the route's pose here)
@@ -1567,18 +1560,10 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         const tall = VH > innerWidth, unit = (tall ? ARMADA_VIEW.tall : ARMADA_VIEW.wide).unit || Math.max(0.4, Math.min(1, visW / 12));   // on a narrow screen the ranks close up and the hulls shrink
         const AW = launch ? armadaWin(tall, unit) : null, RUN0 = AW ? AW.s0 : 0, RUNLEN = AW ? AW.len : ARMADA_LOOP; ship.armadaWin = AW;   // world units along the course: both ends out of the frame for this screen
         const fTex = launch ? armadaTex : fleetTex; if (U.tFleet.value !== fTex) for (const u of ALLU) u.tFleet.value = fTex;
-        // the silk road (silkArmada="weave"): the ships ride its surface, lifted and tilted by it, so the armada sails up the shape into the distance
-        const rideSilk = launch && armadaSilk && armadaSilk.style === 'weave' && pcfg.silkRide > 0 ? armadaSilk : null;
-        const gather = rideSilk ? rideSilk.opts.gather : 1;   // riding the road the fleet closes up across the course into a procession along it (armadaWin still measures the open scatter, so a ship can only wrap later than it must, never sooner)
-        if (armadaSilk && launch) armadaSilk.setRun(RUN0, RUNLEN, -5.8 * unit * gather, 3.2 * unit * gather);   // the ARMADA scatter's reach across the course: the road is laid a margin wider than that
         for (let k = 0; k < ARMADA_K; k++) {
-            if (!rideSilk) fleetTilt[k].set(0, 0, 0, 0);
             if (launch) {   // the armada: along the course, wrapping out of the frame at both ends; each ship surges and drifts on its own clock
                 const A = ARMADA[k], h = A[3], rel = ((A[0] * RUNLEN / ARMADA_LOOP + t * ARMADA_SPEED) % RUNLEN + RUNLEN) % RUNLEN;
-                const ax = RUN0 + rel + 0.45 * Math.sin(t * (0.05 + 0.04 * h) + 6.283 * h), az = (A[1] * unit + 0.08 * Math.sin(t * (0.04 + 0.04 * h) + 4.1 * h)) * gather;
-                const R = rideSilk ? rideSilk.rideAt(ax, az, t) : null, rs = pcfg.silkRide;
-                fleetU[k].set(ax, 0.02 * Math.sin(t * (0.8 + 0.3 * h) + 9 * h) + (R ? R.y * rs : 0), az, Math.max(0.001, A[2] * unit * fsz));
-                if (R) fleetTilt[k].set(M.clamp(R.bank * rs, -0.35, 0.35), M.clamp(R.pitch * rs, -0.3, 0.3), 0, 0);   // capped: a ship leans into the silk, it never capsizes on it
+                fleetU[k].set(RUN0 + rel + 0.45 * Math.sin(t * (0.05 + 0.04 * h) + 6.283 * h), 0.02 * Math.sin(t * (0.8 + 0.3 * h) + 9 * h), A[1] * unit + 0.08 * Math.sin(t * (0.04 + 0.04 * h) + 4.1 * h), Math.max(0.001, A[2] * unit * fsz));
             } else if (k >= FLEET_K) fleetU[k].set(0, 0, 0, 0.001);
             else {
                 const F = FLEET_POS[k], wob = 0.06 * Math.sin(t * (0.19 + 0.02 * k) + k);
@@ -1597,7 +1582,6 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         let clipTop = 1e9;   // above the page the canvas draws only from the block's top edge down (below it the block's own ground; above it the page covers the canvas anyway)
         if (ship.overlay) { const sel = /^(.+):(top|center|bottom)@/.exec(pcfg.shipOverlayAt || ''), el = sel ? document.querySelector(sel[1]) : null; if (el) { const cTop = canvas.getBoundingClientRect().top, eTop = el.getBoundingClientRect().top, cssH = VH + pinnedExtra; clipTop = Math.max(0, cssH - (eTop - cTop)) * (canvas.height / Math.max(1, cssH)); } }   // the block's top edge in the canvas's own coordinates (both rects from the same layout, so it holds still while scrolling)
         U.uClipTop.value = clipTop; for (const o of WIRES) o.material.uniforms.uClipTop.value = clipTop; for (const o of SILKS_ALL) o.material.uniforms.uClipTop.value = clipTop;
-        if (armadaSilk) armadaSilk.update({ visible: launch, t, scale: U.uFleetScale.value, clipTop });
         const fleetForm = M.clamp(P.fleet, 0, 4) * M.clamp(pcfg.shipFleet, 0, 1);
         for (const u of ALLU) u.uFleetForm.value = fleetForm;
         const smoke = BOAT && BOAT.SMOKE ? tbl(BOAT.SMOKE) * (1 - rocketMix) : 0, FN = BOAT && BOAT.FUNNELS;   // funnel smoke and the funnels' tops, mixed between the two levels
@@ -1672,7 +1656,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         mat.blending = pale > 0.3 ? THREE.NormalBlending : THREE.AdditiveBlending; mat.needsUpdate = true;
         if (ship.overlay) canvas.style.mixBlendMode = light ? 'multiply' : 'screen';
         if (fold) {   // the hero sea: the picked colour's hue at the lab's saturation and lightness; the page's ground, which the wall's edges fade into
-            const c = new THREE.Color(), hsl = { h: 0, s: 0, l: 0 }; try { c.setStyle(foldColorKey() || '#1466B8'); } catch (e) { c.set(0x1466b8); } c.getHSL(hsl, THREE.SRGBColorSpace); fold.setHue(hsl.h); if (armadaSilk) armadaSilk.setHue(hsl.h);
+            const c = new THREE.Color(), hsl = { h: 0, s: 0, l: 0 }; try { c.setStyle(foldColorKey() || '#1466B8'); } catch (e) { c.set(0x1466b8); } c.getHSL(hsl, THREE.SRGBColorSpace); fold.setHue(hsl.h);
             let m = null; try { m = /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/.exec(getComputedStyle(document.body).backgroundColor || ''); } catch (e) {}
             if (m) fold.setGround(+m[1] / 255, +m[2] / 255, +m[3] / 255);
         }
@@ -1754,7 +1738,6 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
     layer = section.wsLayer = {
         theme: () => themeId, setTheme, themes: () => THEMES ? Object.keys(THEMES) : [],
         fold,   // the hero's sea (its uniforms are live: a dev aid for tuning in the console)
-        armadaSilk,   // the armada's silk wakes (uniforms live, the same dev aid)
         // retune the ship's silk cloth live, e.g. section.wsLayer.silkShip.set({ threads: 0.6, sheen: 1.5 }) (the keys of SILK_SHIP; K and hullK need a reload)
         silkShip: SILKS.length ? { opts: SILK_SHIP, set(p) { Object.assign(SILK_SHIP, p); for (const o of SILKS) for (const k in p) { const u = o.material.uniforms['u' + k[0].toUpperCase() + k.slice(1)]; if (u && typeof p[k] === 'number') u.value = p[k]; } applyTheme(); } } : null,
         // the armada's own cloth, retuned live, e.g. section.wsLayer.silkArmadaShips.set({ alpha: 1, sheen: 1.2 }) (the keys of SILK_ARMADA
@@ -1784,7 +1767,17 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
     };
 }
 
-if (section && !reduced && 'IntersectionObserver' in window) boot();
+// The hero's Lottie is now only a fallback. Its player is 124 KB over five files from two other origins, and since the sea replaced it — on phones
+// too — nobody who sees the sea ever needed any of it, so index.html no longer loads it: it is fetched here, and only for the visitors the sea will
+// not reach (reduced motion, no IntersectionObserver, no WebGL2, ?fold=0, data-fold-portrait="0" on a phone, or a module that failed to load).
+let lottieAsked = false;
+function lottieFallback() {
+    if (lottieAsked || !document.querySelector('.hero-wrapper dotlottie-player')) return;
+    lottieAsked = true;
+    import('https://unpkg.com/@dotlottie/player-component@2.7.12/dist/dotlottie-player.mjs').catch(e => console.warn('work-spine: the hero Lottie failed to load', e));   // it upgrades the <dotlottie-player> already in the hero
+}
+
+if (section && !reduced && 'IntersectionObserver' in window) boot(); else lottieFallback();
 
 async function boot() {
     const cards = [...section.querySelectorAll('.case-study-teaser')];
@@ -1802,6 +1795,7 @@ async function boot() {
         ]);
     } catch (err) {
         console.warn('work-spine: three.js did not load, keeping the flat list.', err);
+        lottieFallback();   // nothing of the voyage will run: the hero keeps its animation
         return;
     }
     try { GPUC = await import('three/addons/misc/GPUComputationRenderer.js'); } catch (e) { console.warn('work-spine: no GPU particles', e); }
@@ -1816,7 +1810,7 @@ async function boot() {
     }
     let FOLD = null;
     if (pcfg.fold && BOAT) { try { FOLD = await import('./voyage-fold.js' + MOD_V); } catch (e) { console.warn('work-spine: the hero sea failed to load (the Lottie stays)', e); } }
-    if (pcfg.mode === 'page') startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD);
+    if (pcfg.mode === 'page') startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD); else lottieFallback();
     if (FOLD && pcfg.silkBg > 0) FOLD.mountSilk(THREE, document.getElementById('scalability'), { style: pcfg.silkBgStyle, light: coarse, strength: pcfg.silkBg });   // the silk ground behind the principles (it starts drawing when the section comes near)
     if (layer && new URLSearchParams(location.search).get('route') === '1') import('./voyage-editor.js' + MOD_V).then(m => m.mountRouteEditor(layer.routeApi)).catch(e => console.warn('work-spine: route editor', e));
     if (cards.length < 2) return;
@@ -1919,6 +1913,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         });
     } catch (err) {
         console.warn('work-spine: WebGL unavailable, cards only.', err);
+        lottieFallback();   // no layer at all, so the hero keeps its animation
         gl = null;
         glCanvas.remove();
     }
@@ -1986,7 +1981,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         const velVar = gpu.addVariable('tVel', SIM_VEL, vel0), posVar = gpu.addVariable('tPos', SIM_POS, pos0);
         gpu.setVariableDependencies(velVar, [posVar, velVar]); gpu.setVariableDependencies(posVar, [posVar, velVar]);
         const velU = velVar.material.uniforms, posU = posVar.material.uniforms;
-        const noBoat = () => ({ tBoatA: { value: home }, tBoatB: { value: home }, tMetaA: { value: home }, tMetaB: { value: home }, uMix: { value: 0 }, uForm: { value: 0 }, uBoatScale: { value: 1 }, uBoat: { value: new THREE.Vector3() }, uRot: { value: new THREE.Matrix3() }, uTime: { value: 0 }, uRipple: { value: 0 }, uFlow: { value: 0 }, uSettle: { value: 0 }, uWay: { value: 0 }, uReflect: { value: 1 }, uStarT: { value: Array.from({ length: 12 }, () => new THREE.Vector4()) }, uN: { value: N }, uStarForm: { value: 0 }, uSnap: { value: 1.2 }, uSnapBoat: { value: 0 }, uSoft: { value: 0 }, uLoose: { value: 0 }, uSoftLane: { value: 0 }, uRotSea: { value: new THREE.Matrix3() }, uSeaD: { value: new THREE.Vector2(1, 0) }, uSqN: { value: new THREE.Vector3(0.970, 0, 0.242) }, uTrail: { value: 0 }, uTrailClk: { value: 0 }, uTrailClk0: { value: 0 }, tFleet: { value: home }, tFleetPos: { value: home }, tFleetMeta: { value: home }, uFleet: { value: Array.from({ length: 32 }, () => new THREE.Vector4()) }, uFleetTilt: { value: Array.from({ length: 32 }, () => new THREE.Vector4()) }, uFleetForm: { value: 0 }, uFleetScale: { value: 1 }, uFleetBoat: { value: new THREE.Vector3() }, uFleetRot: { value: new THREE.Matrix3() }, uFleetLift: { value: new THREE.Vector2(0, 12) }, uSmoke: { value: 0 }, uSmokeClk: { value: 0 }, uPaddle: { value: 0 }, uAnchor: { value: 0 }, uAnchorSide: { value: 1 }, uDepart: { value: 0 }, uFlowDep: { value: 0 }, uDepOn: { value: 0 }, uWaterFade: { value: 1 }, uFunnel: { value: new THREE.Vector4(0, 0, 0, 1) },
+        const noBoat = () => ({ tBoatA: { value: home }, tBoatB: { value: home }, tMetaA: { value: home }, tMetaB: { value: home }, uMix: { value: 0 }, uForm: { value: 0 }, uBoatScale: { value: 1 }, uBoat: { value: new THREE.Vector3() }, uRot: { value: new THREE.Matrix3() }, uTime: { value: 0 }, uRipple: { value: 0 }, uFlow: { value: 0 }, uSettle: { value: 0 }, uWay: { value: 0 }, uReflect: { value: 1 }, uStarT: { value: Array.from({ length: 12 }, () => new THREE.Vector4()) }, uN: { value: N }, uStarForm: { value: 0 }, uSnap: { value: 1.2 }, uSnapBoat: { value: 0 }, uSoft: { value: 0 }, uLoose: { value: 0 }, uSoftLane: { value: 0 }, uRotSea: { value: new THREE.Matrix3() }, uSeaD: { value: new THREE.Vector2(1, 0) }, uSqN: { value: new THREE.Vector3(0.970, 0, 0.242) }, uTrail: { value: 0 }, uTrailClk: { value: 0 }, uTrailClk0: { value: 0 }, tFleet: { value: home }, tFleetPos: { value: home }, tFleetMeta: { value: home }, uFleet: { value: Array.from({ length: 32 }, () => new THREE.Vector4()) }, uFleetForm: { value: 0 }, uFleetScale: { value: 1 }, uFleetBoat: { value: new THREE.Vector3() }, uFleetRot: { value: new THREE.Matrix3() }, uFleetLift: { value: new THREE.Vector2(0, 12) }, uSmoke: { value: 0 }, uSmokeClk: { value: 0 }, uPaddle: { value: 0 }, uAnchor: { value: 0 }, uAnchorSide: { value: 1 }, uDepart: { value: 0 }, uFlowDep: { value: 0 }, uDepOn: { value: 0 }, uWaterFade: { value: 1 }, uFunnel: { value: new THREE.Vector4(0, 0, 0, 1) },
             uWave: { value: new THREE.Vector4(0, 0.3, 0, 0.15) }, uSea: { value: new THREE.Vector4(0, 2.618, 0, 0) }, uMotion: { value: new THREE.Vector4() }, uSail: { value: new THREE.Vector4(1, 0, 0, 0) }, uClock: { value: new THREE.Vector4() }, uHull: { value: new THREE.Vector4(0.5, -0.5, 1, 0.02) }, uMisc: { value: new THREE.Vector4(-0.02, 0, 0, 1.6) }, uSail2: { value: new THREE.Vector4() }, uBeam: { value: new Float32Array(17) }, uRot0: { value: new THREE.Matrix3() }, uBoat0: { value: new THREE.Vector3() }, uScale0: { value: 1 }, uSwell: { value: new THREE.Vector4(1, 0, 0, 0) } });
         Object.assign(velU, { tHome: { value: home }, uDelta: { value: 0 }, uCurl: { value: cfg.pCurl }, uReturn: { value: cfg.pReturn }, uDamp: { value: cfg.pDamp }, uPull: { value: cfg.pPull }, uRadius: { value: cfg.pRadius }, uScroll: { value: 0 }, uH: { value: 1e5 }, uW: { value: 1e5 }, uDrift: { value: new THREE.Vector2() }, uRocket: { value: 0 }, uCam: { value: new THREE.Vector3() }, uDir: { value: new THREE.Vector3(0, 0, -1) } }, noBoat());
         Object.assign(posU, { tHome: { value: home }, uDelta: { value: 0 }, uScroll: { value: 0 }, uH: { value: 1e5 }, uW: { value: 1e5 }, uDrift: { value: new THREE.Vector2() } }, noBoat());

@@ -33,6 +33,7 @@ function start() {
         #ink-cursor { --ink: #4faad1; --ink-rim: rgba(0, 0, 0, 0.55); position: fixed; top: 0; left: 0; z-index: 2147483647; pointer-events: none;
             filter: url(#ink-goo) drop-shadow(0 0 1px var(--ink-rim)); opacity: 0; transition: opacity 0.25s ease; }
         #ink-cursor.is-shown { opacity: 1; }
+        #ink-cursor.is-shown.is-picking { opacity: 0; transition-duration: 0.12s; }
         #ink-cursor span { position: absolute; top: 0; left: 0; width: ${WIDTH}px; height: ${WIDTH}px; border-radius: 50%; transform-origin: center center; will-change: transform;
             background-color: var(--ink); transition: background-color 0.25s ease; }`;
     const cursor = document.createElement('div');
@@ -96,13 +97,30 @@ function start() {
     });
 
     const goIdle = () => { idle = true; for (const d of dots) { d.lockX = d.x; d.lockY = d.y; d.angleX = Math.PI * 2 * Math.random(); d.angleY = Math.PI * 2 * Math.random(); } };
-    addEventListener('mousemove', e => {
+    // pointermove, not mousemove: a pointerdown handler that calls preventDefault (the colour picker's does) stops the mouse events for the drag
+    addEventListener('pointermove', e => {
+        if (e.pointerType !== 'mouse') return;
         mouse.x = e.clientX - WIDTH / 2; mouse.y = e.clientY - WIDTH / 2;
+        if (picking) return;
         if (!cursor.classList.contains('is-shown')) { for (const d of dots) { d.x = mouse.x; d.y = mouse.y; } recolor(); cursor.classList.add('is-shown'); }   // first move: the ink appears where the pointer is, already in its colour
         idle = false; clearTimeout(idleTimer); idleTimer = setTimeout(goIdle, IDLE_MS);
         hoverT = e.target instanceof Element && e.target.closest(INTERACTIVE) ? 1.55 : 1;
         queueRecolor();
     }, { passive: true });
+    // while dragging on the colour picker the ink steps aside, so its own dot is what the eye follows; on release it reappears at the pointer
+    let picking = false;
+    addEventListener('pointerdown', e => {
+        if (e.pointerType !== 'mouse' || !(e.target instanceof Element) || !e.target.closest('#color-picker-container .hitbox')) return;
+        picking = true; cursor.classList.add('is-picking');
+    }, { capture: true, passive: true });
+    const endPicking = () => {
+        if (!picking) return;
+        picking = false; for (const d of dots) { d.x = mouse.x; d.y = mouse.y; }
+        idle = false; clearTimeout(idleTimer); idleTimer = setTimeout(goIdle, IDLE_MS);
+        cursor.classList.remove('is-picking'); queueRecolor();
+    };
+    addEventListener('pointerup', endPicking, { capture: true, passive: true });
+    addEventListener('pointercancel', endPicking, { capture: true, passive: true });
     document.addEventListener('mouseleave', () => cursor.classList.remove('is-shown'));
     document.addEventListener('mouseenter', () => cursor.classList.add('is-shown'));
 

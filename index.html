@@ -35,7 +35,9 @@
         "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
     } }
     </script>
-    <script src="https://unpkg.com/@dotlottie/player-component@2.7.12/dist/dotlottie-player.mjs" type="module"></script>
+    <!-- The dotLottie player is NOT loaded here any more. The hero's sea (js/work-spine.js) replaced the one Lottie left on this page, so the
+         player's 124 KB over five files from two other origins would be fetched on every visit for something almost nobody sees. work-spine.js
+         imports it only when the sea will not run (reduced motion, no WebGL2, ?fold=0, ...) — see lottieFallback() there. -->
 </head>
 <body>
 
