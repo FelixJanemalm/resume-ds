@@ -120,6 +120,12 @@
   color: #fff;
   z-index: 1;
   overflow: hidden;
+  transition: padding-bottom 0.4s ease-in-out;
+}
+/* Open card loses the chevron's 12px bottom margin, so the body text would sit
+   tighter to the card edge than the collapsed title did — give it back a little. */
+.card-wrapper .item.active .item-desc {
+  padding-bottom: 16px;
 }
 
 /* Body text hidden when collapsed, revealed on active. max-height drives the
@@ -223,6 +229,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .card-wrapper .item,
+  .card-wrapper .item-desc,
   .card-wrapper .item-desc p,
   .card-wrapper .item-desc h3::after {
     transition-duration: 0.01s !important;
@@ -343,6 +350,9 @@
   }
   .card-wrapper .item-desc {
     padding: 0 14px 5px;
+  }
+  .card-wrapper .item.active .item-desc {
+    padding-bottom: 9px;
   }
   .card-wrapper .item-desc h3::after {
     width: 6px;
