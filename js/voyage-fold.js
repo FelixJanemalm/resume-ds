@@ -472,7 +472,7 @@ const ARMADA_SILK_FS = SNOISE2 + `
 
 export const ARMADA_SILK = {   // world units and radians in the fleet's frame (a hull is about one unit long); the wake's lengths are in hull lengths
     wake: { len: 9, half0: 0.12, spread: 0.42, arc: 0.3, rollA: 1.1, rollB: 0.06, twistAt: 0.34, twistSpan: 0.3, ripple: 0.05, swirl: 0.08,
-        threadFreq: 34, threads: 0.7, sheen: 1.15, gain: 0.42, flow: 0.55, grain: 1, edge: 0.06, shade: 0.55 },
+        threadFreq: 34, threads: 0.7, sheen: 1.15, gain: 0.62, flow: 0.55, grain: 1, edge: 0.06, shade: 0.55 },   // gain: as strong as the wakes can be read against the testimonial's text (0.8 and up starts to swamp it)
     weave: { climb: 4, climbA: 0.12, climbB: 0.92, bank: 1.05, bankA: 0.1, amp: 0.1, freq: 0.9, speed: 0.5, meander: 0.35, wave: 0.12, curl: 3, margin: 2.4, taper: 1, fade0: 0.03, fade1: 0.92,
         gather: 0.2, ride: 1, rideBank: 0.4, threadFreq: 55, threads: 0.6, sheen: 1.5, gain: 0.24, flow: 0.25, grain: 1, edge: 0.05, shade: 0.5 },   // gather: how far the armada's scatter closes up across the course, so the fleet sails the road in procession and the road can be a band with edges instead of a sea; ride: how much of its lie the ships take; rideBank: how much of its bank in particular (the road can twist far more than a fleet can lean)
 };
