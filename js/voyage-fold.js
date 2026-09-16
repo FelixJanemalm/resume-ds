@@ -24,10 +24,20 @@ export const DEFAULTS = {
     amp: 0.16, lambda: 3.6, speed: 0.45, amp2: 0.05, lambda2: 2.2, dir2: 35,
     bands: 2, bandPow: 2.5, strand: 0.25, strandFreq: 18, sheen: 0.55, sheenPow: 3.5, light: 0.45, grain: 1,
     solidA: 2, solidB: 30, lineGain: 0.55, lineWidth: 1.1, lineFar: 26, dotGain: 1.1, dotOnSolid: 0.25, dotPx: 2, dotFar: 30,
+    smoothN: 1, fanSoft: 0.9,   // shade the sheet from its own normal rather than the screen-space derivative of the mesh (0 = flat-shaded, as it was); how gently the fan eases into its limits, in across/12 units (0 = the hard clamp it had)
 };
 
 const SEA = `
     uniform float uTime, uFold, uX0, uR, uPhiMax, uFan, uAxis, uBend, uAmp, uLambda, uSpeed, uAmp2, uLambda2, uDir2, uFoldDamp;
+    uniform float uFanSoft;
+    /* the fan's widening, held between its limits. A clamp has a corner at each end: dR/d(across) drops to zero in one step, so the curl radius
+       stops widening abruptly and the sheet creases along a line of constant across, which runs along the swell and so straight across the bands,
+       where it shades as a dark streak down the wall. These two polynomial joins reach the same limits over uFanSoft instead, and return x exactly
+       outside the join, so the fan keeps the shape it was tuned to. */
+    float smax2(float a, float b, float k){ float h = clamp(0.5 + 0.5 * (a - b) / k, 0.0, 1.0); return mix(b, a, h) + k * h * (1.0 - h); }
+    float fanAt(float across){ float x = across / 12.0;
+      if (uFanSoft < 0.001) return clamp(x, -0.9, 3.0);
+      return -smax2(-smax2(x, -0.9, uFanSoft), -3.0, uFanSoft); }
     uniform vec3 uAt; uniform mat3 uRot; uniform float uK; uniform vec2 uS, uFlow;
     /* the run: distance along the swell's travel, measured from a crescent (bend), so the bands are arcs round the fold */
     float runOf(vec2 xz, out float across){ vec2 d = vec2(cos(uAxis), sin(uAxis)); across = dot(xz, vec2(-d.y, d.x)); return dot(xz, d) - uBend * across * across * 0.1; }
@@ -44,7 +54,7 @@ const SEA = `
       float s = runOf(xz, across) - uX0, h = swellH(xz, uTime, q);
       phi = 0.0; beyond = 0.0; n = vec3(0.0, 1.0, 0.0); p = vec3(xz.x, 0.0, xz.y);
       if (s > 0.0 && uFold > 0.001) {
-        float R = max(0.5, uR * (1.0 + uFan * clamp(across / 12.0, -0.9, 3.0))) / uFold, pm = uPhiMax * uFold, along, up;
+        float R = max(0.5, uR * (1.0 + uFan * fanAt(across))) / uFold, pm = uPhiMax * uFold, along, up;
         if (s < R * pm) { phi = s / R; along = R * sin(phi); up = R * (1.0 - cos(phi)); }
         else { phi = pm; beyond = s - R * pm; along = R * sin(pm) + beyond * cos(pm); up = R * (1.0 - cos(pm)) + beyond * sin(pm); }
         p.xz = xz - d * s + d * along; p.y = up;
@@ -64,12 +74,19 @@ const SWELL_NORMAL = `
       return normalize(vec3(-hx / (2.0 * e), 1.0, -hz / (2.0 * e))); }`;
 
 const SHEET_VS = SEA + SWELL_NORMAL + `
-    uniform float uGlint; varying vec3 vW, vN; varying float vQ, vPhi, vAcross, vBeyond;
+    uniform float uGlint, uSmoothN; varying vec3 vW, vN, vNs; varying float vQ, vPhi, vAcross, vBeyond;
     void main(){
       vec3 p, n; float q, phi, across, beyond;
       deform(position, p, n, q, phi, across, beyond);
       vW = p; vQ = q; vPhi = phi; vAcross = across; vBeyond = beyond;
       vN = uGlint > 0.0 ? swellNormal(position.xz) : n;
+      /* the surface's own normal, from two more points on the deformed sheet. The fragment shader's screen-space derivative is constant over a
+         whole triangle, so it flat-shades the wall and bands it into facets wherever the sheet's cells change size. */
+      vNs = n;
+      if (uSmoothN > 0.5) { float e = 0.06; vec3 pa, pb, nn; float qq, pp, aa, bb;
+        deform(position + vec3(e, 0.0, 0.0), pa, nn, qq, pp, aa, bb);
+        deform(position + vec3(0.0, 0.0, e), pb, nn, qq, pp, aa, bb);
+        vNs = normalize(cross(pb - p, pa - p)); }
       gl_Position = project(viewMatrix * vec4(toWorld(p), 1.0)); }`;
 
 /* shaded in the lab's own space (uCam, uCamFwd: the layer's camera mapped into it), so the light, the sheen and every fade are the lab's */
@@ -77,13 +94,14 @@ const SHEET_FS = `
     uniform vec3 uColor, uCam, uCamFwd, uGround; uniform float uTime, uBands, uBandPow, uHueDrift, uEdge, uFloor, uStrand, uStrandFreq, uSheen, uSheenPow, uLight, uGrain;
     uniform float uLineGain, uLineWidth, uLineFar, uWallDark, uFarDark, uPhiMax, uFold, uBaseGlow, uVis, uLines, uSolidA, uSolidB, uFarA, uFarB, uFogA, uLipLen, uLipSoft, uNearA, uNearB;
     uniform float uGlint; uniform vec3 uSun;
-    varying vec3 vW, vN; varying float vQ, vPhi, vAcross, vBeyond;
+    uniform float uSmoothN;
+    varying vec3 vW, vN, vNs; varying float vQ, vPhi, vAcross, vBeyond;
     vec3 hueShift(vec3 c, float a){ vec3 g = vec3(0.57735); vec3 pr = g * dot(g, c); vec3 U = c - pr; vec3 V = cross(g, U); return U * cos(a) + V * sin(a) + pr; }
     float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
     float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
       return mix(mix(hash12(i), hash12(i + vec2(1.0, 0.0)), f.x), mix(hash12(i + vec2(0.0, 1.0)), hash12(i + 1.0), f.x), f.y); }
     void main(){
-      vec3 N = normalize(cross(dFdx(vW), dFdy(vW)));
+      vec3 N = uSmoothN > 0.5 ? normalize(vNs) : normalize(cross(dFdx(vW), dFdy(vW)));
       float qb = vQ * uBands, t = fract(qb), fw = fwidth(qb);
       vec2 sp = vec2(vAcross * uStrandFreq, vQ * 1.5); float sAA = 1.0 - smoothstep(0.35, 1.0, length(fwidth(sp)));   /* no strands where they would alias */
       float dist = length(uCam - vW);
@@ -170,7 +188,7 @@ export function createFold(THREE, { scene, pixelRatio = 1, light = false, dots: 
         uX0: { value: o.x0 }, uR: { value: o.R }, uPhiMax: { value: o.phiMax * R }, uFan: { value: o.fan }, uAxis: { value: o.axis * R }, uBend: { value: o.bend }, uFoldDamp: { value: o.foldDamp },
         uAmp: { value: o.amp }, uLambda: { value: o.lambda }, uSpeed: { value: o.speed }, uAmp2: { value: o.amp2 }, uLambda2: { value: o.lambda2 }, uDir2: { value: o.dir2 * R },
         uColor: { value: new THREE.Color() }, uBands: { value: o.bands }, uBandPow: { value: o.bandPow }, uHueDrift: { value: o.hueDrift * R }, uEdge: { value: o.edge }, uFloor: { value: o.floor }, uBaseGlow: { value: o.baseGlow },
-        uStrand: { value: o.strand }, uStrandFreq: { value: o.strandFreq }, uSheen: { value: o.sheen }, uSheenPow: { value: o.sheenPow }, uLight: { value: o.light }, uGrain: { value: o.grain },
+        uStrand: { value: o.strand }, uStrandFreq: { value: o.strandFreq }, uSheen: { value: o.sheen }, uSheenPow: { value: o.sheenPow }, uLight: { value: o.light }, uGrain: { value: o.grain }, uSmoothN: { value: o.smoothN }, uFanSoft: { value: o.fanSoft },
         uWallDark: { value: o.wallDark }, uFarDark: { value: o.farDark }, uSolidA: { value: o.solidA }, uSolidB: { value: o.solidB }, uFarA: { value: o.farA }, uFarB: { value: o.farB }, uFogA: { value: o.fogA },
         uLipLen: { value: o.lipLen }, uLipSoft: { value: o.lipSoft }, uSpray: { value: o.spray }, uSprayLen: { value: o.sprayLen }, uNearA: { value: o.nearA }, uNearB: { value: o.nearB },
         uLineGain: { value: o.lineGain }, uLineWidth: { value: o.lineWidth }, uLineFar: { value: o.lineFar },
