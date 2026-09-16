@@ -373,6 +373,11 @@ cursor: grabbing;
 
 /* Media query for mobile devices (up to 767px) */
 @media (max-width: 767px) {
+    /* the interactive grid is desktop-only; grid.js removes the canvas at this
+       same breakpoint, this keeps it from flashing before the script runs */
+    #grid {
+        display: none;
+    }
     .hero {
         flex-direction: column;
     }

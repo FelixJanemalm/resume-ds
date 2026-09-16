@@ -1,5 +1,22 @@
 document.addEventListener("DOMContentLoaded", function () {
+  // cards.css reads --scroll for its parallax, so this runs on every device.
+  document.addEventListener("scroll", () => {
+      document.documentElement.style.setProperty("--scroll", window.scrollY + "px");
+  });
+
   const canvas = document.getElementById('grid');
+  if (!canvas) return;
+
+  // Phones get no grid at all: the canvas is hidden in hero.css at the same
+  // breakpoint, and without a hover pointer the distortion is unreachable anyway.
+  const isMobile = window.matchMedia('(max-width: 767px)').matches
+      || window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+
+  if (isMobile) {
+      canvas.remove();
+      return;
+  }
+
   const ctx = canvas.getContext('2d');
 
   function getGridColor() {
@@ -38,69 +55,60 @@ document.addEventListener("DOMContentLoaded", function () {
     ctx.stroke();
   }
 
-  document.addEventListener("scroll", () => {
-      document.documentElement.style.setProperty("--scroll", window.scrollY + "px");
-  });
+  const distortionStrength = 5.6;
+  const falloffFactor = 0.0025;
 
-  // Detect mobile device
-  const isMobile = /Mobi|Android|iPhone|iPad|iPod/.test(navigator.userAgent);
-  
-  if (!isMobile) {
-      const distortionStrength = 5.6;
-      const falloffFactor = 0.0025;
+  function distortGrid(mouseX, mouseY) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.beginPath();
 
-      function distortGrid(mouseX, mouseY) {
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.beginPath();
-
-          for (let y = 0; y <= canvas.height; y += gridSize) {
-              let startNewLine = true;
-              for (let x = 0; x <= canvas.width; x += gridSize) {
-                  const dx = mouseX - x;
-                  const dy = mouseY - y;
-                  const dist = Math.sqrt(dx * dx + dy * dy) + 0.0001;
-                  const falloff = Math.exp(-dist * falloffFactor);
-                  const offsetY = (dy / dist) * distortionStrength * falloff;
-
-                  if (startNewLine) {
-                      ctx.moveTo(x, y + offsetY);
-                      startNewLine = false;
-                  } else {
-                      ctx.lineTo(x, y + offsetY);
-                  }
-              }
-          }
-
+      for (let y = 0; y <= canvas.height; y += gridSize) {
+          let startNewLine = true;
           for (let x = 0; x <= canvas.width; x += gridSize) {
-              let startNewLine = true;
-              for (let y = 0; y <= canvas.height; y += gridSize) {
-                  const dx = mouseX - x;
-                  const dy = mouseY - y;
-                  const dist = Math.sqrt(dx * dx + dy * dy) + 0.0001;
-                  const falloff = Math.exp(-dist * falloffFactor);
-                  const offsetX = (dx / dist) * distortionStrength * falloff;
+              const dx = mouseX - x;
+              const dy = mouseY - y;
+              const dist = Math.sqrt(dx * dx + dy * dy) + 0.0001;
+              const falloff = Math.exp(-dist * falloffFactor);
+              const offsetY = (dy / dist) * distortionStrength * falloff;
 
-                  if (startNewLine) {
-                      ctx.moveTo(x + offsetX, y);
-                      startNewLine = false;
-                  } else {
-                      ctx.lineTo(x + offsetX, y);
-                  }
+              if (startNewLine) {
+                  ctx.moveTo(x, y + offsetY);
+                  startNewLine = false;
+              } else {
+                  ctx.lineTo(x, y + offsetY);
               }
           }
-
-          ctx.lineWidth = 1;
-          ctx.strokeStyle = gridColor;
-          ctx.stroke();
       }
 
-      canvas.addEventListener('mousemove', (event) => {
-          distortGrid(event.offsetX, event.offsetY);
-      });
+      for (let x = 0; x <= canvas.width; x += gridSize) {
+          let startNewLine = true;
+          for (let y = 0; y <= canvas.height; y += gridSize) {
+              const dx = mouseX - x;
+              const dy = mouseY - y;
+              const dist = Math.sqrt(dx * dx + dy * dy) + 0.0001;
+              const falloff = Math.exp(-dist * falloffFactor);
+              const offsetX = (dx / dist) * distortionStrength * falloff;
 
-      canvas.addEventListener('mouseout', drawGrid);
+              if (startNewLine) {
+                  ctx.moveTo(x + offsetX, y);
+                  startNewLine = false;
+              } else {
+                  ctx.lineTo(x + offsetX, y);
+              }
+          }
+      }
+
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = gridColor;
+      ctx.stroke();
   }
-  
+
+  canvas.addEventListener('mousemove', (event) => {
+      distortGrid(event.offsetX, event.offsetY);
+  });
+
+  canvas.addEventListener('mouseout', drawGrid);
+
   function observeColorChanges() {
       const observer = new MutationObserver(() => {
           const newColor = getGridColor();
