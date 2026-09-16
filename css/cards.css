@@ -38,11 +38,35 @@
     text-align: center
 }
 
-.card-wrapper .owl-stage {
+/* The rail: the browser's own horizontal scroller, in place of Owl Carousel's transformed stage. Snapping is
+   `proximity`, not `mandatory`, so a card wider than the viewport can still be scrolled past; the open card is
+   brought to the head by js/cards.js. overflow-x makes the other axis scrollable too, whatever it is set to, so the
+   top padding is the headroom a card needs when it lifts and scales on hover — without it the lift is clipped. */
+.card-wrapper .card-rail {
   margin: 15px 0;
   display: flex;
   display: -webkit-flex;
-  padding-left: 30px;
+  padding: 18px 0 0 30px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+.card-wrapper .card-rail::-webkit-scrollbar { display: none; }
+@media (prefers-reduced-motion: reduce) { .card-wrapper .card-rail { scroll-behavior: auto; } }
+/* the cards answer the keyboard now (js/cards.js gives them tabindex and a button role), so they have to show where
+   focus is; :focus-visible keeps the ring off a mouse click, which would otherwise leave it on the card you just opened */
+.card-wrapper .item:focus-visible {
+  outline: 2px solid var(--primary-color, #4faad1);
+  outline-offset: 3px;
+}
+.card-wrapper .card-rail > .item {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  scroll-margin-left: 30px;
 }
 .card-wrapper .item {
   margin: 0 15px 60px;
@@ -166,16 +190,16 @@
     transform: translateY(-3px);
   }
 
-  .card-wrapper .owl-item:has(.item:not(.active):hover) ~ .owl-item .item {
+  .card-wrapper .item:not(.active):hover ~ .item {
     transform: translateX(10px);
   }
-  .card-wrapper .owl-item:has(.item:not(.active):hover) + .owl-item .item {
+  .card-wrapper .item:not(.active):hover + .item {
     transform: translateX(14px);
   }
-  .card-wrapper .owl-item:has(~ .owl-item .item:not(.active):hover) .item {
+  .card-wrapper .item:has(~ .item:not(.active):hover) {
     transform: translateX(-10px);
   }
-  .card-wrapper .owl-item:has(+ .owl-item .item:not(.active):hover) .item {
+  .card-wrapper .item:has(+ .item:not(.active):hover) {
     transform: translateX(-14px);
   }
 
@@ -205,13 +229,13 @@
     transition-delay: 0s !important;
   }
   .card-wrapper .item:hover,
-  .card-wrapper .owl-item .item {
+  .card-wrapper .card-rail .item {
     transform: none !important;
   }
 }
 
 /* Looping pulse on the next card — only until user opens another card (see js/cards.js + .card-wrapper--hint-dismissed) */
-.card-wrapper:not(.card-wrapper--hint-dismissed) .owl-item:has(.item.active) + .owl-item .item:not(.active)::after {
+.card-wrapper:not(.card-wrapper--hint-dismissed) .item.active + .item:not(.active)::after {
   animation: card-pulse 2.2s ease-in-out infinite;
 }
 @media (hover: hover) {
@@ -228,25 +252,46 @@
     box-shadow: inset 0 0 0 2px var(--primary-color, hsl(200, 100%, 50%));
   }
 }
-.card-wrapper .owl-theme.custom-carousel .owl-dots {
+.card-wrapper .card-dots {
   margin-top: -20px;
   position: relative;
   z-index: 5;
+  display: flex;
+  justify-content: center;
+  gap: 4px;
 }
-
-.card-wrapper .owl-theme.custom-carousel .owl-dots .owl-dot {
-    width: 24px;
-    position: relative;
-  }
+.card-wrapper .card-dot {
+  width: 24px;
+  height: 20px;
+  position: relative;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  appearance: none;
+}
+.card-wrapper .card-dot::before {
+  content: "";
+  display: block;
+  width: 10px;
+  height: 10px;
+  margin: 5px auto;
+  border-radius: 50%;
+  background: #d6d6d6;
+  transition: background-color 0.25s ease, transform 0.25s ease;
+}
+.card-wrapper .card-dot.is-on::before { background: #869791; transform: scale(1.1); }
+@media (hover: hover) { .card-wrapper .card-dot:hover::before { background: #869791; } }
+.card-wrapper .card-dot:focus-visible::before { outline: 2px solid var(--primary-color, #4faad1); outline-offset: 3px; }
 
 /***** responsive css Start ******/
 
 @media (min-width: 1830px) {
 
-    .card-wrapper .owl-stage {
-        margin: auto;
+    .card-wrapper .card-rail {
+        justify-content: center;
     }
-    .owl-dots {
+    .card-wrapper .card-dots {
         display: none;
     }
     .card-wrapper h2 {
@@ -304,7 +349,8 @@
     height: 6px;
     margin-top: 4px;
   }
-  .card-wrapper .owl-stage {
+  .card-wrapper .card-rail {
     padding-left: 20px;
   }
+  .card-wrapper .card-rail > .item { scroll-margin-left: 20px; }
 }
