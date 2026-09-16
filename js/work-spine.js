@@ -77,7 +77,7 @@ const pcfg = section ? {
     foldSway: numAttr(section.dataset.foldSway, 0.3),                      // the share of the scene's slow sway (at anchor) the hero sea takes; the ship always takes all of it
     silk: numAttr(section.dataset.silk, 0),                                // 1 = the fold's silk lines stay as the sea the ship sails on down the page (streaming past it with its way); 0 = they fade out into the work section (Felix, 2026-09-15)
     silkGoneAt: section.dataset.silkGoneAt || 'stage-pin',                 // the scroll mark by which the silk lines have faded out (from foldFadeAt), as the work section pins
-    silkArmada: section.dataset.silkArmada || 'wake',                      // silk in the armada's ending: 'wake' (every ship trails a silk wake, the ripple it opens) | 'weave' (the armada rides one band of silk into the distance, a test) | 'off'
+    silkArmada: section.dataset.silkArmada || 'off',                       // silk sheets in the armada's ending, over the ships' own particle wakes: 'off' (Felix, 2026-09-15: the plain wake) | 'wake' (every ship trails a silk wake, the ripple it opens) | 'weave' (the armada rides one band of silk into the distance)
     silkRide: numAttr(section.dataset.silkRide, 1),                        // with 'weave': how much of the silk road's lie the ships take (1 = they sit on its surface and tilt with it, sailing up it into the distance; 0 = they sail the flat sea under it)
     silkBg: numAttr(section.dataset.silkBg, 1),                            // the animated silk ground of the principles section (#scalability): its strength (1 = full); 0 = none
     silkBgStyle: section.dataset.silkBgStyle || 'ribbon',                  // that ground: 'ribbon' (the Stripe-style silk ribbon) | 'beach' (the silk sea seen from the shore)
@@ -89,7 +89,7 @@ const pcfg = section ? {
 if (pcfg) for (const [k, v] of new URLSearchParams(location.search)) if (k in pcfg && v !== '') pcfg[k] = Number.isNaN(+v) ? v : +v;   // dev aid: ?shipWorkTilt=45&boat=off
 let layer = null;
 const THEME_ROW = false;   // the ship-style icon row under the colour picker (and the stored choice it writes): off for now
-const MOD_V = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '?t=' + Date.now() : '?v=2026-09-15i';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache): never cached on a local server, versioned elsewhere (bump when they change)
+const MOD_V = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '?t=' + Date.now() : '?v=2026-09-15j';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache): never cached on a local server, versioned elsewhere (bump when they change)
 import('./ink-cursor.js' + MOD_V).catch(e => console.warn('ink cursor', e));   // the pointer as a trail of ink in the picked colour (it checks for a real mouse and reduced motion itself)
 
 const SIM_NOISE = `
