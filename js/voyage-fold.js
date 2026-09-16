@@ -397,6 +397,11 @@ export function mountSilk(THREE, host, { style = 'ribbon', colorVar = '--primary
    selvedges rolling up into the light outside the ships' own band — and the armada rides its surface (rideAt mirrors the same shape in JS, so the
    ships are lifted and tilted by the silk they sail on). Both read the fleet's live uniforms by reference (copies, rotation, anchor, scroll lift),
    so they move exactly with the ships. */
+/* the same sea shaped for a tall hero: the wide one's wall fills a phone's frame from edge to edge, and the headline ends up reading against the
+   bands. A shallower curl (R, phiMax) set further from the ship (x0) keeps the swell just as big a piece of the picked colour while its mass sits
+   low and to one side, the way the wide hero's does. Applied over DEFAULTS by the layer whenever the orientation changes. */
+export const PORTRAIT = { R: 3, phiMax: 110, x0: 14 };
+
 function armadaFleetGLSL(count) {
     return `
     uniform vec4 uFleet[${count}]; uniform mat3 uFleetRot; uniform vec3 uFleetBoat; uniform float uFleetScale; uniform vec2 uFleetLift, uRun;

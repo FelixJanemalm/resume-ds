@@ -72,6 +72,8 @@ const pcfg = section ? {
     fold: numAttr(section.dataset.fold, 1),                                // the hero's sea (js/voyage-fold.js): the Lottie's swell remade in the layer, the ship riding it; 0 = the Lottie as before (wide screens only for now: phones keep the Lottie)
     foldFlatAt: section.dataset.foldFlatAt || '#work:center@0.25',          // the scroll mark by which the fold has laid down flat into the sea
     foldFadeAt: section.dataset.foldFadeAt || '#work:center@0.5', foldGoneAt: section.dataset.foldGoneAt || '.hero-wrapper:bottom@0',   // the fold's sea fades out between these marks as the ship gets under way (its own water and the field take over)
+    foldPortrait: numAttr(section.dataset.foldPortrait, 1),                // the hero sea in portrait too (Felix, 2026-09-15: the phone hero in line with the desktop one); 0 = phones keep the Lottie, as they did while the fold was tuned for the wide hero
+    foldPortraitYaw: numAttr(section.dataset.foldPortraitYaw, 180),        // with it: degrees added to the sea's course in portrait, which turns the fold about the ship so its lit face meets the camera. The portrait route's hero heads 35 deg against landscape's 215.5, so without this the tall hero looks at the fold's dark far side
     foldScale: numAttr(section.dataset.foldScale, 1),                      // the fold's sea relative to the ship (1 = as tuned in the look-dev lab)
     foldRide: numAttr(section.dataset.foldRide, 1),                        // how much the hull answers the fold's swell (heave, pitch, roll); 0 = only the layer's own swell
     foldSway: numAttr(section.dataset.foldSway, 0.3),                      // the share of the scene's slow sway (at anchor) the hero sea takes; the ship always takes all of it
@@ -89,7 +91,7 @@ const pcfg = section ? {
 if (pcfg) for (const [k, v] of new URLSearchParams(location.search)) if (k in pcfg && v !== '') pcfg[k] = Number.isNaN(+v) ? v : +v;   // dev aid: ?shipWorkTilt=45&boat=off
 let layer = null;
 const THEME_ROW = false;   // the ship-style icon row under the colour picker (and the stored choice it writes): off for now
-const MOD_V = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '?t=' + Date.now() : '?v=2026-09-15j';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache): never cached on a local server, versioned elsewhere (bump when they change)
+const MOD_V = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '?t=' + Date.now() : '?v=2026-09-15k';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache): never cached on a local server, versioned elsewhere (bump when they change)
 import('./ink-cursor.js' + MOD_V).catch(e => console.warn('ink cursor', e));   // the pointer as a trail of ink in the picked colour (it checks for a real mouse and reduced motion itself)
 
 const SIM_NOISE = `
@@ -1404,12 +1406,17 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         // the sea's own smoothed scroll (the pose's angle lag), so the fold's height, course and tilt always move together
         let foldW = 0, foldAmt = 1, foldK = 1, foldTheta = 0, silkW = 0;
         if (fold) {
-            const on = VH <= innerWidth, h0 = ship.keys[0].k;
+            const portrait = VH > innerWidth, on = !portrait || pcfg.foldPortrait > 0, h0 = ship.keys[0].k;
+            if (portrait !== ship.foldPortraitNow) {   // the sea reshaped for the frame it is in (FOLD.PORTRAIT), and back if the phone is turned
+                ship.foldPortraitNow = portrait;
+                const PF = FOLD.PORTRAIT, o = {}; for (const k in PF) o[k] = portrait ? PF[k] : FOLD.DEFAULTS[k];   // (PF, not P: P is the route's pose here)
+                fold.set(o);
+            }
             if (!ship.seaF) ship.seaF = { p: { s: scrollY }, v: { s: 0 } };
             follow(ship.seaF, 's', scrollY, pcfg.shipLag, dt);
             const sS = ship.seaF.p.s;
             foldK = Math.hypot(camera.position.x - h0.x * visW / 2, camera.position.y - h0.y * visH / 2, camera.position.z) / FOLD.LAB.camDist * (P.size / Math.max(1e-4, h0.size)) * pcfg.foldScale;
-            foldTheta = h0.turn - FOLD.LAB.yaw;
+            foldTheta = h0.turn - FOLD.LAB.yaw + (portrait ? pcfg.foldPortraitYaw : 0);   // the sea's course, turned about the ship in portrait so its lit face meets the camera
             foldAmt = 1 - M.smoothstep(sS, 0, Math.max(1, ship.foldFlatY || 700));
             foldW = on ? 1 - M.smoothstep(sS, ship.foldFadeY || 480, ship.foldGoneY || 790) : 0;
             const linesW = 1 - M.smoothstep(sS, ship.foldFadeY || 480, ship.silkGoneY || 1040);   // the silk lines outlast the wall a little: gone as the work section pins
