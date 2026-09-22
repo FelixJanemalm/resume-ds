@@ -16,20 +16,40 @@
 
 export const LAB = { S: [-0.447, 1.777], camDist: 13.61, yaw: 15 };   // the lab ship's spot on the sea at the hero (1722 x 899), its camera's distance to it, the lab camera's yaw (deg)
 
+/* Felix's pick of 2026-09-21 (his panel, read off his screenshot the same evening), tuned on the live page (js/fold-lab.js, ?waves=1): lines only. The risen silk is not drawn (solid 0), so the hero
+   is the swell's crest lines and the sea's dots in the picked colour, and the swell itself is the fuller one below (a shaped crest, a third
+   swell, chop, wander, breath). Every other number is the panel's as copied, kept so the sheet comes back as it was tuned if solid is turned
+   up again. Before this: the silk wall of 2026-09-15 (phiMax 155, wallDark 0.2, farA 170, farB 250, fogA 110 in the working tree; 130 / 0.7 /
+   60 / 140 / 30 as committed in 4dcc0b7), amp 0.16, lambda 3.6, speed 0.45, amp2 0.05, lambda2 2.2, dir2 35, bands 2. */
 export const DEFAULTS = {
-    sat: 0.92, lum: 0.55, hueDrift: -4, edge: 0.3, floor: 0.2, baseGlow: 0.35,
-    axis: -5, x0: 6, bend: -0.1, R: 4, phiMax: 130, fan: 0.3, foldDamp: 0.9, wallDark: 0.7, farDark: 0.008,
-    farA: 60, farB: 140, fogA: 30, lipLen: 4, lipSoft: 5, spray: 0.35, sprayLen: 6,   // the far end: fading into the page's ground from fogA, gone by farB (camera distance, lab units); the lab had 40 / 75 and faded to black
+    solid: 0,   // the risen sheet's opacity: 0 = lines and dots only. The dots still thin out over the risen part (dotOnSolid), so the wall reads as a lighter ground even with nothing drawn on it
+    curl: 0,    // how much of the fold the sheet gets at the top of the page (1 = the full curl, 0 = the sea lies flat, Felix's pick: the lines run out across a flat sea); the scroll lays down whatever is there, over the same distance as before
+    clock: 0.25,   // the water's rate: everything that moves with time (the swells, the chop's drift, the breath, the wander, the spray) runs this many times as fast (0.25 is the panel's "slow")
+    sat: 0.8158, lum: 0.5349, hueDrift: -7.4329, edge: 1, floor: 0.43, baseGlow: 0.6709,
+    axis: -5.4631, x0: 2.6045, bend: -0.1505, R: 4.1524, phiMax: 151.4736, fan: 0.2468, foldDamp: 0.8785, wallDark: 0.5958, farDark: 0.0191,
+    farA: 163.6497, farB: 306.469, fogA: 153.6497, lipLen: 5.5103, lipSoft: 6.2052, spray: 2, sprayLen: 26,   // the far end: fading into the page's ground from fogA, gone by farB (camera distance, lab units); the lab had 40 / 75 and faded to black
     nearA: 2.5, nearB: 7,                                                              // the wall dissolves as it comes this close in front of the camera (lab units): it can never sweep over the lens
-    amp: 0.16, lambda: 3.6, speed: 0.45, amp2: 0.05, lambda2: 2.2, dir2: 35,
-    bands: 2, bandPow: 2.5, strand: 0.25, strandFreq: 18, sheen: 0.55, sheenPow: 3.5, light: 0.45, grain: 1,
-    solidA: 2, solidB: 30, lineGain: 0.55, lineWidth: 1.1, lineFar: 26, dotGain: 1.1, dotOnSolid: 0.25, dotPx: 2, dotFar: 30,
-    smoothN: 1, fanSoft: 0.9,   // shade the sheet from its own normal rather than the screen-space derivative of the mesh (0 = flat-shaded, as it was); how gently the fan eases into its limits, in across/12 units (0 = the hard clamp it had)
+    amp: 0.055, lambda: 2.7, speed: 1, amp2: 0.185, lambda2: 10, dir2: -69,
+    bands: 5, bandPow: 1.8642, strand: 0.14, strandFreq: 17.5, sheen: 2, sheenPow: 3.5697, light: 1, grain: 0.5383,
+    solidA: 5.7646, solidB: 34.0423, lineGain: 0.3297, lineWidth: 1.402, lineFar: 25.2896, dotGain: 1.1847, dotOnSolid: 0.2369, dotPx: 2.7146, dotFar: 31.1837,
+    smoothN: 1, fanSoft: 0.7095,   // shade the sheet from its own normal rather than the screen-space derivative of the mesh (0 = flat-shaded, as it was); how gently the fan eases into its limits, in across/12 units (0 = the hard clamp it had)
+    /* the swell beyond two cosines (the panel's extra parameters, baked 2026-09-21). height scales the whole water; crest shapes the wave (0 = a
+       cosine, 1 = sharp crests and flat troughs); swellRot turns the main swell off the fold's axis (deg) and bandFollow lets the bands turn with
+       it (0 = they run along the fold); breathe makes the swell rise and fall (± share, radians/s); spd2 is the cross swell's speed as a share of
+       the main one's; amp3.. a third, long swell; chop is fractal noise on top, at chopScale, drifting chopDir at chopSpeed, gone by chopFade
+       lab units from the camera; wander wobbles every direction (deg, radians/s); nEps / sEps are the normals' sampling steps. */
+    height: 1.43, crest: 0.38, swellRot: -180, breathe: 0.5, breatheRate: 0.3, bandFollow: 0.11,
+    spd2: 1, amp3: 0.011, lambda3: 10.2356, dir3: -101.135, spd3: 0.3737,
+    chop: 0.024, chopScale: 0.2736, chopSpeed: 0.2015, chopDir: -18.5876, chopOct: 3, chopGain: 0.625, chopFade: 67.7338,
+    wander: 6.9629, wanderRate: 0.0507, nEps: 0.075, sEps: 0.095,
 };
 
 const SEA = `
     uniform float uTime, uFold, uX0, uR, uPhiMax, uFan, uAxis, uBend, uAmp, uLambda, uSpeed, uAmp2, uLambda2, uDir2, uFoldDamp;
     uniform float uFanSoft;
+    uniform float uHeight, uCrest, uSwellRot, uBreathe, uBreatheRate, uBandFollow, uSpd2, uAmp3, uLambda3, uDir3, uSpd3;
+    uniform float uChop, uChopScale, uChopSpeed, uChopDir, uChopOct, uChopGain, uChopFade, uWander, uWanderRate, uNEps, uSEps;
+    uniform vec3 uCam;   /* the layer's camera in the lab's space, for the chop's fade (the fragment shader declares its own) */
     /* the fan's widening, held between its limits. A clamp has a corner at each end: dR/d(across) drops to zero in one step, so the curl radius
        stops widening abruptly and the sheet creases along a line of constant across, which runs along the swell and so straight across the bands,
        where it shades as a dark streak down the wall. These two polynomial joins reach the same limits over uFanSoft instead, and return x exactly
@@ -41,12 +61,35 @@ const SEA = `
     uniform vec3 uAt; uniform mat3 uRot; uniform float uK; uniform vec2 uS, uFlow;
     /* the run: distance along the swell's travel, measured from a crescent (bend), so the bands are arcs round the fold */
     float runOf(vec2 xz, out float across){ vec2 d = vec2(cos(uAxis), sin(uAxis)); across = dot(xz, vec2(-d.y, d.x)); return dot(xz, d) - uBend * across * across * 0.1; }
-    /* the swell at a point of the sheet; uFlow streams the pattern past the ship (the fold itself stays where it is) */
+    float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+    float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(hash12(i), hash12(i + vec2(1.0, 0.0)), f.x), mix(hash12(i + vec2(0.0, 1.0)), hash12(i + 1.0), f.x), f.y); }
+    /* the chop: a few octaves of the same value noise, each half the height and twice the frequency of the last */
+    float fbm(vec2 p){ float a = 1.0, s = 0.0, w = 0.0;
+      for (int i = 0; i < 4; i++) { if (float(i) >= uChopOct) break; s += a * (vnoise(p) - 0.5) * 2.0; w += a; a *= uChopGain; p = p * 2.03 + 11.7; }
+      return w > 0.0 ? s / w : 0.0; }
+    /* the wave's profile: a cosine at crest 0, and with it the crest sharpens and the trough flattens, as a real swell does (the second harmonic
+       of a trochoid), held to the same peak height so turning it up does not raise the water */
+    float wave(float th, float crest){ return (cos(th) + crest * 0.5 * cos(2.0 * th)) / (1.0 + crest * 0.5); }
+    /* the swell at a point of the sheet; uFlow streams the pattern past the ship (the fold itself stays where it is). q, the phase the bands and
+       the crest lines are drawn from, runs along the fold (mixed toward the swell's own phase by uBandFollow); the water's height is the main
+       swell (turned by uSwellRot, wobbling with uWander, breathing), the cross swell, the third swell and the chop, all scaled by uHeight */
     float swellH(vec2 xz, float t, out float q){
       xz += uFlow;
       float across; float run = runOf(xz, across); q = (run + uSpeed * t) / uLambda;
-      vec2 d2 = vec2(cos(uDir2), sin(uDir2)); float q2 = (dot(xz, d2) + uSpeed * 0.8 * t) / uLambda2;
-      return uAmp * cos(6.2831853 * q) + uAmp2 * cos(6.2831853 * q2); }
+      float wob = uWander * sin(t * uWanderRate);
+      vec2 d1 = vec2(cos(uAxis + uSwellRot + wob), sin(uAxis + uSwellRot + wob));
+      float q1 = (dot(xz, d1) - uBend * across * across * 0.1 + uSpeed * t) / uLambda;
+      q = mix(q, q1, uBandFollow);
+      float h = uAmp * wave(6.2831853 * q1, uCrest) * (1.0 + uBreathe * sin(t * uBreatheRate));
+      vec2 d2 = vec2(cos(uDir2 - wob), sin(uDir2 - wob));
+      h += uAmp2 * wave(6.2831853 * (dot(xz, d2) + uSpeed * uSpd2 * t) / uLambda2, uCrest * 0.6);
+      if (uAmp3 > 0.0) { vec2 d3 = vec2(cos(uDir3 + wob * 0.5), sin(uDir3 + wob * 0.5));
+        h += uAmp3 * wave(6.2831853 * (dot(xz, d3) + uSpeed * uSpd3 * t) / max(0.2, uLambda3), uCrest * 0.4); }
+      if (uChop > 0.0) { vec2 cd = vec2(cos(uChopDir), sin(uChopDir));
+        float fade = exp(-length(uCam - vec3(xz.x, 0.0, xz.y)) / max(1.0, uChopFade));   /* the detail dies with distance: nothing to alias out there */
+        h += uChop * fbm(xz * uChopScale + cd * (uChopSpeed * t)) * fade; }
+      return h * uHeight; }
     /* the sheet: flat up to the fold line, then a curl of radius R to phiMax, then straight on along the tangent (beyond: how far). Arc length
        is preserved, so the swell's phase q (and the bands) run on up the fold unchanged. fold 1 -> 0 lays it down (the radius grows, the angle shrinks) */
     void deform(vec3 p0, out vec3 p, out vec3 n, out float q, out float phi, out float across, out float beyond){
@@ -70,7 +113,7 @@ const SEA = `
 /* the flat sea's normal from the swell's slope (finite differences), for the sun catching the lines and dots: smooth across the grid's triangles, where the
    derivatives of the drawn surface would light whole facets */
 const SWELL_NORMAL = `
-    vec3 swellNormal(vec2 xz){ float e = 0.08, qq; float hx = swellH(xz + vec2(e, 0.0), uTime, qq) - swellH(xz - vec2(e, 0.0), uTime, qq), hz = swellH(xz + vec2(0.0, e), uTime, qq) - swellH(xz - vec2(0.0, e), uTime, qq);
+    vec3 swellNormal(vec2 xz){ float e = uNEps, qq; float hx = swellH(xz + vec2(e, 0.0), uTime, qq) - swellH(xz - vec2(e, 0.0), uTime, qq), hz = swellH(xz + vec2(0.0, e), uTime, qq) - swellH(xz - vec2(0.0, e), uTime, qq);
       return normalize(vec3(-hx / (2.0 * e), 1.0, -hz / (2.0 * e))); }`;
 
 const SHEET_VS = SEA + SWELL_NORMAL + `
@@ -83,7 +126,7 @@ const SHEET_VS = SEA + SWELL_NORMAL + `
       /* the surface's own normal, from two more points on the deformed sheet. The fragment shader's screen-space derivative is constant over a
          whole triangle, so it flat-shades the wall and bands it into facets wherever the sheet's cells change size. */
       vNs = n;
-      if (uSmoothN > 0.5) { float e = 0.06; vec3 pa, pb, nn; float qq, pp, aa, bb;
+      if (uSmoothN > 0.5) { float e = uSEps; vec3 pa, pb, nn; float qq, pp, aa, bb;
         deform(position + vec3(e, 0.0, 0.0), pa, nn, qq, pp, aa, bb);
         deform(position + vec3(0.0, 0.0, e), pb, nn, qq, pp, aa, bb);
         vNs = normalize(cross(pb - p, pa - p)); }
@@ -92,7 +135,7 @@ const SHEET_VS = SEA + SWELL_NORMAL + `
 /* shaded in the lab's own space (uCam, uCamFwd: the layer's camera mapped into it), so the light, the sheen and every fade are the lab's */
 const SHEET_FS = `
     uniform vec3 uColor, uCam, uCamFwd, uGround; uniform float uTime, uBands, uBandPow, uHueDrift, uEdge, uFloor, uStrand, uStrandFreq, uSheen, uSheenPow, uLight, uGrain;
-    uniform float uLineGain, uLineWidth, uLineFar, uWallDark, uFarDark, uPhiMax, uFold, uBaseGlow, uVis, uLines, uSolidA, uSolidB, uFarA, uFarB, uFogA, uLipLen, uLipSoft, uNearA, uNearB;
+    uniform float uLineGain, uLineWidth, uLineFar, uWallDark, uFarDark, uPhiMax, uFold, uBaseGlow, uVis, uLines, uSolidA, uSolidB, uFarA, uFarB, uFogA, uLipLen, uLipSoft, uNearA, uNearB, uSolid;
     uniform float uGlint; uniform vec3 uSun;
     uniform float uSmoothN;
     varying vec3 vW, vN, vNs; varying float vQ, vPhi, vAcross, vBeyond;
@@ -106,8 +149,8 @@ const SHEET_FS = `
       vec2 sp = vec2(vAcross * uStrandFreq, vQ * 1.5); float sAA = 1.0 - smoothstep(0.35, 1.0, length(fwidth(sp)));   /* no strands where they would alias */
       float dist = length(uCam - vW);
       /* material first (cheap): solid where the sheet has risen (and is neither too far, past the lip, nor too near the lens), crest lines on the flat sea */
-      float farK = 1.0 - smoothstep(uFarA, max(uFarA + 0.01, uFarB), dist), lipK = 1.0 - smoothstep(uLipLen, uLipLen + uLipSoft, vBeyond), nearK = smoothstep(uNearA, uNearB, dot(vW - uCam, uCamFwd));
-      float sol = smoothstep(uSolidA, max(uSolidA + 0.01, uSolidB), degrees(vPhi)) * farK * lipK * nearK * uVis;
+      float farK = 1.0 - smoothstep(uFarA, max(uFarA + 0.01, uFarB), dist), lipK = 1.0 - smoothstep(uLipLen, uLipLen + uLipSoft, vBeyond), nearK = smoothstep(uNearA, max(uNearA + 0.01, uNearB), dot(vW - uCam, uCamFwd));
+      float sol = smoothstep(uSolidA, max(uSolidA + 0.01, uSolidB), degrees(vPhi)) * farK * lipK * nearK * uVis * uSolid;   /* uSolid 0: lines and dots only */
       /* the sun catching the lines (off unless uGlint): where the swell tilts the water to mirror a low sun (uSun: toward it) into the eye, a line flares
          toward white, drifting along it as the swell rolls through, as light glints on a real sea; nothing is drawn between the lines */
       float spec = 0.0;
@@ -137,7 +180,7 @@ const SHEET_FS = `
       gl_FragDepthEXT = sol > 0.5 ? gl_FragCoord.z : 1.0; }`;   /* only the risen sheet hides what is behind it (the field's stars); the lines never cut into the ship or its reflection */
 
 const DOTS_VS = SEA + SWELL_NORMAL + `
-    uniform float uPx, uPR, uDotGain, uDotOnSolid, uDotFar, uBands, uBandPow, uHueDrift, uSpray, uSprayLen, uDots, uSolidA, uSolidB, uFarA, uFarB, uLipLen, uLipSoft; uniform vec3 uColor, uCam;
+    uniform float uPx, uPR, uDotGain, uDotOnSolid, uDotFar, uBands, uBandPow, uHueDrift, uSpray, uSprayLen, uDots, uSolidA, uSolidB, uFarA, uFarB, uLipLen, uLipSoft; uniform vec3 uColor;
     uniform float uGlint, uTwinkle; uniform vec3 uSun;
     attribute float aSeed; varying float vB; varying vec3 vC;
     void main(){
@@ -161,13 +204,19 @@ const DOTS_FS = `
     varying float vB; varying vec3 vC;
     void main(){ float d = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.1, d); if (a * vB < 0.004) discard; gl_FragColor = vec4(min(vC * vB, vec3(1.0)), a); }`;   /* additive: the colour times the disc */
 
-/* The sea in JS (the flat part: the ship never sails up the fold), for the ride. Lab units, the same clock and flow as the shader. */
+/* The sea in JS (the flat part: the ship never sails up the fold), for the ride. Lab units, the same clock and flow as the shader, the same
+   swells — without the chop: a hull does not follow ripples. */
+const wave = (th, crest) => (Math.cos(th) + crest * 0.5 * Math.cos(2 * th)) / (1 + crest * 0.5);
 export function seaHeight(o, x, z, t, fx = 0, fz = 0) {
     x += fx; z += fz;
-    const a = o.axis * Math.PI / 180, across = -x * Math.sin(a) + z * Math.cos(a);
-    const q = (x * Math.cos(a) + z * Math.sin(a) - o.bend * across * across * 0.1 + o.speed * t) / o.lambda;
-    const a2 = o.dir2 * Math.PI / 180, q2 = (x * Math.cos(a2) + z * Math.sin(a2) + o.speed * 0.8 * t) / o.lambda2;
-    return o.amp * Math.cos(2 * Math.PI * q) + o.amp2 * Math.cos(2 * Math.PI * q2);
+    const D = Math.PI / 180, a = o.axis * D, across = -x * Math.sin(a) + z * Math.cos(a), wob = o.wander * D * Math.sin(t * o.wanderRate);
+    const a1 = a + o.swellRot * D + wob;
+    const q1 = (x * Math.cos(a1) + z * Math.sin(a1) - o.bend * across * across * 0.1 + o.speed * t) / o.lambda;
+    let h = o.amp * wave(2 * Math.PI * q1, o.crest) * (1 + o.breathe * Math.sin(t * o.breatheRate));
+    const a2 = o.dir2 * D - wob;
+    h += o.amp2 * wave(2 * Math.PI * (x * Math.cos(a2) + z * Math.sin(a2) + o.speed * o.spd2 * t) / o.lambda2, o.crest * 0.6);
+    if (o.amp3 > 0) { const a3 = o.dir3 * D + wob * 0.5; h += o.amp3 * wave(2 * Math.PI * (x * Math.cos(a3) + z * Math.sin(a3) + o.speed * o.spd3 * t) / Math.max(0.2, o.lambda3), o.crest * 0.4); }
+    return h * o.height;
 }
 
 /* the sheet's grid: fine (0.45 lab units a cell at full resolution) within 45 units of the lab's middle, where the fold, the ship and the near sea
@@ -191,7 +240,11 @@ export function createFold(THREE, { scene, pixelRatio = 1, light = false, dots: 
         uStrand: { value: o.strand }, uStrandFreq: { value: o.strandFreq }, uSheen: { value: o.sheen }, uSheenPow: { value: o.sheenPow }, uLight: { value: o.light }, uGrain: { value: o.grain }, uSmoothN: { value: o.smoothN }, uFanSoft: { value: o.fanSoft },
         uWallDark: { value: o.wallDark }, uFarDark: { value: o.farDark }, uSolidA: { value: o.solidA }, uSolidB: { value: o.solidB }, uFarA: { value: o.farA }, uFarB: { value: o.farB }, uFogA: { value: o.fogA },
         uLipLen: { value: o.lipLen }, uLipSoft: { value: o.lipSoft }, uSpray: { value: o.spray }, uSprayLen: { value: o.sprayLen }, uNearA: { value: o.nearA }, uNearB: { value: o.nearB },
-        uLineGain: { value: o.lineGain }, uLineWidth: { value: o.lineWidth }, uLineFar: { value: o.lineFar },
+        uLineGain: { value: o.lineGain }, uLineWidth: { value: o.lineWidth }, uLineFar: { value: o.lineFar }, uSolid: { value: o.solid },
+        uHeight: { value: o.height }, uCrest: { value: o.crest }, uSwellRot: { value: o.swellRot * R }, uBreathe: { value: o.breathe }, uBreatheRate: { value: o.breatheRate }, uBandFollow: { value: o.bandFollow },
+        uSpd2: { value: o.spd2 }, uAmp3: { value: o.amp3 }, uLambda3: { value: o.lambda3 }, uDir3: { value: o.dir3 * R }, uSpd3: { value: o.spd3 },
+        uChop: { value: o.chop }, uChopScale: { value: o.chopScale }, uChopSpeed: { value: o.chopSpeed }, uChopDir: { value: o.chopDir * R }, uChopOct: { value: o.chopOct }, uChopGain: { value: o.chopGain }, uChopFade: { value: o.chopFade },
+        uWander: { value: o.wander * R }, uWanderRate: { value: o.wanderRate }, uNEps: { value: o.nEps }, uSEps: { value: o.sEps },
         uPx: { value: o.dotPx }, uPR: { value: pixelRatio }, uDotGain: { value: o.dotGain }, uDotOnSolid: { value: o.dotOnSolid }, uDotFar: { value: o.dotFar },
         uGlint: { value: 0 }, uTwinkle: { value: 0 }, uSun: { value: new THREE.Vector3(0.3, 0.1, -1).normalize() },   // the sun catching the lines and dots, the dots' twinkle: off in the layer
     };
@@ -211,7 +264,7 @@ export function createFold(THREE, { scene, pixelRatio = 1, light = false, dots: 
     const full = new THREE.Matrix3(), fullT = new THREE.Matrix3(), ry = new THREE.Matrix3(), v = new THREE.Vector3(), fwd = new THREE.Vector3();
     const ride = { heave: 0, pitch: 0, roll: 0 };
     let hue = 0.58;
-    const DEG = ['axis', 'phiMax', 'dir2', 'hueDrift'], UKEY = { dotPx: 'uPx' };   // the keys the lab writes in degrees, and the one whose uniform is not named after it
+    const DEG = ['axis', 'phiMax', 'dir2', 'hueDrift', 'swellRot', 'dir3', 'chopDir', 'wander'], UKEY = { dotPx: 'uPx' };   // the keys the lab writes in degrees, and the one whose uniform is not named after it
     const view = {
         opts: o, uniforms: U, sheet, dots,
         // the picked colour's hue at the lab's saturation and lightness (raw sRGB into the shader, as the lab wrote it); the page's ground (sRGB 0..1)
@@ -231,7 +284,7 @@ export function createFold(THREE, { scene, pixelRatio = 1, light = false, dots: 
             v.copy(cam).sub(at).applyMatrix3(fullT).multiplyScalar(1 / Math.max(1e-4, k));
             U.uCam.value.set(v.x + LAB.S[0], v.y, v.z + LAB.S[1]);
             U.uCamFwd.value.copy(fwd.set(0, 0, -1).applyMatrix3(fullT));   // the layer's camera looks down -z
-            U.uFold.value = fold; U.uVis.value = vis; U.uLines.value = lines; U.uDots.value = dotsVis; U.uTime.value = t; U.uFlow.value.set(flowX, flowZ);
+            U.uFold.value = fold * o.curl; U.uVis.value = vis; U.uLines.value = lines; U.uDots.value = dotsVis; U.uTime.value = t * o.clock; U.uFlow.value.set(flowX, flowZ);
             sheet.visible = vis > 0.002 || lines > 0.002;
             if (dots) dots.visible = dotsVis > 0.002;
         },
@@ -239,9 +292,9 @@ export function createFold(THREE, { scene, pixelRatio = 1, light = false, dots: 
         // (deg, the layer's heel sign), followed at `rate` per second. bowX / bowZ: the hull's course in the lab's sea (unit); k as in place; L = hull length (world)
         ride({ bowX, bowZ, k, L, t, dt, flowX = 0, flowZ = 0, rate = 4 }) {
             const zx = -bowZ, zz = bowX;   // the hull's +z (toward the viewer at course 0) in the lab's sea
-            const Ll = L / Math.max(1e-4, k), B = 0.3 * Ll, S0 = LAB.S[0], S1 = LAB.S[1];
-            const hB = seaHeight(o, S0 + bowX * Ll * 0.45, S1 + bowZ * Ll * 0.45, t, flowX, flowZ), hS = seaHeight(o, S0 - bowX * Ll * 0.45, S1 - bowZ * Ll * 0.45, t, flowX, flowZ);
-            const hP = seaHeight(o, S0 + zx * B * 0.5, S1 + zz * B * 0.5, t, flowX, flowZ), hM = seaHeight(o, S0 - zx * B * 0.5, S1 - zz * B * 0.5, t, flowX, flowZ);
+            const Ll = L / Math.max(1e-4, k), B = 0.3 * Ll, S0 = LAB.S[0], S1 = LAB.S[1], tt = t * o.clock;   // the shader's clock
+            const hB = seaHeight(o, S0 + bowX * Ll * 0.45, S1 + bowZ * Ll * 0.45, tt, flowX, flowZ), hS = seaHeight(o, S0 - bowX * Ll * 0.45, S1 - bowZ * Ll * 0.45, tt, flowX, flowZ);
+            const hP = seaHeight(o, S0 + zx * B * 0.5, S1 + zz * B * 0.5, tt, flowX, flowZ), hM = seaHeight(o, S0 - zx * B * 0.5, S1 - zz * B * 0.5, tt, flowX, flowZ);
             const f = 1 - Math.exp(-rate * dt);
             ride.heave += ((hB + hS + hP + hM) / 4 / Ll - ride.heave) * f;
             ride.pitch += (Math.atan2(hB - hS, 0.9 * Ll) - ride.pitch) * f;
