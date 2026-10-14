@@ -38,7 +38,7 @@
 (function () {
   "use strict";
 
-  var PUBLIC = false;
+  var PUBLIC = true;
   var FALLBACK_OPENER = "What are you hiring for? Tell me the role and I'll say honestly whether Felix fits.";
   var BOT_UA = /bot|crawl|spider|slurp|headless|lighthouse|prerender|facebookexternalhit|embedly|preview|whatsapp|telegram|discord/i;
 
@@ -567,6 +567,15 @@
   }
   var ownScrollUntil = 0;   // page scrolls the widget starts itself (navigate) must not fold the companion
   function markOwnScroll() { ownScrollUntil = Date.now() + 1500; }
+  // What navigate can actually do on this page. The worker passes it to the model,
+  // so it cannot pick a target that does nothing here.
+  function pageTargets() {
+    var t = ["home", "resume"];
+    if (document.querySelector("footer")) t.push("contact");
+    ["work", "principles", "testimonials"].forEach(function (k) { if (findSection(k)) t.push(k); });
+    return t.concat(Object.keys(CASE)).concat(Object.keys(DEEP));
+  }
+
   function scrollToNode(node) {
     markOwnScroll();
     var top = node.getBoundingClientRect().top + window.pageYOffset - 96;   // clear the fixed header
@@ -646,7 +655,8 @@
     showDots(bot);
     if (root.getAttribute("data-state") === "docked") setOpen(true);
     var acc = "", acted = [];
-    request({ session: sessionId, context: ctx, history: prior, text: text }, function (t) {
+    var ctxNow = { path: ctx.path, headline: ctx.headline, application_id: ctx.application_id, qa: ctx.qa, targets: pageTargets() };
+    request({ session: sessionId, context: ctxNow, history: prior, text: text }, function (t) {
       acc += t;
       renderText(bot, acc);
       scrollThread();
