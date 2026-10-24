@@ -113,7 +113,6 @@
 
   var CASE = {
     "work/ai-sourcing": ["AI-powered supply chain traceability", "/work/ai-sourcing.html"],
-    "work/ai-classifier": ["A classifier that knows how good it is", "/work/ai-classifier.html"],
     "work/design-system": ["One design system for five products", "/work/design-system.html"],
     "work/design-tokens": ["One change, six platforms", "/work/design-tokens.html"]
   };
@@ -124,10 +123,6 @@
     "work/ai-sourcing#agents": ["Specialized AI agents", "Specialized AI agents"],
     "work/ai-sourcing#human-in-the-loop": ["Human in the loop", "Human in the Loop"],
     "work/ai-sourcing#records": ["Permanent records", "Permanent records, a checkpoint in time"],
-    "work/ai-classifier#architecture": ["Retrieval as a service, generation as a workflow", "Retrieval is a service"],
-    "work/ai-classifier#evaluation": ["The harness came first", "The harness came first"],
-    "work/ai-classifier#results": ["Four things the numbers said", "Four things the numbers said"],
-    "work/ai-classifier#honesty": ["Honest numbers are a feature", "Honest numbers are a feature"],
     "work/design-system#governance": ["How teams would trust the system", "How teams would trust the system in practice"],
     "work/design-system#accessibility": ["Accessibility built in", "Simple APIs, accessibility built in"],
     "work/design-system#results": ["Every target exceeded", "Every target exceeded"],
