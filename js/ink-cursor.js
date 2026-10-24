@@ -7,14 +7,14 @@
  * The ink is the hue picked in the hero (--primary-color, which color-shade-calculator.js sets on the root), made to stand out from
  * whatever is under the pointer: the ground there is read from the element under the pointer (its nearest painted background), and
  * the ink's lightness is pushed away from it until the contrast reaches 4.5:1 (light ink on a dark ground, deep ink on a pale one),
- * saturated so it still reads as the picked colour. The blob is blended, not painted over the page (multiply on a pale ground, screen
- * on a dark one), so on bare ground it shows as the ink while whatever lies under it keeps its tone: dark text stays dark inside it,
- * light text stays light. It re-reads
+ * saturated so it still reads as the picked colour. It re-reads
  * the ground as the pointer moves (at most every 90 ms), on scroll, and when the colour is picked again; the change eases over 0.25 s.
  *
  * Only for a real mouse (hover + fine pointer) and without reduced motion; touch devices keep their native behaviour. Over links and
- * buttons the head swells a little, standing in for the native hand cursor, and the ink thins to a tint (pastel on a pale ground, a
- * dim glow on a dark one) so the link shows through it like a highlighter. Self-contained: it injects its own filter, styles and
+ * buttons the head swells a little, standing in for the native hand cursor, and (except on the colour picker, where a
+ * change of colour would read as part of the pick) the blob switches to mix-blend-mode: difference, as in
+ * the original, with the ink offset from the ground by its colour: the blob keeps its colour on the bare ground while the link under it
+ * comes through inverted, in high contrast. Self-contained: it injects its own filter, styles and
  * element, and can be loaded on any page with <script type="module" src="js/ink-cursor.js"></script>.
  */
 const fine = matchMedia('(hover: hover) and (pointer: fine)').matches, calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -34,8 +34,9 @@ function start() {
     style.textContent = `
         html.ink-cursor-on, html.ink-cursor-on * { cursor: none !important; }
         #ink-cursor { --ink: #4faad1; position: fixed; top: 0; left: 0; z-index: 2147483647; pointer-events: none;
-            filter: url(#ink-goo); mix-blend-mode: multiply; opacity: 0; transition: opacity 0.25s ease; }
-        #ink-cursor.on-dark { mix-blend-mode: screen; }
+            filter: url(#ink-goo); opacity: 0; transition: opacity 0.25s ease; }
+        #ink-cursor.is-link { mix-blend-mode: difference; }
+        #ink-cursor.is-snap span { transition: none; }
         #ink-cursor.is-shown { opacity: 1; }
         #ink-cursor.is-shown.is-picking { opacity: 0; transition-duration: 0.12s; }
         #ink-cursor span { position: absolute; top: 0; left: 0; width: ${WIDTH}px; height: ${WIDTH}px; border-radius: 50%; transform-origin: center center; will-change: transform;
@@ -74,17 +75,20 @@ function start() {
         for (let k = layers.length - 1; k >= 0; k--) { const [r, g, b, a] = layers[k]; base = [base[0] + (r - base[0]) * a, base[1] + (g - base[1]) * a, base[2] + (b - base[2]) * a, 1]; }
         return base;
     }
-    let lastInk = '', over = false;   // over: the pointer is on a link or button
-    function recolor() {
+    let lastInk = '', over = false;   // over: the pointer is on a link or button (not the colour picker), so the blob inverts what is under it
+    function recolor(snap) {   // snap: the blend just changed, so the ink must not ease from a colour meant for the other blend
         const root = getComputedStyle(document.documentElement);
         const picked = parseColor(root.getPropertyValue('--primary-color')) || parseColor(root.getPropertyValue('--button-color')) || [79, 170, 209, 1];
         const ground = groundAt(Math.min(innerWidth - 1, Math.max(0, mouse.x + WIDTH / 2)), Math.min(innerHeight - 1, Math.max(0, mouse.y + WIDTH / 2)));
         const [h, s0] = toHsl(picked), s = Math.max(s0, 0.75), dark = lum(ground) < 0.3;
-        let l = over ? (dark ? 0.32 : 0.74) : dark ? 0.58 : 0.42, rgb = toRgb([h, s, l]);
-        for (let k = 0; !over && k < 16 && contrast(rgb, ground) < CONTRAST; k++) { l = dark ? Math.min(0.94, l + 0.025) : Math.max(0.08, l - 0.025); rgb = toRgb([h, s, l]); }   // push the lightness away from the ground until it stands out
-        const ink = `rgb(${rgb.map(v => Math.round(v)).join(', ')})`;
+        let l = dark ? 0.58 : 0.42, rgb = toRgb([h, s, l]);
+        for (let k = 0; k < 16 && contrast(rgb, ground) < CONTRAST; k++) { l = dark ? Math.min(0.94, l + 0.025) : Math.max(0.08, l - 0.025); rgb = toRgb([h, s, l]); }   // push the lightness away from the ground until it stands out
+        // over a link what shows is |ground - ink|, so the ink sits that colour away from the ground in each channel, as far as 0-255 allows
+        const ink = `rgb(${rgb.map((v, c) => { const g = ground[c]; return Math.round(!over ? v : g + v <= 255 ? g + v : g - v >= 0 ? g - v : 255 - g > g ? 255 : 0); }).join(', ')})`;
+        if (snap) cursor.classList.add('is-snap');
+        cursor.classList.toggle('is-link', over);
         if (ink !== lastInk) { cursor.style.setProperty('--ink', ink); lastInk = ink; }
-        cursor.classList.toggle('on-dark', dark);
+        if (snap) { void cursor.offsetWidth; cursor.classList.remove('is-snap'); }
     }
     let recolorAt = 0, recolorQueued = false;
     const queueRecolor = () => { if (recolorQueued) return; const wait = Math.max(0, 90 - (performance.now() - recolorAt)); recolorQueued = true; setTimeout(() => { recolorQueued = false; recolorAt = performance.now(); recolor(); }, wait); };
@@ -110,7 +114,8 @@ function start() {
         idle = false; clearTimeout(idleTimer); idleTimer = setTimeout(goIdle, IDLE_MS);
         const onLink = e.target instanceof Element && !!e.target.closest(INTERACTIVE);
         hoverT = onLink ? 1.55 : 1;
-        if (onLink !== over) { over = onLink; recolor(); } else queueRecolor();   // onto or off a link: thin or thicken the ink at once
+        const invert = onLink && !e.target.closest('#color-picker-container');
+        if (invert !== over) { over = invert; recolor(true); } else queueRecolor();
     }, { passive: true });
     // while dragging on the colour picker the ink steps aside, so its own dot is what the eye follows; on release it reappears at the pointer
     let picking = false;
