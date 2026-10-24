@@ -1782,11 +1782,12 @@ function lottieFallback() {
 if (section && !reduced && 'IntersectionObserver' in window) boot(); else lottieFallback();
 
 async function boot() {
-    const cards = [...section.querySelectorAll('.case-study-teaser')];
-
     // three loads after the page has loaded and the browser is idle, so it never competes with the hero
     await new Promise(r => (document.readyState === 'complete' ? r() : addEventListener('load', r, { once: true })));
     await new Promise(r => ('requestIdleCallback' in window) ? requestIdleCallback(r, { timeout: 2000 }) : setTimeout(r, 400));
+    // on an application link the chat widget reorders the cards to that posting's lead; read them after it has
+    if (window.fjcLead) await Promise.race([window.fjcLead, new Promise(r => setTimeout(r, 800))]);
+    const cards = [...section.querySelectorAll('.case-study-teaser')];
 
     let THREE, CSS3D, ENV, GPUC = null;
     try {
