@@ -394,7 +394,8 @@ const PTS_VS = SIM_SHARED + `
       vec4 mv=modelViewMatrix*vec4(pw,1.0); float pz=max(-mv.z,1.0);
       pz=mix(pz, max(-(modelViewMatrix*vec4(uFleetBoat,1.0)).z, 1.0), ff*(1.0-uRocket));   // a fleet copy's dots are sized at the fleet's anchor depth: the copies set toward the camera drew their hulls bigger and their dots bigger with them, and read as coarse beside the rest (at the launch the armada keeps true perspective: its far ranks are meant to draw smaller)
       gl_PointSize=uSize*uDPR*aSize*(1.0+0.9*vLit+bf*(uBoatPx-1.0)+2.4*sf+0.25*bf*laneR*clamp(fd-1.0,0.0,1.5)+0.5*bf*laneR*uTrail*step(6.5,role)*step(role,7.5)+bf*laneR*uSwell.z*(0.8*hash1(md.z*7.7)-0.2)+0.3*vFlag+0.15*ff*uRocket+0.4*bf*step(4.5,role)*step(role,5.5)*step(1.5,md.y))*uP/pz*uIntro;   // the rest disc's specks vary in size (0.7x .. 1.8x)
-      gl_Position=projectionMatrix*mv; }`;
+      gl_Position=projectionMatrix*mv;
+      if (vFade < 0.02) { gl_PointSize=0.0; gl_Position=vec4(2.0, 2.0, 2.0, 1.0); } }`;   /* the fragment shader discards these anyway: culled here they cost no pixels at all (on a phone the hidden field is ~25k points, every frame) */
 const PTS_FS = `
     uniform vec3 uColorA, uColorB, uColorLit, uColorFlag; uniform float uGlow, uClipTop; varying float vLit, vRand, vSpeed, vBoat, vShade, vStar, vFade, vFlag;
     void main(){ if (gl_FragCoord.y > uClipTop) discard; vec2 c=gl_PointCoord-0.5; float d=length(c); if(d>0.5||vFade<0.02) discard; float disc=(1.0-smoothstep(0.08,0.5,d))*vFade;
@@ -1867,7 +1868,7 @@ async function boot() {
     // and an idle callback: seven round trips before the hero sea could start). The work itself still waits for the load event and an idle
     // moment, so it never competes with the page's first paint.
     const soft = (pr, what) => pr.catch(e => { console.warn('work-spine: ' + what + ' did not load', e); return null; });
-    const core = Promise.all([import('three'), import('three/addons/renderers/CSS3DRenderer.js'), import('three/addons/environments/RoomEnvironment.js')]);
+    const core = Promise.all([import('three'), import('three/addons/renderers/CSS3DRenderer.js')]);   // (RoomEnvironment is imported by init, only for a centerpiece that draws in the stage)
     core.catch(() => {});   // handled below
     const gpucP = soft(import('three/addons/misc/GPUComputationRenderer.js'), 'GPUComputationRenderer (no GPU particles)');
     const boatP = pcfg.boat !== 'off' ? soft(import('./voyage-boat.js' + MOD_V), 'the ship model') : Promise.resolve(null);
@@ -1879,9 +1880,9 @@ async function boot() {
     if (window.fjcLead) await Promise.race([window.fjcLead, new Promise(r => setTimeout(r, 800))]);
     const cards = [...section.querySelectorAll('.case-study-teaser')];
 
-    let THREE, CSS3D, ENV;
+    let THREE, CSS3D;
     try {
-        [THREE, CSS3D, ENV] = await core;
+        [THREE, CSS3D] = await core;
     } catch (err) {
         console.warn('work-spine: three.js did not load, keeping the flat list.', err);
         heroStill('three.js did not load');
@@ -1914,6 +1915,10 @@ async function boot() {
         }, { rootMargin: '150% 0px' });
         io.observe(section);
     });
+    // the room environment lights only the stage's own centerpieces (spine, axis, polystar); the default ship draws in the page-wide layer
+    const centerpiece = new URLSearchParams(location.search).get('centerpiece') || section.dataset.centerpiece || 'ship';
+    let ENV = {};
+    if (pcfg.mode === 'stage' || ['spine', 'axis', 'polystar'].includes(centerpiece)) { try { ENV = await import('three/addons/environments/RoomEnvironment.js'); } catch (e) { console.warn('work-spine: RoomEnvironment did not load', e); } }
     init(THREE, CSS3D, ENV, GPUC, cards);
 }
 
@@ -1995,7 +2000,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         gl.toneMapping = THREE.ACESFilmicToneMapping;
         glScene = new THREE.Scene();
         const pmrem = new THREE.PMREMGenerator(gl);
-        glScene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+        if (RoomEnvironment) glScene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
         glScene.add(world);
         queueMicrotask(() => {        // runs after the declarations below
             if (cfg.centerpiece === 'spine') buildSpine();
