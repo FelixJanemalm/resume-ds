@@ -1,8 +1,8 @@
 /* ink-cursor.js: the pointer as a gooey trail of ink in the picked colour.
  *
  * A port of Eder Anaya's "Ink Cursor" (codepen.io/mendieta/pen/WgvENJ) without GSAP: twenty dots, each a little smaller than the one
- * before, chase each other at 35% of the gap per 120 Hz frame (rescaled by elapsed time, so a 60 Hz screen or Safari draws the same tight, quick trail) and an SVG goo filter (blur + alpha threshold) melts them into one blob with
- * a tail. When the pointer rests for 150 ms the tail's dots let go of the chain and wobble in place, so the ink keeps breathing.
+ * before, chase each other at 35% of the gap per 120 Hz frame (rescaled by elapsed time, so a 60 Hz screen or Safari draws the same tight, quick trail) and a goo (blur + alpha threshold, drawn
+ * with WebGL on a small canvas round the trail; an SVG filter without WebGL) melts them into one blob with a tail. When the pointer rests for 150 ms the tail's dots let go of the chain and wobble in place, so the ink keeps breathing.
  *
  * The ink is the hue picked in the hero (--primary-color, which color-shade-calculator.js sets on the root), made to stand out from
  * whatever is under the pointer: the ground there is read from the element under the pointer (its nearest painted background), and
@@ -35,7 +35,9 @@ function start() {
     style.textContent = `
         html.ink-cursor-on, html.ink-cursor-on * { cursor: none !important; }
         #ink-cursor { --ink: #4faad1; position: fixed; top: 0; left: 0; z-index: 2147483647; pointer-events: none;
-            filter: url(#ink-goo); opacity: 0; transition: opacity 0.25s ease; }
+            opacity: 0; transition: opacity 0.25s ease; }
+        #ink-cursor.is-svg { filter: url(#ink-goo); }
+        #ink-cursor canvas { position: absolute; top: 0; left: 0; display: block; }
         #ink-cursor.is-link { mix-blend-mode: difference; }
         #ink-cursor.is-snap span { transition: none; }
         #ink-cursor.is-shown { opacity: 1; }
@@ -46,6 +48,10 @@ function start() {
     cursor.id = 'ink-cursor'; cursor.setAttribute('aria-hidden', 'true');
     document.head.appendChild(style); document.body.append(svg, cursor);
     document.documentElement.classList.add('ink-cursor-on');
+    let goo = new URLSearchParams(location.search).get('ink') === 'svg' ? null : gooCanvas(cursor, () => {   // ?ink=svg: the SVG filter, for comparison
+        goo = null; cursor.classList.add('is-svg'); for (const d of dots) { d.el = document.createElement('span'); cursor.appendChild(d.el); }   // a lost context: the SVG filter takes over
+    });
+    if (!goo) cursor.classList.add('is-svg');
 
     const mouse = { x: -100, y: -100 };   // the pointer (the dot's top-left corner)
     /* ---- colour: the picked hue, as far from the ground under the pointer as it needs to be */
@@ -76,7 +82,7 @@ function start() {
         for (let k = layers.length - 1; k >= 0; k--) { const [r, g, b, a] = layers[k]; base = [base[0] + (r - base[0]) * a, base[1] + (g - base[1]) * a, base[2] + (b - base[2]) * a, 1]; }
         return base;
     }
-    let lastInk = '', over = false;   // over: the pointer is on a link or button (not the colour picker), so the blob inverts what is under it
+    let lastInk = '', over = false, inkTo = [0.31, 0.67, 0.82], inkNow = null;   // over: the pointer is on a link or button (not the colour picker), so the blob inverts what is under it
     function recolor(snap) {   // snap: the blend just changed, so the ink must not ease from a colour meant for the other blend
         const root = getComputedStyle(document.documentElement);
         const picked = parseColor(root.getPropertyValue('--primary-color')) || parseColor(root.getPropertyValue('--button-color')) || [79, 170, 209, 1];
@@ -85,7 +91,8 @@ function start() {
         let l = dark ? 0.58 : 0.42, rgb = toRgb([h, s, l]);
         for (let k = 0; k < 16 && contrast(rgb, ground) < CONTRAST; k++) { l = dark ? Math.min(0.94, l + 0.025) : Math.max(0.08, l - 0.025); rgb = toRgb([h, s, l]); }   // push the lightness away from the ground until it stands out
         // over a link what shows is |ground - ink|, so the ink sits that colour away from the ground in each channel, as far as 0-255 allows
-        const ink = `rgb(${rgb.map((v, c) => { const g = ground[c]; return Math.round(!over ? v : g + v <= 255 ? g + v : g - v >= 0 ? g - v : 255 - g > g ? 255 : 0); }).join(', ')})`;
+        const inkRgb = rgb.map((v, c) => { const g = ground[c]; return Math.round(!over ? v : g + v <= 255 ? g + v : g - v >= 0 ? g - v : 255 - g > g ? 255 : 0); }), ink = `rgb(${inkRgb.join(', ')})`;
+        inkTo = inkRgb.map(v => v / 255); if (snap || !inkNow) inkNow = inkTo.slice();   // the canvas eases to it as the spans' background-color transition does
         if (snap) cursor.classList.add('is-snap');
         cursor.classList.toggle('is-link', over);
         if (ink !== lastInk) { cursor.style.setProperty('--ink', ink); lastInk = ink; }
@@ -100,8 +107,8 @@ function start() {
     /* ---- motion */
     let idle = false, idleTimer = 0, hover = 1, hoverT = 1;
     const dots = Array.from({ length: AMOUNT }, (_, index) => {
-        const scale = 1 - 0.05 * index, el = document.createElement('span');
-        cursor.appendChild(el);
+        const scale = 1 - 0.05 * index, el = goo ? null : document.createElement('span');
+        if (el) cursor.appendChild(el);
         return { index, scale, el, x: -100, y: -100, lockX: 0, lockY: 0, angleX: 0, angleY: 0, range: WIDTH / 2 - WIDTH / 2 * scale + 2 };
     });
 
@@ -135,8 +142,8 @@ function start() {
     document.addEventListener('mouseleave', () => cursor.classList.remove('is-shown'));
     document.addEventListener('mouseenter', () => cursor.classList.add('is-shown'));
 
-    // the dots are painted into the goo layer, not composited one by one: Safari leaves its own layers out of an SVG filter
-    let lastT = performance.now();
+    // without WebGL the dots are painted into the SVG goo layer, not composited one by one: Safari leaves its own layers out of an SVG filter
+    let lastT = performance.now(), shownAt = -1e9;
     function frame(t) {
         const dt = Math.min(50, Math.max(1, t - lastT)), k = dt / TICK, follow = LAG / (dt + LAG); lastT = t;   // follow: the share of the gap kept, so the trail spans the same time at any frame rate
         hover += (hoverT - hover) * (1 - Math.pow(0.8, k));
@@ -149,10 +156,93 @@ function start() {
                 dot.x = dot.lockX + Math.sin(dot.angleX) * dot.range; dot.y = dot.lockY + Math.sin(dot.angleY) * dot.range;
             }
             const s = dot.scale * (index <= SINE_DOTS ? hover : 1);
-            dot.el.style.transform = `translate(${dot.x}px, ${dot.y}px) scale(${s})`;
+            if (goo) dot.r = WIDTH / 2 * s; else dot.el.style.transform = `translate(${dot.x}px, ${dot.y}px) scale(${s})`;
             if (!idle || index <= SINE_DOTS) { x += (next.x - dot.x) * follow; y += (next.y - dot.y) * follow; }
         });
+        if (goo && inkNow) {
+            const e = 1 - Math.exp(-dt / 80); for (let c = 0; c < 3; c++) inkNow[c] += (inkTo[c] - inkNow[c]) * e;
+            if (cursor.classList.contains('is-shown')) shownAt = t;
+            if (t - shownAt < 300) goo.draw(dots, WIDTH / 2, inkNow);   // and through the 0.25 s fade-out, so the ink keeps moving as it goes
+        }
         requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);
+}
+
+// The goo, drawn: a small WebGL canvas round the trail does on the GPU, in every browser, what the SVG filter does (Safari renders an SVG
+// filter on page content on the CPU every frame, and its blob came out sluggish and less melted): the dots' union is drawn into a texture
+// at half the CSS resolution (the blur hides it), blurred by 6 px in two passes, and the blurred alpha is pushed through 35a - 15 into a
+// crisp edge at full resolution. Without WebGL, or after a lost context, the cursor uses the SVG filter.
+function gooCanvas(host, onLost) {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl', { alpha: true, premultipliedAlpha: true, antialias: false, depth: false, stencil: false, failIfMajorPerformanceCaveat: true });
+    if (!gl) return null;
+    const N = 20, SIGMA = 6, MARGIN = 3 * SIGMA, TAPS = 9;   // the blur at half resolution: sigma 3 texels, 9 taps each side
+    const VS = 'attribute vec2 p; void main() { gl_Position = vec4(p, 0.0, 1.0); }';
+    const program = fs => {
+        const pr = gl.createProgram();
+        for (const [type, src] of [[gl.VERTEX_SHADER, VS], [gl.FRAGMENT_SHADER, 'precision highp float;\n' + fs]]) { const o = gl.createShader(type); gl.shaderSource(o, src); gl.compileShader(o); gl.attachShader(pr, o); }
+        gl.bindAttribLocation(pr, 0, 'p'); gl.linkProgram(pr);
+        if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) return null;
+        const u = {}; for (const n of ['uDots', 'uTex', 'uStep', 'uSize', 'uInk']) u[n] = gl.getUniformLocation(pr, n);
+        return { pr, u };
+    };
+    const discs = program(`uniform vec3 uDots[${N}];   // x, y (CSS px, from the bottom-left), radius
+        void main() {
+            vec2 p = gl_FragCoord.xy * 2.0; float c = 0.0;
+            for (int i = 0; i < ${N}; i++) c = max(c, clamp((uDots[i].z - length(p - uDots[i].xy)) * 0.5 + 0.5, 0.0, 1.0));
+            gl_FragColor = vec4(c);
+        }`);
+    const blur = program(`uniform sampler2D uTex; uniform vec2 uStep, uSize;
+        void main() {
+            vec2 uv = gl_FragCoord.xy / uSize; float s = 0.0, w = 0.0;
+            for (int i = -${TAPS}; i <= ${TAPS}; i++) { float k = exp(-float(i * i) / ${(2 * (SIGMA / 2) ** 2).toFixed(1)}); s += texture2D(uTex, uv + uStep * float(i)).a * k; w += k; }
+            gl_FragColor = vec4(s / w);
+        }`);
+    const edge = program(`uniform sampler2D uTex; uniform vec2 uSize; uniform vec3 uInk;
+        void main() { float a = clamp(35.0 * texture2D(uTex, gl_FragCoord.xy / uSize).a - 15.0, 0.0, 1.0); gl_FragColor = vec4(uInk * a, a); }`);
+    if (!discs || !blur || !edge) return null;
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    const target = () => {
+        const tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
+        for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+        const fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+        return { tex, fb };
+    };
+    const A = target(), B = target();
+    const buf = new Float32Array(N * 3), MAX_PX = 1024;   // a long flick stretches the trail across the screen: past MAX_PX device pixels the edge pass runs coarser
+    let box = 0, half = 0, pr = 0, lost = false, smallSince = 0;
+    function resize(size) {   // box: an even CSS size, so the half-resolution texture covers it exactly
+        box = size; half = box / 2;
+        pr = Math.min(devicePixelRatio || 1, 2, MAX_PX / box);   // read each time: the window may have moved to another display
+        canvas.width = canvas.height = Math.round(box * pr); canvas.style.width = canvas.style.height = box + 'px';
+        for (const t of [A, B]) { gl.bindTexture(gl.TEXTURE_2D, t.tex); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, half, half, 0, gl.RGBA, gl.UNSIGNED_BYTE, null); }
+    }
+    const pass = (prog, to, from, size) => {
+        gl.useProgram(prog.pr); gl.bindFramebuffer(gl.FRAMEBUFFER, to ? to.fb : null); gl.viewport(0, 0, size, size);
+        if (from) { gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, from.tex); gl.uniform1i(prog.u.uTex, 0); }
+        if (prog.u.uSize) gl.uniform2f(prog.u.uSize, size, size);
+        return prog;
+    };
+    canvas.addEventListener('webglcontextlost', () => { lost = true; canvas.remove(); onLost(); }, { once: true });
+    host.appendChild(canvas);
+    return {
+        draw(dots, r0, ink) {
+            if (lost) return;
+            let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;   // the trail's extent, dot centres
+            for (const d of dots) { const cx = d.x + r0, cy = d.y + r0; if (cx < x0) x0 = cx; if (cx > x1) x1 = cx; if (cy < y0) y0 = cy; if (cy > y1) y1 = cy; }
+            const need = 2 * Math.ceil((Math.max(x1 - x0, y1 - y0) + 2 * (r0 * 1.6 + MARGIN)) / 2);   // r0 * 1.6: the head swells over links
+            const now = performance.now(); if (need >= box * 0.5) smallSince = now;
+            const fit = Math.max(120, 32 * Math.ceil(need * 1.25 / 32));   // grows with room to spare, shrinks once the trail has stayed well inside for half a second
+            if (need > box || (fit < box && now - smallSince > 500)) resize(fit); else if (Math.min(devicePixelRatio || 1, 2, MAX_PX / box) !== pr) resize(box);
+            const dp = devicePixelRatio || 1, ox = Math.round(((x0 + x1) / 2 - box / 2) * dp) / dp, oy = Math.round(((y0 + y1) / 2 - box / 2) * dp) / dp;   // on whole device pixels
+            canvas.style.transform = `translate(${ox}px, ${oy}px)`;
+            dots.forEach((d, i) => { buf[i * 3] = d.x + r0 - ox; buf[i * 3 + 1] = box - (d.y + r0 - oy); buf[i * 3 + 2] = d.r; });
+            gl.uniform3fv(pass(discs, A, null, half).u.uDots, buf); gl.drawArrays(gl.TRIANGLES, 0, 3);
+            gl.uniform2f(pass(blur, B, A, half).u.uStep, 1 / half, 0); gl.drawArrays(gl.TRIANGLES, 0, 3);
+            gl.uniform2f(pass(blur, A, B, half).u.uStep, 0, 1 / half); gl.drawArrays(gl.TRIANGLES, 0, 3);
+            gl.uniform3f(pass(edge, null, A, canvas.width).u.uInk, ink[0], ink[1], ink[2]); gl.drawArrays(gl.TRIANGLES, 0, 3);
+        },
+    };
 }
