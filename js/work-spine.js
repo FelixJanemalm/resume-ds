@@ -32,8 +32,7 @@ const coarse = matchMedia('(pointer: coarse)').matches;
 // Can this browser give us a WebGL2 context (fast = not a software renderer)? Asked once per kind with a throwaway canvas, so a
 // browser without WebGL never gets a THREE.WebGLRenderer at all: three logs every failed attempt as a console error.
 const glProbe = {};
-// ?sea=cpu: accept a software WebGL (the sea on the CPU), to test how it runs there; ?sea=recorded: the recorded sea (js/sea-frames.js),
-// which no longer starts on its own (it could not keep the sea moving).
+// ?sea=cpu: accept a software WebGL (the sea on the CPU), to test how it runs there.
 const SEA = new URLSearchParams(location.search).get('sea');
 function webgl2(fast) {
     if (SEA === 'cpu') fast = false;
@@ -104,7 +103,7 @@ const pcfg = section ? {
 if (pcfg) for (const [k, v] of new URLSearchParams(location.search)) if (k in pcfg && v !== '') pcfg[k] = Number.isNaN(+v) ? v : +v;   // dev aid: ?shipWorkTilt=45&boat=off
 let layer = null;
 const THEME_ROW = false;   // the ship-style icon row under the colour picker (and the stored choice it writes): off for now
-const MOD_V = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '?t=' + Date.now() : '?v=2026-10-29m';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache): never cached on a local server, versioned elsewhere (bump when they change)
+const MOD_V = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '?t=' + Date.now() : '?v=2026-10-29n';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache): never cached on a local server, versioned elsewhere (bump when they change)
 import('./ink-cursor.js' + MOD_V).catch(e => console.warn('ink cursor', e));   // the pointer as a trail of ink in the picked colour (it checks for a real mouse and reduced motion itself)
 
 const SIM_NOISE = `
@@ -576,25 +575,23 @@ const STAR_N = 12;
 // on a fast machine and several times that on a phone). Nothing it registers (listeners, observers, the frame loop) exists before the last yield.
 const yieldTask = () => new Promise(r => setTimeout(r, 0));
 async function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD, PRE) {
-    if (SEA === 'recorded') return heroStill('?sea=recorded', true);   // the recording in any browser, to review it
-    if (!GPUC) return heroStill('GPUComputationRenderer did not load', true);   // (this used to return without any hero at all: a blank hero)
+    if (!GPUC) return heroStill('GPUComputationRenderer did not load');   // (this used to return without any hero at all: a blank hero)
     if (!FOLD || !BOAT || pcfg.boat === 'off') return heroStill('no hero sea');
-    if (!webgl2(true)) return heroStill('no WebGL2, or only a software one', true);
+    if (!webgl2(true)) return heroStill('no WebGL2, or only a software one');
     const canvas = document.createElement('canvas');
     canvas.id = 'ws-particles'; canvas.setAttribute('aria-hidden', 'true');
     canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100vh;height:100lvh;z-index:-1;pointer-events:none;opacity:0;transition:opacity 1.6s ease';   // the LARGE viewport's height: a phone's address bar sliding in and out never resizes the layer (it only covers or uncovers its bottom edge)
     document.body.appendChild(canvas);   // appended last: z-index does the layering, and nothing else on the page sees it as the first canvas
     let gl;
     // failIfMajorPerformanceCaveat: a software renderer (a blocklisted GPU) would run the sea at a few frames a second; the plain hero is better
-    try { gl = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: 'high-performance', failIfMajorPerformanceCaveat: SEA !== 'cpu' }); } catch (e) { canvas.remove(); heroStill('no WebGL, or only a software one', true); return; }
+    try { gl = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: 'high-performance', failIfMajorPerformanceCaveat: SEA !== 'cpu' }); } catch (e) { canvas.remove(); heroStill('no WebGL, or only a software one'); return; }
     if (SEA === 'cpu') {   // a readout for testing on any device: the renderer and the frame rate
         const ctx = gl.getContext(), dbg = ctx.getExtension('WEBGL_debug_renderer_info'), name = dbg ? ctx.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : ctx.getParameter(ctx.RENDERER);
         const box = document.createElement('div'); box.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:2147483647;font:12px/1.4 monospace;color:#fff;background:rgba(0,0,0,.75);padding:6px 8px;border-radius:6px;max-width:90vw;pointer-events:none';
         document.body.appendChild(box); let n = 0, t0 = performance.now();
         (function tick(t) { n++; if (t - t0 >= 1000) { box.textContent = `${Math.round(n * 1000 / (t - t0))} fps · ${name}`; n = 0; t0 = t; } requestAnimationFrame(tick); })(t0);
     }
-    let everShown = false;   // once the live sea has shown, a later failure (after a restored context) keeps the plain hero: it may come back
-    const giveUp = why => { dead = true; try { gl.dispose(); gl.forceContextLoss(); } catch (e) {} canvas.remove(); heroStill(why, !everShown); };
+    const giveUp = why => { dead = true; try { gl.dispose(); gl.forceContextLoss(); } catch (e) {} canvas.remove(); heroStill(why); };
     let dead = false;
     if (!gl.capabilities.isWebGL2) return giveUp('no WebGL2');
     // the simulation renders into float (or half-float) targets; three's GPUComputationRenderer does not check that they are renderable, and
@@ -1763,7 +1760,7 @@ async function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD, PRE) {
     function verify(dt) {
         check.t += dt; if (check.n++ % 6 !== 5) return;
         let ok = false; try { ok = frameVisible(); } catch (e) {}
-        if (ok) { shown = everShown = true; canvas.style.opacity = '1'; return; }
+        if (ok) { shown = true; canvas.style.opacity = '1'; return; }
         if (check.t > 6) giveUp('no visible frame in 6 s');
     }
     // A lost context (iOS drops them in background tabs and under memory pressure): the canvas fades out at once; when the browser restores it,
@@ -1872,12 +1869,7 @@ onmessage = e => { const b = buildBoatLevels(e.data, 1), t = new Set([...b.pos, 
     });
 }
 
-// frames: the sea cannot run here for good (no GPU WebGL, a module or the simulation failed), so the recorded one plays instead (js/sea-frames.js).
-// Reduced motion, a context the browser may restore, and the config switches keep the plain hero.
-function heroStill(why, frames) {
-    if (why) console.info('work-spine: the hero ' + (frames && SEA === 'recorded' ? 'plays its recording' : 'stays without the sea') + ' (' + why + ')');
-    if (frames && SEA === 'recorded') import('./sea-frames.js' + MOD_V).then(m => m.start()).catch(e => console.warn('work-spine: sea-frames did not load', e));
-}
+function heroStill(why) { if (why) console.info('work-spine: the hero stays without the sea (' + why + ')'); }
 
 if (section && !reduced && 'IntersectionObserver' in window) boot(); else heroStill(reduced ? 'reduced motion' : 'no IntersectionObserver');
 
@@ -1903,7 +1895,7 @@ async function boot() {
         [THREE, CSS3D] = await core;
     } catch (err) {
         console.warn('work-spine: three.js did not load, keeping the flat list.', err);
-        heroStill('three.js did not load', true);
+        heroStill('three.js did not load');
         return;
     }
     const GPUC = await gpucP;
