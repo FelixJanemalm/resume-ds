@@ -199,7 +199,8 @@ const DOTS_VS = SEA + SWELL_NORMAL + `
       vC = mix(hueShift(uColor, uHueDrift * phi), vec3(1.0), 0.3 + 0.5 * min(1.0, flare));
       vec4 mv = viewMatrix * vec4(toWorld(p), 1.0);
       gl_PointSize = uPx * uPR * (0.6 + 0.9 * aSeed) * (1.0 + 0.6 * min(1.0, flare)) * 16.8 / max(1.0, -mv.z / uK);
-      gl_Position = project(mv); }`;
+      gl_Position = project(mv);
+      if (vB < 0.004) { gl_PointSize = 0.0; gl_Position = vec4(2.0, 2.0, 2.0, 1.0); } }`;   /* the fragment shader discards every pixel of these (a * vB < 0.004, a <= 1): culled here they cost no pixels (the far sea, past the lip) */
 const DOTS_FS = `
     varying float vB; varying vec3 vC;
     void main(){ float d = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.1, d); if (a * vB < 0.004) discard; gl_FragColor = vec4(min(vC * vB, vec3(1.0)), a); }`;   /* additive: the colour times the disc */
@@ -254,7 +255,7 @@ export function createFold(THREE, { scene, pixelRatio = 1, light = false, dots: 
     // transparent canvas an alpha written per dot would darken the page under every faint dot into a dark speck)
     let dots = null;
     if (withDots) {
-        const ND = light ? 26000 : 60000, dp = new Float32Array(ND * 3), ds = new Float32Array(ND);
+        const ND = 60000, dp = new Float32Array(ND * 3), ds = new Float32Array(ND);
         for (let i = 0; i < ND; i++) { const r = dotsRadius * Math.sqrt(Math.random()), a = Math.random() * Math.PI * 2; dp[i * 3] = dotsAt[0] + Math.cos(a) * r; dp[i * 3 + 2] = dotsAt[1] + Math.sin(a) * r; ds[i] = Math.pow(Math.random(), 2.2); }
         const dotGeo = new THREE.BufferGeometry(); dotGeo.setAttribute('position', new THREE.BufferAttribute(dp, 3)); dotGeo.setAttribute('aSeed', new THREE.BufferAttribute(ds, 1));
         dots = new THREE.Points(dotGeo, new THREE.ShaderMaterial({ uniforms: U, vertexShader: DOTS_VS, fragmentShader: DOTS_FS, transparent: true, depthWrite: false,
