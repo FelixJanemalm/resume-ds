@@ -560,7 +560,7 @@ const FIGURES = [
 const STAR_N = 12;
 function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
     if (!GPUC) return heroStill('GPUComputationRenderer did not load');   // (this used to return without any hero at all: a blank hero)
-    if (!FOLD || !BOAT || pcfg.boat === 'off') return heroStill('no hero sea');   // the still shows the sea and the ship: a layer without them would put a second ship on it
+    if (!FOLD || !BOAT || pcfg.boat === 'off') return heroStill('no hero sea');   // the still is the sea alone; the live layer is the sea and its ship, or nothing
     const canvas = document.createElement('canvas');
     canvas.id = 'ws-particles'; canvas.setAttribute('aria-hidden', 'true');
     canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100vh;height:100lvh;z-index:-1;pointer-events:none;opacity:0;transition:opacity 1.6s ease';   // the LARGE viewport's height: a phone's address bar sliding in and out never resizes the layer (it only covers or uncovers its bottom edge)

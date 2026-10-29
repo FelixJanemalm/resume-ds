@@ -60,12 +60,12 @@
     </script>
 </head>
 <body>
-    <!-- The hero's sea and ship as a still: a frame of the live scene (js/work-spine.js), drawn light-on-black and screen-blended, so it sits on
-         any dark ground. It is the hero for everyone until the live canvas has drawn a frame that is verifiably there (pixels read back), and
+    <!-- The hero's sea as a still, without the ship (Felix, 2026-10-29: no ship still while it loads): a frame of the live scene
+         (js/work-spine.js) with the ship's particles off, drawn light-on-black and screen-blended, so it sits on any dark ground. It is the hero for everyone until the live canvas has drawn a frame that is verifiably there (pixels read back), and
          for good where that never happens: no WebGL, reduced motion, a failed module, a lost GPU context. -->
     <picture>
-        <source media="(orientation: portrait)" srcset="images/hero/hero-sea-portrait.webp" width="786" height="1704">
-        <img class="hero-poster" src="images/hero/hero-sea-landscape.webp" width="1920" height="1200" alt="" aria-hidden="true" fetchpriority="high">
+        <source media="(orientation: portrait)" srcset="images/hero/hero-sea-only-portrait.webp" width="786" height="1704">
+        <img class="hero-poster" src="images/hero/hero-sea-only-landscape.webp" width="1920" height="1200" alt="" aria-hidden="true" fetchpriority="high">
     </picture>
 
     <header class="at-top"><!-- the state header.js sets at the top of the page, in the markup so the first paint already has it (it moved the hero 8 px: a 0.23 layout shift) -->
