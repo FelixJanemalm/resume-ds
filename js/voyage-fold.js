@@ -438,7 +438,7 @@ export function mountSilk(THREE, host, { style = 'ribbon', colorVar = '--primary
     gl.setPixelRatio(pixelRatio); gl.setClearColor(0x000000, 0);
     const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(35, 1, 0.5, 60); camera.position.set(0, 0, 12);
     const view = style === 'beach' ? beachView(THREE, scene, { pixelRatio, light, strength, ...rest }) : ribbonView(THREE, scene, { ...RIBBON, light, strength, ...rest });
-    let key = '', visible = false, raf = 0, t0 = performance.now(), polled = 0;
+    let key = '', visible = false, raf = 0, t0 = performance.now(), polled = 0, ready = false;
     function color() {
         let c = ''; try { c = getComputedStyle(document.documentElement).getPropertyValue(colorVar).trim(); } catch (e) {}
         if (c === key) return; key = c;
@@ -454,7 +454,9 @@ export function mountSilk(THREE, host, { style = 'ribbon', colorVar = '--primary
     }
     size(); color();
     new ResizeObserver(size).observe(host);
-    new IntersectionObserver(entries => { visible = entries.some(e => e.isIntersecting); if (visible && !raf) raf = requestAnimationFrame(frame); }, { rootMargin: '10% 0px' }).observe(host);
+    new IntersectionObserver(entries => { visible = entries.some(e => e.isIntersecting); if (visible && ready && !raf) raf = requestAnimationFrame(frame); }, { rootMargin: '10% 0px' }).observe(host);
+    // the shaders link in parallel now (KHR_parallel_shader_compile), not on the first frame: that frame would block the page mid-scroll while the driver links
+    gl.compileAsync(scene, camera).catch(() => {}).then(() => { ready = true; if (visible && !raf) raf = requestAnimationFrame(frame); });
     host.wsSilk = view;   // a dev aid: the view's uniforms (and the ribbon's set()) are live for tuning in the console
     return { canvas, view };
 }

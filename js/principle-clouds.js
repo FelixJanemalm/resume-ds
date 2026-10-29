@@ -202,7 +202,6 @@ function mount(host, def) {
     canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block;';
     let gl;
     try { gl = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: 'low-power' }); } catch (e) { return null; }
-    host.appendChild(canvas);
     const PR = Math.min(devicePixelRatio || 1, 2);
     gl.setPixelRatio(PR); gl.setClearColor(0x000000, 1);
     const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 60); camera.position.set(0, 0, CAM_Z);
@@ -304,32 +303,41 @@ function mount(host, def) {
     function drawStill() { if (!size()) return; pollColor(); if (freezeAt !== null) { ct = freezeAt % def.T; time = freezeAt; } else if (reduced) ct = stillAt(); snap(); upload(); gl.render(scene, camera); }
     function wake() { if (visible && !raf && !reduced && freezeAt === null) { last = 0; raf = requestAnimationFrame(frame); } }
 
-    new MutationObserver(() => {
-        const a = item.classList.contains('active');
-        if (a && !active && !hover) ct = def.start;
-        active = a; settle = 0; wake();
-    }).observe(item, { attributes: true, attributeFilter: ['class'] });
-    if (!coarse) {
-        item.addEventListener('pointerenter', () => { if (!active && !hover) ct = def.start; hover = true; settle = 0; wake(); });
-        item.addEventListener('pointerleave', () => { hover = false; settle = 0; wake(); });
-    }
-    if (desc) new ResizeObserver(() => { layout(); if (!raf && !reduced && freezeAt === null) { settle = Math.min(settle, 2.5); wake(); } else if (!raf) drawStill(); }).observe(desc);
-    // resizing clears the canvas, and resize callbacks run after the frame has drawn: draw again at once or the card blinks black while it opens
-    new ResizeObserver(() => { if (!size()) return; gl.render(scene, camera); if (!raf) { if (reduced || freezeAt !== null) drawStill(); else { settle = Math.min(settle, 2.5); wake(); } } }).observe(host);
-    new IntersectionObserver(entries => { visible = entries.some(e => e.isIntersecting); if (visible) wake(); }, { rootMargin: '15% 0px' }).observe(host);
+    function start() {
+        new MutationObserver(() => {
+            const a = item.classList.contains('active');
+            if (a && !active && !hover) ct = def.start;
+            active = a; settle = 0; wake();
+        }).observe(item, { attributes: true, attributeFilter: ['class'] });
+        if (!coarse) {
+            item.addEventListener('pointerenter', () => { if (!active && !hover) ct = def.start; hover = true; settle = 0; wake(); });
+            item.addEventListener('pointerleave', () => { hover = false; settle = 0; wake(); });
+        }
+        if (desc) new ResizeObserver(() => { layout(); if (!raf && !reduced && freezeAt === null) { settle = Math.min(settle, 2.5); wake(); } else if (!raf) drawStill(); }).observe(desc);
+        // resizing clears the canvas, and resize callbacks run after the frame has drawn: draw again at once or the card blinks black while it opens
+        new ResizeObserver(() => { if (!size()) return; gl.render(scene, camera); if (!raf) { if (reduced || freezeAt !== null) drawStill(); else { settle = Math.min(settle, 2.5); wake(); } } }).observe(host);
+        new IntersectionObserver(entries => { visible = entries.some(e => e.isIntersecting); if (visible) wake(); }, { rootMargin: '15% 0px' }).observe(host);
 
-    drawStill();
+        drawStill();
+    }
+    // Rendering a material the first time links its shaders, and the link blocks the main thread until the driver is done (hundreds of ms on a
+    // phone). compileAsync links them in parallel; the canvas goes in once they are ready, and until then the host's own black ground shows.
+    gl.compileAsync(scene, camera).catch(() => {}).then(() => { host.appendChild(canvas); start(); });
     return { host, get ct() { return ct; } };
 }
 
 // index.html loads this module async: a deferred one would hold every module after it (js/work-spine.js and the hero sea) and the page's
 // DOMContentLoaded until three.js had downloaded. So it waits for the document itself before it looks for its hosts.
+// The scenes are built only once the cards come within a screen of view, one per idle moment: on load they used to be built and drawn at once,
+// alongside the hero sea's own start, though the cards sit well below the first screen. The first card near is enough for all of them: on a
+// phone they are side by side in a swiped row, and the next one must be ready before it is swiped in.
 const mounted = [];
+const idle = fn => ('requestIdleCallback' in window) ? requestIdleCallback(fn, { timeout: 500 }) : setTimeout(fn, 50);
 function mountAll() {
-    document.querySelectorAll('[data-principle-cloud]').forEach(host => {
-        const def = SCENES[host.dataset.principleCloud];
-        if (def) { const m = mount(host, def); if (m) mounted.push(m); }
-    });
+    const hosts = [...document.querySelectorAll('[data-principle-cloud]')].filter(host => SCENES[host.dataset.principleCloud]);
+    const next = () => { const host = hosts.shift(); if (!host) return; const m = mount(host, SCENES[host.dataset.principleCloud]); if (m) mounted.push(m); idle(next); };
+    const io = new IntersectionObserver(entries => { if (entries.some(e => e.isIntersecting)) { io.disconnect(); idle(next); } }, { rootMargin: '100% 0px' });
+    hosts.forEach(host => io.observe(host));
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountAll, { once: true }); else mountAll();
 window.__principleClouds = mounted;

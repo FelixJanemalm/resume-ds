@@ -100,7 +100,7 @@ const pcfg = section ? {
 if (pcfg) for (const [k, v] of new URLSearchParams(location.search)) if (k in pcfg && v !== '') pcfg[k] = Number.isNaN(+v) ? v : +v;   // dev aid: ?shipWorkTilt=45&boat=off
 let layer = null;
 const THEME_ROW = false;   // the ship-style icon row under the colour picker (and the stored choice it writes): off for now
-const MOD_V = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '?t=' + Date.now() : '?v=2026-10-24b';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache): never cached on a local server, versioned elsewhere (bump when they change)
+const MOD_V = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '?t=' + Date.now() : '?v=2026-10-29c';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache): never cached on a local server, versioned elsewhere (bump when they change)
 import('./ink-cursor.js' + MOD_V).catch(e => console.warn('ink cursor', e));   // the pointer as a trail of ink in the picked colour (it checks for a real mouse and reduced motion itself)
 
 const SIM_NOISE = `
@@ -567,7 +567,10 @@ const FIGURES = [
 /* Page-wide particle layer: a fixed canvas behind everything (z-index -1, no pointer events), the same
    simulation as the lab, with the field wrapping vertically so it follows the page scroll with a little parallax. */
 const STAR_N = 12;
-function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
+// Async only so its start can yield between the heavy steps (the browser paints and takes input between them, where it was one ~50 ms block
+// on a fast machine and several times that on a phone). Nothing it registers (listeners, observers, the frame loop) exists before the last yield.
+const yieldTask = () => new Promise(r => setTimeout(r, 0));
+async function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD, PRE) {
     if (!GPUC) return heroStill('GPUComputationRenderer did not load');   // (this used to return without any hero at all: a blank hero)
     if (!FOLD || !BOAT || pcfg.boat === 'off') return heroStill('no hero sea');
     if (!webgl2(true)) return heroStill('no WebGL2, or only a software one');
@@ -752,7 +755,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
     // particle count and roles per slot are not guaranteed across themes, so the particles simply re-form (spring + settle) on a swap
     function buildLevels(mod) {
         BOAT = mod;
-        const built = mod.buildBoatLevels(boatCount, 1);
+        const built = PRE && mod === PRE.mod && PRE.count === boatCount ? PRE.built : mod.buildBoatLevels(boatCount, 1); PRE = null;   // the worker's build (boot) the first time; a theme switch builds here
         if (!mod.LEVEL_HEEL) tagSailBellies(built, boatCount);   // the six-level module bakes the sail bellies itself
         hullWL = measureHull(built, boatCount); shipRole = built.role;
         buildWire(mod, built);
@@ -766,6 +769,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         return old;
     }
     if (shipOn) buildLevels(BOAT);
+    await yieldTask(); if (dead) return;
 
     if (!levels.length) { const t = dataTex(new Float32Array(COUNT * 4)); levels.push({ pos: t, meta: t, scale: 1 }); }
     const starT = Array.from({ length: STAR_N }, () => new THREE.Vector4());   // shared by every material that needs the star targets
@@ -896,6 +900,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         armadaSilkGeos.set(base, g); return g;
     }
     // the hero's sea (js/voyage-fold.js): drawn before the particles; its risen sheet hides the field's stars behind it
+    await yieldTask(); if (dead) return;
     const fold = FOLD && shipOn ? FOLD.createFold(THREE, { scene, pixelRatio: DPR_MAX, light: coarse }) : null;
     if (!fold) return giveUp('the hero sea did not build');
     let visW = 1, visH = 1;
@@ -1756,7 +1761,14 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         try { for (const v of gpu.variables) for (const rt of v.renderTargets) gpu.renderTexture(v.initialValueTexture, rt); } catch (e) { console.warn('work-spine: re-seeding the particles', e); }
         ctxLost = false;
     });
-    let running = true; last = performance.now(); requestAnimationFrame(frame);   // a hidden tab simply stops getting animation frames
+    // Every program the layer will ever draw with (the silks and wires that only appear further down the page too: compile walks the whole scene,
+    // visible or not) and the simulation's two steps link in parallel first. Left to the first frames, each link blocked the page until the driver
+    // was done: the stall on load, and again mid-scroll when a hidden silk first showed. The simulation's materials are compiled against one of its
+    // own float targets, so the programs match the ones compute() asks for.
+    const warm = new THREE.Scene(), quad = new THREE.PlaneGeometry(2, 2);
+    for (const v of gpu.variables) { const q = new THREE.Mesh(quad, v.material); q.frustumCulled = false; warm.add(q); }
+    gl.setRenderTarget(gpu.getCurrentRenderTarget(posVar)); const simReady = gl.compileAsync(warm, camera); gl.setRenderTarget(null);
+    Promise.all([simReady, gl.compileAsync(scene, camera)]).catch(() => {}).then(() => { quad.dispose(); if (!dead) { last = performance.now(); requestAnimationFrame(frame); } });   // a hidden tab simply stops getting animation frames
     // ---- the theme (lineage) switch and the icon row under the colour picker
     const themeStore = 'ws-ship-theme';
     let themeId = (shipOn && BOAT.THEME && BOAT.THEME.id) || 'atlantic', themeRow = null;
@@ -1825,6 +1837,27 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
 // No still image in the hero (Felix, 2026-10-29): until the live sea has drawn a frame that is verifiably on screen, and for good where
 // that never happens (reduced motion, no IntersectionObserver, no WebGL2 or only a software one, no float render targets, a module that
 // failed to load, a lost GPU context), the hero is the page's own background with the headline and the picker. heroStill only says why.
+// The ship's particles for every evolution level (voyage-boat.js buildBoatLevels: pure arithmetic, deterministic for a count and seed) are
+// built in a worker while the page loads: on the main thread it was the longest single piece of the sea's start (~20-30 ms here, several times
+// that on a phone). The count is the one startParticleLayer derives. Any failure (no module workers, an error, 4 s) resolves null, and the
+// layer builds the ship itself as it always did.
+function prebuildShip(url) {
+    const N = Math.max(32, Math.round(pcfg.pCount)), COUNT = N * N, count = Math.min(COUNT - STAR_N, Math.floor(COUNT * pcfg.shipShare));
+    return new Promise(resolve => {
+        let w, src;
+        const done = v => { clearTimeout(timer); try { w && w.terminate(); } catch (e) {} if (src) URL.revokeObjectURL(src); resolve(v); };
+        const timer = setTimeout(() => done(null), 4000);
+        try {
+            src = URL.createObjectURL(new Blob([`import { buildBoatLevels } from ${JSON.stringify(new URL(url, import.meta.url).href)};
+onmessage = e => { const b = buildBoatLevels(e.data, 1), t = new Set([...b.pos, ...b.meta, b.role].map(a => a.buffer)); postMessage(b, [...t]); };`], { type: 'text/javascript' }));
+            w = new Worker(src, { type: 'module' });
+            w.onmessage = e => done(e.data && e.data.count === count ? { count, built: e.data } : null);
+            w.onerror = () => done(null);
+            w.postMessage(count);
+        } catch (e) { done(null); }
+    });
+}
+
 function heroStill(why) { if (why) console.info('work-spine: the hero stays without the sea (' + why + ')'); }
 
 if (section && !reduced && 'IntersectionObserver' in window) boot(); else heroStill(reduced ? 'reduced motion' : 'no IntersectionObserver');
@@ -1839,6 +1872,7 @@ async function boot() {
     const gpucP = soft(import('three/addons/misc/GPUComputationRenderer.js'), 'GPUComputationRenderer (no GPU particles)');
     const boatP = pcfg.boat !== 'off' ? soft(import('./voyage-boat.js' + MOD_V), 'the ship model') : Promise.resolve(null);
     const foldP = pcfg.fold ? soft(import('./voyage-fold.js' + MOD_V), 'the hero sea') : Promise.resolve(null);
+    const preP = pcfg.boat !== 'off' && pcfg.mode === 'page' ? prebuildShip('./voyage-boat.js' + MOD_V) : Promise.resolve(null);
     await new Promise(r => (document.readyState === 'complete' ? r() : addEventListener('load', r, { once: true })));
     await new Promise(r => ('requestIdleCallback' in window) ? requestIdleCallback(r, { timeout: 2000 }) : setTimeout(r, 400));
     // on an application link the chat widget reorders the cards to that posting's lead; read them after it has
@@ -1865,8 +1899,12 @@ async function boot() {
     }
     let FOLD = null;
     if (pcfg.fold && BOAT) FOLD = await foldP;
-    if (pcfg.mode === 'page') startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD); else heroStill('no page layer');
-    if (FOLD && pcfg.silkBg > 0 && webgl2(false)) FOLD.mountSilk(THREE, document.getElementById('scalability'), { style: pcfg.silkBgStyle, light: coarse, strength: pcfg.silkBg });   // the silk ground behind the principles (it starts drawing when the section comes near)
+    let PRE = await preP; if (PRE) PRE.mod = THEMES && THEMES.atlantic;   // the worker built the default lineage's ship; another one is built on the page
+    if (pcfg.mode === 'page') await startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD, PRE); else heroStill('no page layer');
+    if (FOLD && pcfg.silkBg > 0 && webgl2(false)) {   // the silk ground behind the principles (it starts drawing when the section comes near), built in the next idle moment: the section is far below the first screen
+        const silk = () => FOLD.mountSilk(THREE, document.getElementById('scalability'), { style: pcfg.silkBgStyle, light: coarse, strength: pcfg.silkBg });
+        if ('requestIdleCallback' in window) requestIdleCallback(silk, { timeout: 1500 }); else setTimeout(silk, 200);
+    }
     if (layer && new URLSearchParams(location.search).get('route') === '1') import('./voyage-editor.js' + MOD_V).then(m => m.mountRouteEditor(layer.routeApi)).catch(e => console.warn('work-spine: route editor', e));
     if (cards.length < 2) return;
     // the work section itself waits until it is within 1.5 viewports
