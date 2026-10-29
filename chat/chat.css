@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@500;600&display=swap');
+/* Caveat is loaded by a non-blocking <link> in the page head (index.html), not an @import here (an @import is a render-blocking chain). */
 /* "Ask about Felix" widget. Source of truth: job-machine/chat/web/chat.css
  * (build_portfolio.py copies it to resume-ds/chat/).
  *

@@ -29,6 +29,7 @@ const section = document.querySelector('[data-work-spine]');
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const numAttr = (v, d) => (v !== undefined && v !== '' && !Number.isNaN(+v)) ? +v : d;
 const coarse = matchMedia('(pointer: coarse)').matches;
+const DPR_MAX = Math.min(devicePixelRatio || 1, coarse ? 1.5 : 2);   // the hero layer's pixel ratio: 2 on desktop; phones 1.5 (their 3x screens drew 2x before, 78% more pixels than 1.5, for dots that are drawn at the same CSS size either way)
 
 // Particle settings, shared by the page-wide layer and the tune panel (data-p-* on the section)
 const pcfg = section ? {
@@ -558,20 +559,28 @@ const FIGURES = [
    simulation as the lab, with the field wrapping vertically so it follows the page scroll with a little parallax. */
 const STAR_N = 12;
 function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
-    if (!GPUC) return;
+    if (!GPUC) return heroStill('GPUComputationRenderer did not load');   // (this used to return without any hero at all: a blank hero)
+    if (!FOLD || !BOAT || pcfg.boat === 'off') return heroStill('no hero sea');   // the still shows the sea and the ship: a layer without them would put a second ship on it
     const canvas = document.createElement('canvas');
     canvas.id = 'ws-particles'; canvas.setAttribute('aria-hidden', 'true');
     canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100vh;height:100lvh;z-index:-1;pointer-events:none;opacity:0;transition:opacity 1.6s ease';   // the LARGE viewport's height: a phone's address bar sliding in and out never resizes the layer (it only covers or uncovers its bottom edge)
     document.body.appendChild(canvas);   // appended last: z-index does the layering, and nothing else on the page sees it as the first canvas
     let gl;
-    try { gl = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: 'high-performance' }); } catch (e) { canvas.remove(); lottieFallback(); return; }
-    if (!gl.capabilities.isWebGL2) { gl.dispose(); canvas.remove(); lottieFallback(); return; }
-    gl.setPixelRatio(Math.min(devicePixelRatio || 1, 2)); gl.setClearColor(0x000000, 0);
+    // failIfMajorPerformanceCaveat: a software renderer (a blocklisted GPU) would run the sea at a few frames a second; the still is better
+    try { gl = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: 'high-performance', failIfMajorPerformanceCaveat: true }); } catch (e) { canvas.remove(); heroStill('no WebGL, or only a software one'); return; }
+    const giveUp = why => { dead = true; try { gl.dispose(); gl.forceContextLoss(); } catch (e) {} canvas.remove(); heroStill(why); };
+    let dead = false;
+    if (!gl.capabilities.isWebGL2) return giveUp('no WebGL2');
+    // the simulation renders into float (or half-float) targets; three's GPUComputationRenderer does not check that they are renderable, and
+    // where they are not it silently writes nothing: an invisible ship. Desktop uses float, phones half-float; half-float is the fallback.
+    const rtFloat = gl.extensions.has('EXT_color_buffer_float'), rtHalf = rtFloat || gl.extensions.has('EXT_color_buffer_half_float');
+    if (!rtHalf) return giveUp('no float render targets');
+    gl.setPixelRatio(DPR_MAX); gl.setClearColor(0x000000, 0);
     const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(35, 1, 0.5, 60);
     camera.position.set(0, 0, 12);
     const M = THREE.MathUtils, N = Math.max(32, Math.round(pcfg.pCount)), COUNT = N * N, H = 11;
     const gpu = new GPUC.GPUComputationRenderer(N, N, gl);
-    if (coarse) gpu.setDataType(THREE.HalfFloatType);
+    if (coarse || !rtFloat) gpu.setDataType(THREE.HalfFloatType);
     const pos0 = gpu.createTexture(), vel0 = gpu.createTexture(), home = gpu.createTexture();
     for (let i = 0; i < COUNT; i++) {
         const x = (Math.random() * 2 - 1) * 10, y = (Math.random() - 0.5) * H, z = (Math.random() * 2 - 1) * 4, w = Math.random();
@@ -827,13 +836,19 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
     const velU = velVar.material.uniforms, posU = posVar.material.uniforms;
     Object.assign(velU, { tHome: { value: home }, uDelta: { value: 0 }, uCurl: { value: pcfg.pCurl }, uReturn: { value: pcfg.pReturn }, uDamp: { value: pcfg.pDamp }, uPull: { value: pcfg.pPull }, uRadius: { value: pcfg.pRadius }, uScroll: { value: 0 }, uH: { value: H }, uW: { value: 20 }, uDrift: { value: new THREE.Vector2() }, uRocket: { value: 0 }, uCam: { value: new THREE.Vector3() }, uDir: { value: new THREE.Vector3(0, 0, -1) } }, boatU());
     Object.assign(posU, { tHome: { value: home }, uDelta: { value: 0 }, uScroll: { value: 0 }, uH: { value: H }, uW: { value: 20 }, uDrift: { value: new THREE.Vector2() }, uFleetSettle: { value: 1 } }, boatU());   // the position step needs the field's offset for the wake trail
-    const err = gpu.init(); if (err) { console.warn('work-spine: particle layer', err); gl.dispose(); canvas.remove(); lottieFallback(); return; }
+    const err = gpu.init(); if (err) { console.warn('work-spine: particle layer', err); return giveUp(err); }
+    {   // and that the targets really are complete framebuffers here (a driver can list the extension and still refuse the format)
+        const c = gl.getContext(); let ok = true;
+        for (const v of gpu.variables) { gl.setRenderTarget(v.renderTargets[0]); if (c.checkFramebufferStatus(c.FRAMEBUFFER) !== c.FRAMEBUFFER_COMPLETE) ok = false; }
+        gl.setRenderTarget(null);
+        if (!ok) return giveUp('the simulation cannot render to its float targets');
+    }
     const geo = new THREE.BufferGeometry(), ref = new Float32Array(COUNT * 2), sz = new Float32Array(COUNT);
     for (let i = 0; i < COUNT; i++) { ref[i * 2] = ((i % N) + 0.5) / N; ref[i * 2 + 1] = (Math.floor(i / N) + 0.5) / N; sz[i] = Math.random() < 0.015 ? 1.4 + Math.random() * 0.5 : 0.5 + Math.random() * 0.5; }
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(COUNT * 3), 3));
     geo.setAttribute('ref', new THREE.BufferAttribute(ref, 2)); geo.setAttribute('aSize', new THREE.BufferAttribute(sz, 1));
     const mat = new THREE.ShaderMaterial({
-        uniforms: Object.assign({ tPos: { value: null }, tVel: { value: null }, tHomeP: { value: home }, uSize: { value: pcfg.pSize }, uDPR: { value: Math.min(devicePixelRatio || 1, 2) }, uP: { value: 1000 }, uRadius: { value: pcfg.pRadius }, uIntro: { value: 0 }, uScroll: { value: 0 }, uH: { value: H }, uW: { value: 20 }, uDrift: { value: new THREE.Vector2() }, uRocket: { value: 0 }, uFieldDim: { value: 1 }, uWake: { value: 0 }, uBoatPx: { value: 1.25 },
+        uniforms: Object.assign({ tPos: { value: null }, tVel: { value: null }, tHomeP: { value: home }, uSize: { value: pcfg.pSize }, uDPR: { value: DPR_MAX }, uP: { value: 1000 }, uRadius: { value: pcfg.pRadius }, uIntro: { value: 0 }, uScroll: { value: 0 }, uH: { value: H }, uW: { value: 20 }, uDrift: { value: new THREE.Vector2() }, uRocket: { value: 0 }, uFieldDim: { value: 1 }, uWake: { value: 0 }, uBoatPx: { value: 1.25 },
             uCam: { value: new THREE.Vector3() }, uDir: { value: new THREE.Vector3(0, 0, -1) }, uColorA: { value: new THREE.Color(0x4faad1) }, uColorB: { value: new THREE.Color(0x4faad1) }, uColorLit: { value: new THREE.Color(0xffffff) }, uColorFlag: { value: new THREE.Color(0xffffff) }, uFlag: { value: pcfg.shipBurgee }, uClipTop: { value: 1e9 }, uGlow: { value: pcfg.pGlow } }, boatU()),
         vertexShader: PTS_VS, fragmentShader: PTS_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
     });
@@ -871,9 +886,8 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         armadaSilkGeos.set(base, g); return g;
     }
     // the hero's sea (js/voyage-fold.js): drawn before the particles; its risen sheet hides the field's stars behind it
-    const fold = FOLD && shipOn ? FOLD.createFold(THREE, { scene, pixelRatio: Math.min(devicePixelRatio || 1, 2), light: coarse }) : null;
-    if (!fold) lottieFallback();   // no sea to replace the hero's animation: fetch it after all
-    const lottieHost = document.querySelector('.hero-wrapper dotlottie-player');
+    const fold = FOLD && shipOn ? FOLD.createFold(THREE, { scene, pixelRatio: DPR_MAX, light: coarse }) : null;
+    if (!fold) return giveUp('the hero sea did not build');
     let visW = 1, visH = 1;
     // constellation lines between recruited stars: vertices sample the live position texture, so the lines follow the particles
     // each line vertex knows both endpoints (position texture refs and star indices) so the segment only shows once both stars are near their targets
@@ -1401,7 +1415,6 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         let foldW = 0, foldAmt = 1, foldK = 1, foldTheta = 0, silkW = 0;
         if (fold) {
             const portrait = VH > innerWidth, on = !portrait || pcfg.foldPortrait > 0, h0 = ship.keys[0].k;
-            if (!on) lottieFallback();   // this frame keeps the Lottie (a phone with data-fold-portrait="0"), so it has to exist
             if (portrait !== ship.foldPortraitNow) {   // the sea reshaped for the frame it is in (FOLD.PORTRAIT), and back if the phone is turned
                 ship.foldPortraitNow = portrait;
                 const PF = FOLD.PORTRAIT, o = {}; for (const k in PF) o[k] = portrait ? PF[k] : FOLD.DEFAULTS[k];   // (PF, not P: P is the route's pose here)
@@ -1416,11 +1429,8 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
             foldW = on ? 1 - M.smoothstep(sS, ship.foldFadeY || 480, ship.foldGoneY || 790) : 0;
             const linesW = 1 - M.smoothstep(sS, ship.foldFadeY || 480, ship.silkGoneY || 1040);   // the silk lines outlast the wall a little: gone as the work section pins
             silkW = on && !ship.overlay && rocketMix < 0.5 ? Math.max(foldW, linesW, M.clamp(pcfg.silk, 0, 1)) : 0;   // (with data-silk="1" they stay on down the page until the ending)
-            const hideLottie = on && shown;   // the fold replaces the Lottie (it fades out as the layer fades in); phones keep it
-            if (lottieHost && hideLottie !== ship.lottieHidden) {
-                ship.lottieHidden = hideLottie; lottieHost.style.transition = 'opacity 1.6s ease'; lottieHost.style.opacity = hideLottie ? '0' : '';
-                try { if (hideLottie) setTimeout(() => ship.lottieHidden && lottieHost.pause && lottieHost.pause(), 1700); else if (lottieHost.play) lottieHost.play(); } catch (e) {}
-            }
+            const live = on && shown && !ctxLost;   // the live sea replaces the still (it fades out as the layer fades in) once a frame is verified
+            if (live !== ship.posterHidden) { ship.posterHidden = live; if (live) heroLive(); else heroStill(); }
         }
         // gust: wind the sails feel before the hull has answered it (sails shake, the ship luffs and heels), smoothed and floored so a one-notch wheel does not twitch the sails
         const squall = storm * 0.6 * (0.5 + 0.5 * Math.sin(t * 1.1 + 0.6 * Math.sin(t * 0.37)));   // the storm's gusts: the sails shake, the ship luffs and heels, in squalls
@@ -1677,6 +1687,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
     // adaptive quality: after the first 2.5 s, a slow device gets a lower pixel ratio, half the drawn particles and a half-rate simulation
     const qual = { acc: 0, frames: 0, done: false, half: false, tick: 0, simDt: 0 };
     function frame(now) {
+        if (dead) return;
         const dt = Math.min(0.05, Math.max(0.001, (now - last) / 1000)); last = now; const t = now * 0.001;
         const stale = !pointer.active || now - pointer.last > 2500;
         if (stale) pointer.target.set(0.55 * Math.sin(t * 0.23), 0.35 * Math.sin(t * 0.31 + 1.0));
@@ -1700,9 +1711,43 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         for (const o of WIRES) o.material.uniforms.tPos.value = U.tPos.value; for (const o of SILKS_ALL) o.material.uniforms.tPos.value = U.tPos.value;
         U.uIntro.value = Math.min(1, U.uIntro.value + dt * 0.5);
         gl.render(scene, camera);
-        if (!shown) { shown = true; canvas.style.opacity = '1'; }
+        if (!shown && !ctxLost) verify(dt);   // straight after the render: the drawing buffer is still there to read
         requestAnimationFrame(frame);
     }
+    // The canvas is shown, and the still faded out, only once a drawn frame is verifiably there: pixels read back across the sea and at the
+    // ship. "The first frame drew" is not enough: a context whose simulation writes nothing draws frames too, and hid the old hero behind an
+    // empty canvas. Every 6th frame (each read stalls the GPU a little) until it passes; after 6 s of frames, the still stays for good.
+    const check = { t: 0, n: 0 }, shipNdc = new THREE.Vector3();
+    function litShare(c, x, y, w, rows, h) {
+        const buf = new Uint8Array(w * 4); let lit = 0, all = 0;
+        for (let k = 0; k < rows; k++) {
+            c.readPixels(x, Math.round(y + (rows > 1 ? k * h / (rows - 1) : 0)), w, 1, c.RGBA, c.UNSIGNED_BYTE, buf);
+            for (let i = 3; i < buf.length; i += 4) { all++; if (buf[i] > 8) lit++; }
+        }
+        return all ? lit / all : 0;
+    }
+    function frameVisible() {
+        const c = gl.getContext(), W = c.drawingBufferWidth, Hh = c.drawingBufferHeight; if (!W || !Hh) return false;
+        if (litShare(c, 0, Hh * 0.1, W, 5, Hh * 0.4) < 0.002) return false;   // the sea: five rows across the lower half (GL rows count from the bottom)
+        shipNdc.copy(shipAt).project(camera);   // the ship: a block round its waterline centre, mostly above it (the sails)
+        const bw = Math.round(W * 0.16), bx = Math.round(M.clamp((shipNdc.x * 0.5 + 0.5) * W - bw / 2, 0, W - bw)), by = M.clamp((shipNdc.y * 0.5 + 0.5) * Hh - Hh * 0.04, 0, Hh * 0.8);
+        return litShare(c, bx, by, bw, 8, Hh * 0.18) > 0.004;
+    }
+    function verify(dt) {
+        check.t += dt; if (check.n++ % 6 !== 5) return;
+        let ok = false; try { ok = frameVisible(); } catch (e) {}
+        if (ok) { shown = true; canvas.style.opacity = '1'; return; }
+        if (check.t > 6) giveUp('no visible frame in 6 s');
+    }
+    // A lost context (iOS drops them in background tabs and under memory pressure): back to the still at once; when the browser restores it,
+    // three rebuilds its own state, the simulation's targets come back empty and are re-seeded, and the canvas returns after a verified frame.
+    let ctxLost = false;
+    canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); if (dead) return; ctxLost = true; shown = false; check.t = 0; check.n = 0; canvas.style.opacity = '0'; heroStill('the GPU context was lost'); });
+    canvas.addEventListener('webglcontextrestored', () => {
+        if (dead) return;
+        try { for (const v of gpu.variables) for (const rt of v.renderTargets) gpu.renderTexture(v.initialValueTexture, rt); } catch (e) { console.warn('work-spine: re-seeding the particles', e); }
+        ctxLost = false;
+    });
     let running = true; last = performance.now(); requestAnimationFrame(frame);   // a hidden tab simply stops getting animation frames
     // ---- the theme (lineage) switch and the icon row under the colour picker
     const themeStore = 'ws-ship-theme';
@@ -1769,42 +1814,44 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
     };
 }
 
-// The hero's Lottie is now only a fallback. Its player is 124 KB over five files from two other origins, and since the sea replaced it — on phones
-// too — nobody who sees the sea ever needed any of it, so index.html no longer loads it: it is fetched here, and only for the visitors the sea will
-// not reach (reduced motion, no IntersectionObserver, no WebGL2, ?fold=0, data-fold-portrait="0" on a phone, or a module that failed to load).
-let lottieAsked = false;
-function lottieFallback() {
-    if (lottieAsked || !document.querySelector('.hero-wrapper dotlottie-player')) return;
-    lottieAsked = true;
-    import('https://unpkg.com/@dotlottie/player-component@2.7.12/dist/dotlottie-player.mjs').catch(e => console.warn('work-spine: the hero Lottie failed to load', e));   // it upgrades the <dotlottie-player> already in the hero
-}
+// The hero's still (index.html .hero-poster, images/hero/) is the hero until the live sea has drawn a frame that is verifiably on screen, and
+// stays the hero where that never happens: reduced motion (a still, no motion at all), no IntersectionObserver, no WebGL2 or only a software
+// one, no float render targets, a module that failed to load, a lost GPU context. It is first-party and in the HTML, so the hero is never blank.
+// It replaced the dotLottie fallback (the retired hero design, fetched from unpkg and lottie.host only after everything else had failed).
+const heroPoster = document.querySelector('.hero-poster');
+function heroStill(why) { if (why) console.info('work-spine: the hero keeps its still (' + why + ')'); if (heroPoster) heroPoster.style.opacity = ''; }
+function heroLive() { if (heroPoster) heroPoster.style.opacity = '0'; }
 
-if (section && !reduced && 'IntersectionObserver' in window) boot(); else lottieFallback();
+if (section && !reduced && 'IntersectionObserver' in window) boot(); else heroStill(reduced ? 'reduced motion' : 'no IntersectionObserver');
 
 async function boot() {
-    // three loads after the page has loaded and the browser is idle, so it never competes with the hero
+    // Every module the voyage needs is requested now, all at once (they used to be fetched one after another, and only after the load event
+    // and an idle callback: seven round trips before the hero sea could start). The work itself still waits for the load event and an idle
+    // moment, so it never competes with the page's first paint; the still holds the hero meanwhile.
+    const soft = (pr, what) => pr.catch(e => { console.warn('work-spine: ' + what + ' did not load', e); return null; });
+    const core = Promise.all([import('three'), import('three/addons/renderers/CSS3DRenderer.js'), import('three/addons/environments/RoomEnvironment.js')]);
+    core.catch(() => {});   // handled below
+    const gpucP = soft(import('three/addons/misc/GPUComputationRenderer.js'), 'GPUComputationRenderer (no GPU particles)');
+    const boatP = pcfg.boat !== 'off' ? soft(import('./voyage-boat.js' + MOD_V), 'the ship model') : Promise.resolve(null);
+    const foldP = pcfg.fold ? soft(import('./voyage-fold.js' + MOD_V), 'the hero sea') : Promise.resolve(null);
     await new Promise(r => (document.readyState === 'complete' ? r() : addEventListener('load', r, { once: true })));
     await new Promise(r => ('requestIdleCallback' in window) ? requestIdleCallback(r, { timeout: 2000 }) : setTimeout(r, 400));
     // on an application link the chat widget reorders the cards to that posting's lead; read them after it has
     if (window.fjcLead) await Promise.race([window.fjcLead, new Promise(r => setTimeout(r, 800))]);
     const cards = [...section.querySelectorAll('.case-study-teaser')];
 
-    let THREE, CSS3D, ENV, GPUC = null;
+    let THREE, CSS3D, ENV;
     try {
-        [THREE, CSS3D, ENV] = await Promise.all([
-            import('three'),
-            import('three/addons/renderers/CSS3DRenderer.js'),
-            import('three/addons/environments/RoomEnvironment.js'),
-        ]);
+        [THREE, CSS3D, ENV] = await core;
     } catch (err) {
         console.warn('work-spine: three.js did not load, keeping the flat list.', err);
-        lottieFallback();   // nothing of the voyage will run: the hero keeps its animation
+        heroStill('three.js did not load');
         return;
     }
-    try { GPUC = await import('three/addons/misc/GPUComputationRenderer.js'); } catch (e) { console.warn('work-spine: no GPU particles', e); }
+    const GPUC = await gpucP;
     let BOAT = null, THEMES = null;
     if (pcfg.boat !== 'off') {
-        try { BOAT = await import('./voyage-boat.js' + MOD_V); THEMES = { atlantic: BOAT }; } catch (e) { console.warn('work-spine: no ship model, particles only', e); }
+        BOAT = await boatP; if (BOAT) THEMES = { atlantic: BOAT };
         // the lineage: ?theme= (dev aid), then the picker's stored choice, then the section's data-ship-theme
         let want = new URLSearchParams(location.search).get('theme') || '';   // the picker's theme icons are off for now (THEME_ROW), so a stored choice is ignored: ?theme= only
         if (!want && THEME_ROW) { try { want = localStorage.getItem('ws-ship-theme') || ''; } catch (e) {} }
@@ -1812,8 +1859,8 @@ async function boot() {
         if (THEMES && THEMES[want || pcfg.shipTheme]) BOAT = THEMES[want || pcfg.shipTheme];
     }
     let FOLD = null;
-    if (pcfg.fold && BOAT) { try { FOLD = await import('./voyage-fold.js' + MOD_V); } catch (e) { console.warn('work-spine: the hero sea failed to load (the Lottie stays)', e); } }
-    if (pcfg.mode === 'page') startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD); else lottieFallback();
+    if (pcfg.fold && BOAT) FOLD = await foldP;
+    if (pcfg.mode === 'page') startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD); else heroStill('no page layer');
     if (FOLD && pcfg.silkBg > 0) FOLD.mountSilk(THREE, document.getElementById('scalability'), { style: pcfg.silkBgStyle, light: coarse, strength: pcfg.silkBg });   // the silk ground behind the principles (it starts drawing when the section comes near)
     if (layer && new URLSearchParams(location.search).get('route') === '1') import('./voyage-editor.js' + MOD_V).then(m => m.mountRouteEditor(layer.routeApi)).catch(e => console.warn('work-spine: route editor', e));
     if (cards.length < 2) return;
@@ -1916,7 +1963,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
         });
     } catch (err) {
         console.warn('work-spine: WebGL unavailable, cards only.', err);
-        lottieFallback();   // no layer at all, so the hero keeps its animation
+        heroStill('no WebGL for the work section');
         gl = null;
         glCanvas.remove();
     }

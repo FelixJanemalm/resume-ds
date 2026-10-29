@@ -294,15 +294,27 @@ cursor: grabbing;
     scroll-margin-top: 80px; /* Adjust based on header height */
 }
 
-.hero-wrapper dotlottie-player {
-    width: auto;
-    height: 110%;
+/* The hero's still (index.html <picture>): the live sea's canvas geometry at scroll 0 (top of the page, full width, the large viewport's
+   height), under the canvas (same z, earlier in the markup), screen-blended so its black is the page's own ground. js/work-spine.js fades it
+   out once the canvas has drawn a verified frame, and back in if the GPU context is lost. */
+.hero-poster {
     position: absolute;
-    z-index: 0; /* same layer as #grid, which comes first in the markup, so the water paints over the grid */
-    pointer-events: none; /* the grid underneath still gets mousemove for its distortion */
-    top:0;
-    right: 0;
- }
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    height: 100lvh;
+    object-fit: cover;
+    z-index: -1;
+    pointer-events: none;
+    mix-blend-mode: screen;
+    filter: hue-rotate(var(--hero-poster-hue, 0deg));
+    transition: opacity 1.6s ease;
+}
+.hero-poster-light .hero-poster {   /* a pale page: the still as dark ink, like the live dots on a pale ground */
+    mix-blend-mode: multiply;
+    filter: invert(1) hue-rotate(calc(180deg + var(--hero-poster-hue, 0deg)));
+}
 
 
 /* Subtle bounce animation */
@@ -395,31 +407,7 @@ cursor: grabbing;
 }
 
 
-@media (max-width: 1400px) {
-    .hero-wrapper dotlottie-player {
-        width: 58%;
-        height: auto;
-    } 
-}
-
-@media (max-width: 1200px) {
-    .hero-wrapper dotlottie-player {
-        width: 70%;
-        height: auto;
-        min-width: 630px;
-        height: auto;
-        top: calc(100% - 630px);
-        right: 0;
-        transform: scaley(-1);
-    } 
-}
-
 @media (max-width: 1000px) {
-
-    .hero-wrapper dotlottie-player {
-        width: 400px;
-        top: calc(100% - 400px);
-    } 
     .hero-subhead {
         max-width: 400px;
     }
@@ -427,15 +415,6 @@ cursor: grabbing;
 
 
 @media (max-width: 756px) {
-
-    .hero-wrapper dotlottie-player {
-        width: 120%;
-        min-width: 630px;
-        height: auto;
-        top: calc(100% - 630px);
-        left: 0;
-        transform: scale(-1);
-    } 
     .hero-subhead {
         color: white;
         max-width: 400px;

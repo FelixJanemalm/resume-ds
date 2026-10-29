@@ -315,9 +315,14 @@ function mount(host, def) {
     return { host, get ct() { return ct; } };
 }
 
+// index.html loads this module async: a deferred one would hold every module after it (js/work-spine.js and the hero sea) and the page's
+// DOMContentLoaded until three.js had downloaded. So it waits for the document itself before it looks for its hosts.
 const mounted = [];
-document.querySelectorAll('[data-principle-cloud]').forEach(host => {
-    const def = SCENES[host.dataset.principleCloud];
-    if (def) { const m = mount(host, def); if (m) mounted.push(m); }
-});
+function mountAll() {
+    document.querySelectorAll('[data-principle-cloud]').forEach(host => {
+        const def = SCENES[host.dataset.principleCloud];
+        if (def) { const m = mount(host, def); if (m) mounted.push(m); }
+    });
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountAll, { once: true }); else mountAll();
 window.__principleClouds = mounted;

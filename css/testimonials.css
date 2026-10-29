@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css?family=Lato:400,400i,700");
+/* Lato is loaded by a non-blocking <link> in index.html, not an @import here (an @import is a render-blocking chain). */
 
 * {
 	box-sizing: border-box;

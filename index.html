@@ -16,30 +16,59 @@
     <link rel="stylesheet" href="css/materials.css"> 
     <link rel="stylesheet" href="css/header.css">
     <link rel="stylesheet" href="css/drawer.css">
-    <link rel="stylesheet" href="css/hero.css">
+    <link rel="stylesheet" href="css/hero.css?v=2026-10-29">
     <link rel="stylesheet" href="css/tools.css">
-    <link rel="stylesheet" href="css/testimonials.css">
+    <link rel="stylesheet" href="css/testimonials.css?v=2026-10-29">
     <link rel="stylesheet" href="css/cards.css?v=3">
     <link rel="stylesheet" href="css/reader.css">
     <link rel="stylesheet" href="css/image-text.css">
     <link rel="stylesheet" href="css/work-spine.css">
     <link rel="stylesheet" href="css/footer.css">
-    <link rel="stylesheet" href="css/figma-iframe.css">
-    <link rel="stylesheet" href="/chat/chat.css?v=22">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap">
+    <link rel="stylesheet" href="/chat/chat.css?v=23">
+    <!-- Third-party fonts never block the first paint: Lato (testimonials) and Caveat (the chat widget's note) load as a print sheet and
+         switch on when it arrives (display=swap). They used to be @imports inside testimonials.css and chat.css, a render-blocking chain to
+         fonts.googleapis.com. Permanent Marker and css/figma-iframe.css were dropped: nothing on this page uses them. -->
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600&family=Lato:ital,wght@0,400;0,700;1,400&display=swap" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600&family=Lato:ital,wght@0,400;0,700;1,400&display=swap"></noscript>
+    <!-- three.js r170 is served from this site (vendor/, MIT, unmodified): no third-party origin between the visitor and the hero sea -->
     <script type="importmap">
     { "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+        "three": "/vendor/three-0.170.0/three.module.min.js",
+        "three/addons/": "/vendor/three-0.170.0/addons/"
     } }
     </script>
-    <!-- The dotLottie player is NOT loaded here any more. The hero's sea (js/work-spine.js) replaced the one Lottie left on this page, so the
-         player's 124 KB over five files from two other origins would be fetched on every visit for something almost nobody sees. work-spine.js
-         imports it only when the sea will not run (reduced motion, no WebGL2, ?fold=0, ...) — see lottieFallback() there. -->
+    <script>
+    /* The hero's still (images/hero/): tinted to the picked colour before the first paint, the way the live sea takes it. The stills were
+       rendered at hue 210 (the picker's first-visit blue); a light colour turns the page pale, so the still turns to dark ink on it. */
+    (function () {
+        function tint(hex) {
+            var m = /^#?([0-9a-f]{6})$/i.exec((hex || '').trim()); if (!m) return;
+            var n = parseInt(m[1], 16), r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+            var mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn, h = 0;
+            if (d) h = mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+            var e = document.documentElement;
+            e.style.setProperty('--hero-poster-hue', (h * 60 - 210).toFixed(1) + 'deg');
+            e.classList.toggle('hero-poster-light', (mx + mn) / 2 > 0.5);
+        }
+        try { tint(localStorage.getItem('portfolio-theme-primary')); } catch (e) {}
+        document.addEventListener('portfolioThemePrimaryChanged', function (ev) {
+            var c = ev.detail && ev.detail.color;
+            tint(/^#?[0-9a-f]{6}$/i.test(String(c || '').trim()) ? String(c) : getComputedStyle(document.documentElement).getPropertyValue('--primary-color'));
+        });
+    })();
+    </script>
 </head>
 <body>
+    <!-- The hero's sea and ship as a still: a frame of the live scene (js/work-spine.js), drawn light-on-black and screen-blended, so it sits on
+         any dark ground. It is the hero for everyone until the live canvas has drawn a frame that is verifiably there (pixels read back), and
+         for good where that never happens: no WebGL, reduced motion, a failed module, a lost GPU context. -->
+    <picture>
+        <source media="(orientation: portrait)" srcset="images/hero/hero-sea-portrait.webp" width="786" height="1704">
+        <img class="hero-poster" src="images/hero/hero-sea-landscape.webp" width="1920" height="1200" alt="" aria-hidden="true" fetchpriority="high">
+    </picture>
 
-    <header>
+    <header class="at-top"><!-- the state header.js sets at the top of the page, in the markup so the first paint already has it (it moved the hero 8 px: a 0.23 layout shift) -->
         <nav>
             <div class="logo">
                 <a href="#home">
@@ -108,7 +137,6 @@
 
     <div class="hero-wrapper">
         <canvas id="grid"></canvas>
-        <dotlottie-player class="hue-shift" src="https://lottie.host/93d57fcd-3fc0-44ba-bc44-8ccce42a223b/ij9xZSCrbn.lottie" background="transparent" speed="1" loop autoplay></dotlottie-player>
         <div class="hero"> 
             <div class="hero-left">
                 <h1>Ship better products <span class="hue-rotate">faster</span></h1>
@@ -153,8 +181,8 @@
 
         <a href="work/ai-sourcing.html" class="case-study-teaser">
             <div class="teaser-visual">
-                <video autoplay muted loop playsinline>
-                    <source src="images/case-studies/sourcing-platform-overview.mp4" type="video/mp4">
+                <video muted loop playsinline data-poster="images/posters/sourcing-platform-overview.webp">
+                    <source data-src="images/case-studies/sourcing-platform-overview.mp4" type="video/mp4">
                 </video>
             </div>
             <div class="teaser-body">
@@ -173,8 +201,8 @@
 
         <a href="work/design-system.html" class="case-study-teaser">
             <div class="teaser-visual">
-                <video class="hue-shift" autoplay muted loop playsinline>
-                    <source src="images/v7-demo.mp4" type="video/mp4">
+                <video class="hue-shift" muted loop playsinline data-poster="images/posters/v7-demo.webp">
+                    <source data-src="images/v7-demo.mp4" type="video/mp4">
                 </video>
             </div>
             <div class="teaser-body">
@@ -192,8 +220,8 @@
 
         <a href="work/design-tokens.html" class="case-study-teaser">
             <div class="teaser-visual">
-                <video autoplay muted loop playsinline>
-                    <source src="images/tokens-v3-export.mp4" type="video/mp4">
+                <video muted loop playsinline data-poster="images/posters/tokens-v3-export.webp">
+                    <source data-src="images/tokens-v3-export.mp4" type="video/mp4">
                 </video>
             </div>
             <div class="teaser-body">
@@ -224,8 +252,8 @@
         <h2 class="h2-gradient">Principles that scale</h2>
         <div class="card-rail" role="group" aria-label="Principles that scale">
           <div class="item">
-            <video autoplay muted loop playsinline class="background-video">
-                <source src="images/value-v1.mp4" type="video/mp4">
+            <video muted loop playsinline class="background-video" data-poster="images/posters/value-v1.webp">
+                <source data-src="images/value-v1.mp4" type="video/mp4">
                 Your browser does not support the video tag.
               </video>
             <div class="item-desc">
@@ -241,8 +269,8 @@
             </div>
           </div>
           <div class="item">
-            <video autoplay muted loop playsinline class="background-video">
-                <source src="images/demoTableComponent.mp4" type="video/mp4">
+            <video muted loop playsinline class="background-video" data-poster="images/posters/demoTableComponent.webp">
+                <source data-src="images/demoTableComponent.mp4" type="video/mp4">
                 Your browser does not support the video tag.
               </video>
             <div class="item-desc">
@@ -251,8 +279,8 @@
             </div>
           </div>
           <div class="item">
-            <video autoplay muted loop playsinline class="background-video">
-                <source src="images/tokens-v3-export.mp4" type="video/mp4">
+            <video muted loop playsinline class="background-video" data-poster="images/posters/tokens-v3-export.webp">
+                <source data-src="images/tokens-v3-export.mp4" type="video/mp4">
                 Your browser does not support the video tag.
               </video>
             <div class="item-desc">
@@ -364,14 +392,15 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/wallop/2.4.1/js/Wallop.min.js" defer></script>
     <script src="js/testimonials.js" defer></script>
     <script src="js/cards.js?v=2" defer></script>
-    <script type="module" src="js/principle-clouds.js?v=3"></script>
+    <script src="js/video-lazy.js?v=1" defer></script>
+    <script type="module" src="js/principle-clouds.js?v=4" async></script>
     <script src="js/header.js"></script>
     <script src="js/drawer.js"></script>
     <script src="js/reader.js"></script>
     <script src="js/grid.js"></script>
     <script src="/track/beacon.js?v=2" data-endpoint="https://jobmachine.felixacat.workers.dev/v"></script>
     <script src="/chat/chat.js?v=22" data-endpoint="https://jobmachine-chat.felixacat.workers.dev" defer></script>
-    <script type="module" src="js/work-spine.js"></script>
+    <script type="module" src="js/work-spine.js?v=2026-10-29"></script>
 
 </body>
 </html>
