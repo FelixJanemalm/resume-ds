@@ -194,16 +194,29 @@ function hasWebGL2() {
     if (gl2 === null) { try { const g = document.createElement('canvas').getContext('webgl2'); gl2 = !!g; if (g) { const x = g.getExtension('WEBGL_lose_context'); if (x) x.loseContext(); } } catch (e) { gl2 = false; } }
     return gl2;
 }
+// One WebGL context for every card (a page holds only so many, and each costs its own memory and shader programs): the shared renderer
+// draws a card's scene into the lower-left corner of its offscreen buffer, sized for the largest card, and the card's own 2D canvas copies
+// that corner straight after, in the same task, while the drawing buffer still holds it.
+const PR = Math.min(devicePixelRatio || 1, 2);
+let shared;
+function sharedGL() {
+    if (shared !== undefined) return shared;
+    shared = null;
+    try {
+        const gl = new THREE.WebGLRenderer({ canvas: document.createElement('canvas'), antialias: false, alpha: false, powerPreference: 'low-power' });
+        gl.setPixelRatio(1); gl.setClearColor(0x000000, 1); gl.setScissorTest(true);   // device pixels throughout; PR goes to the shader as uPR
+        shared = { gl, w: 0, h: 0 };
+    } catch (e) {}
+    return shared;
+}
 function mount(host, def) {
     if (!hasWebGL2()) return null;
-    const item = host.closest('.item') || host;
+    const S = sharedGL(); if (!S) return null;
+    const gl = S.gl, item = host.closest('.item') || host;
     const canvas = document.createElement('canvas');
     canvas.setAttribute('aria-hidden', 'true');
     canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block;';
-    let gl;
-    try { gl = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: 'low-power' }); } catch (e) { return null; }
-    const PR = Math.min(devicePixelRatio || 1, 2);
-    gl.setPixelRatio(PR); gl.setClearColor(0x000000, 1);
+    const ctx = canvas.getContext('2d', { alpha: false }); if (!ctx) return null;
     const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 60); camera.position.set(0, 0, CAM_Z);
 
     const R = rng(def.seed), state = def.create(def.count, R), M = def.count + (def.extra || 0);
@@ -244,7 +257,10 @@ function mount(host, def) {
     };
     function size() {
         const w = host.clientWidth, h = host.clientHeight; if (!w || !h) return false;
-        gl.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+        const cw = Math.max(1, Math.round(w * PR)), ch = Math.max(1, Math.round(h * PR));
+        if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }   // setting either clears the canvas, even to the same value
+        if (canvas.width > S.w || canvas.height > S.h) { S.w = Math.max(S.w, canvas.width); S.h = Math.max(S.h, canvas.height); gl.setSize(S.w, S.h, false); }
+        camera.aspect = w / h; camera.updateProjectionMatrix();
         mat.uniforms.uScale.value = h / (2 * Math.tan(FOV / 2 * Math.PI / 180));
         view.halfW = HALF_H * camera.aspect; view.halfH = HALF_H;
         if (streak) streak.mute = 0.35;
@@ -267,6 +283,11 @@ function mount(host, def) {
     function compute(rest) { def.targets(state, ct, time, view, tgt, rest); }
     function snap() { if (streak) { streak.primed = false; streak.lc.fill(0); } const r = freezeAt === null && !playing(); compute(r); compute(r);   /* twice: the glow at the point reads the mass the first pass gathered */cur.pos.set(tgt.pos); cur.col.set(tgt.col); cur.size.set(tgt.size); cur.alpha.set(tgt.alpha); cur.blur.set(tgt.blur); }
     function upload() { aPos.needsUpdate = aCol.needsUpdate = aSize.needsUpdate = aAlpha.needsUpdate = aBlur.needsUpdate = true; }
+    function render() {
+        const W = canvas.width, H = canvas.height;
+        gl.setViewport(0, 0, W, H); gl.setScissor(0, 0, W, H); gl.render(scene, camera);
+        ctx.drawImage(gl.domElement, 0, S.h - H, W, H, 0, 0, W, H);   // GL rows count from the bottom: the corner is the image's last H rows
+    }
     function frame(now) {
         raf = 0; if (!visible) return;
         const dt = Math.min(0.05, last ? (now - last) / 1000 : 0.016); last = now;
@@ -297,10 +318,10 @@ function mount(host, def) {
             prev.set(pos);
             streak.lg.attributes.position.needsUpdate = streak.lg.attributes.color.needsUpdate = true;
         }
-        upload(); gl.render(scene, camera);
+        upload(); render();
         if (play || settle < 3) raf = requestAnimationFrame(frame);   // at rest the specks keep drifting a moment while they settle, then the frame holds
     }
-    function drawStill() { if (!size()) return; pollColor(); if (freezeAt !== null) { ct = freezeAt % def.T; time = freezeAt; } else if (reduced) ct = stillAt(); snap(); upload(); gl.render(scene, camera); }
+    function drawStill() { if (!size()) return; pollColor(); if (freezeAt !== null) { ct = freezeAt % def.T; time = freezeAt; } else if (reduced) ct = stillAt(); snap(); upload(); render(); }
     function wake() { if (visible && !raf && !reduced && freezeAt === null) { last = 0; raf = requestAnimationFrame(frame); } }
 
     function start() {
@@ -315,7 +336,7 @@ function mount(host, def) {
         }
         if (desc) new ResizeObserver(() => { layout(); if (!raf && !reduced && freezeAt === null) { settle = Math.min(settle, 2.5); wake(); } else if (!raf) drawStill(); }).observe(desc);
         // resizing clears the canvas, and resize callbacks run after the frame has drawn: draw again at once or the card blinks black while it opens
-        new ResizeObserver(() => { if (!size()) return; gl.render(scene, camera); if (!raf) { if (reduced || freezeAt !== null) drawStill(); else { settle = Math.min(settle, 2.5); wake(); } } }).observe(host);
+        new ResizeObserver(() => { if (!size()) return; render(); if (!raf) { if (reduced || freezeAt !== null) drawStill(); else { settle = Math.min(settle, 2.5); wake(); } } }).observe(host);
         new IntersectionObserver(entries => { visible = entries.some(e => e.isIntersecting); if (visible) wake(); }, { rootMargin: '15% 0px' }).observe(host);
 
         drawStill();

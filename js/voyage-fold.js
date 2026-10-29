@@ -249,7 +249,7 @@ export function createFold(THREE, { scene, pixelRatio = 1, light = false, dots: 
         uPx: { value: o.dotPx }, uPR: { value: pixelRatio }, uDotGain: { value: o.dotGain }, uDotOnSolid: { value: o.dotOnSolid }, uDotFar: { value: o.dotFar },
         uGlint: { value: 0 }, uTwinkle: { value: 0 }, uSun: { value: new THREE.Vector3(0.3, 0.1, -1).normalize() },   // the sun catching the lines and dots, the dots' twinkle: off in the layer
     };
-    const sheet = new THREE.Mesh(sheetGeometry(THREE, light ? 240 : 440), new THREE.ShaderMaterial({ uniforms: U, vertexShader: SHEET_VS, fragmentShader: SHEET_FS, side: THREE.DoubleSide, transparent: true, depthWrite: true }));
+    const sheet = new THREE.Mesh(sheetGeometry(THREE, light ? 240 : 320), new THREE.ShaderMaterial({ uniforms: U, vertexShader: SHEET_VS, fragmentShader: SHEET_FS, side: THREE.DoubleSide, transparent: true, depthWrite: true }));   // 320 on desktop: 440 drew the same lines at twice the vertices
     sheet.frustumCulled = false; sheet.renderOrder = -2; sheet.visible = false; scene.add(sheet);
     // the sea's dots: a disc of the same sheet, denser near the middle of the lab's sea (additive light that leaves the canvas's alpha alone: on a
     // transparent canvas an alpha written per dot would darken the page under every faint dot into a dark speck)

@@ -1,7 +1,7 @@
 /* ink-cursor.js: the pointer as a gooey trail of ink in the picked colour.
  *
  * A port of Eder Anaya's "Ink Cursor" (codepen.io/mendieta/pen/WgvENJ) without GSAP: twenty dots, each a little smaller than the one
- * before, chase each other at 35% of the gap per frame and an SVG goo filter (blur + alpha threshold) melts them into one blob with
+ * before, chase each other at 35% of the gap per 120 Hz frame (rescaled by elapsed time, so a 60 Hz screen or Safari draws the same tight, quick trail) and an SVG goo filter (blur + alpha threshold) melts them into one blob with
  * a tail. When the pointer rests for 150 ms the tail's dots let go of the chain and wobble in place, so the ink keeps breathing.
  *
  * The ink is the hue picked in the hero (--primary-color, which color-shade-calculator.js sets on the root), made to stand out from
@@ -22,6 +22,7 @@ if (fine && !calm && !document.getElementById('ink-cursor')) start();
 
 function start() {
     const AMOUNT = 20, SINE_DOTS = Math.floor(AMOUNT * 0.3), WIDTH = 26, IDLE_MS = 150, FOLLOW = 0.35, CONTRAST = 4.5;
+    const TICK = 1000 / 120, LAG = FOLLOW * TICK / (1 - FOLLOW);   // the tuning frame (Chrome on a 120 Hz Mac) and each dot's lag behind the one before, in ms
     const INTERACTIVE = 'a, button, [role="button"], input, select, textarea, label, summary, .case-study-teaser, .hitbox';
 
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -39,7 +40,7 @@ function start() {
         #ink-cursor.is-snap span { transition: none; }
         #ink-cursor.is-shown { opacity: 1; }
         #ink-cursor.is-shown.is-picking { opacity: 0; transition-duration: 0.12s; }
-        #ink-cursor span { position: absolute; top: 0; left: 0; width: ${WIDTH}px; height: ${WIDTH}px; border-radius: 50%; transform-origin: center center; will-change: transform;
+        #ink-cursor span { position: absolute; top: 0; left: 0; width: ${WIDTH}px; height: ${WIDTH}px; border-radius: 50%; transform-origin: center center;
             background-color: var(--ink); transition: background-color 0.25s ease; }`;
     const cursor = document.createElement('div');
     cursor.id = 'ink-cursor'; cursor.setAttribute('aria-hidden', 'true');
@@ -134,19 +135,22 @@ function start() {
     document.addEventListener('mouseleave', () => cursor.classList.remove('is-shown'));
     document.addEventListener('mouseenter', () => cursor.classList.add('is-shown'));
 
-    function frame() {
-        hover += (hoverT - hover) * 0.2;
+    // the dots are painted into the goo layer, not composited one by one: Safari leaves its own layers out of an SVG filter
+    let lastT = performance.now();
+    function frame(t) {
+        const dt = Math.min(50, Math.max(1, t - lastT)), k = dt / TICK, follow = LAG / (dt + LAG); lastT = t;   // follow: the share of the gap kept, so the trail spans the same time at any frame rate
+        hover += (hoverT - hover) * (1 - Math.pow(0.8, k));
         let x = mouse.x, y = mouse.y;
         dots.forEach((dot, index) => {
             const next = dots[index + 1] || dots[0];
             dot.x = x; dot.y = y;
             if (idle && index > SINE_DOTS) {   // the tail wobbles where it came to rest
-                dot.angleX += 0.05; dot.angleY += 0.05;
+                dot.angleX += 0.05 * k; dot.angleY += 0.05 * k;
                 dot.x = dot.lockX + Math.sin(dot.angleX) * dot.range; dot.y = dot.lockY + Math.sin(dot.angleY) * dot.range;
             }
             const s = dot.scale * (index <= SINE_DOTS ? hover : 1);
-            dot.el.style.transform = `translate3d(${dot.x}px, ${dot.y}px, 0) scale(${s})`;
-            if (!idle || index <= SINE_DOTS) { x += (next.x - dot.x) * FOLLOW; y += (next.y - dot.y) * FOLLOW; }
+            dot.el.style.transform = `translate(${dot.x}px, ${dot.y}px) scale(${s})`;
+            if (!idle || index <= SINE_DOTS) { x += (next.x - dot.x) * follow; y += (next.y - dot.y) * follow; }
         });
         requestAnimationFrame(frame);
     }
