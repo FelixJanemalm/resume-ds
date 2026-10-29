@@ -157,6 +157,18 @@
 }
 .fjc[data-state="docked"][data-open="1"] .fjc-msg.fjc-folded { display: flex; }
 
+/* Closed with no reply yet, the preview line would only repeat the placeholder:
+   drop it and put the chip, field, send and toggle on one line. Phones already
+   show only the field when closed. */
+@media (min-width: 768px) {
+  .fjc[data-state="docked"][data-open="0"].fjc-noreply { display: flex; align-items: center; gap: 0.6em; padding: 0.5em 0.6em 0.5em 0.9em; }
+  .fjc[data-state="docked"][data-open="0"].fjc-noreply .fjc-bar { display: contents; }
+  .fjc[data-state="docked"][data-open="0"].fjc-noreply .fjc-bar-text { display: none !important; }
+  .fjc[data-state="docked"][data-open="0"].fjc-noreply .fjc-badge { order: 0; }
+  .fjc[data-state="docked"][data-open="0"].fjc-noreply .fjc-form { order: 1; flex: 1 1 auto; align-items: center; }
+  .fjc[data-state="docked"][data-open="0"].fjc-noreply .fjc-toggle { order: 2; }
+}
+
 /* Reserved space for the first line while the posting lookup is in flight. */
 .fjc-msg.fjc-pending { min-height: 4.4em; }
 @media (max-width: 767px) { .fjc-msg.fjc-pending { min-height: 6.6em; } }

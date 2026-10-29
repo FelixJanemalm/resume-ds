@@ -417,6 +417,7 @@
     earlier.textContent = hidden + (hidden === 1 ? " earlier message" : " earlier messages");
     var last = lastBotText();
     barText.textContent = last ? last.replace(/\s+/g, " ").slice(0, 140) : placeholder;
+    root.classList.toggle("fjc-noreply", !last);   // docked: no preview line repeating the placeholder
   }
   function lastBotText() {
     for (var i = history.length - 1; i >= 0; i--) {
