@@ -171,8 +171,9 @@ function start() {
 
 // The goo, drawn: a small WebGL canvas round the trail does on the GPU, in every browser, what the SVG filter does (Safari renders an SVG
 // filter on page content on the CPU every frame, and its blob came out sluggish and less melted): the dots' union is drawn into a texture
-// at half the CSS resolution (the blur hides it), blurred by 6 px in two passes, and the blurred alpha is pushed through 35a - 15 into a
-// crisp edge at full resolution. Without WebGL, or after a lost context, the cursor uses the SVG filter.
+// at half the CSS resolution (the blur hides it) and blurred by 6 px across; one pass at full resolution then blurs it down and pushes the
+// alpha through 35a - 15, a third as steep, into an edge about a pixel soft (the filter's own edge read on screen as a cut-out; Felix chose
+// this one by eye, 2026-10-29). Without WebGL, or after a lost context, the cursor uses the SVG filter.
 function gooCanvas(host, onLost) {
     const canvas = document.createElement('canvas');
     const gl = canvas.getContext('webgl', { alpha: true, premultipliedAlpha: true, antialias: false, depth: false, stencil: false, failIfMajorPerformanceCaveat: true });
@@ -199,8 +200,12 @@ function gooCanvas(host, onLost) {
             for (int i = -${TAPS}; i <= ${TAPS}; i++) { float k = exp(-float(i * i) / ${(2 * (SIGMA / 2) ** 2).toFixed(1)}); s += texture2D(uTex, uv + uStep * float(i)).a * k; w += k; }
             gl_FragColor = vec4(s / w);
         }`);
-    const edge = program(`uniform sampler2D uTex; uniform vec2 uSize; uniform vec3 uInk;
-        void main() { float a = clamp(35.0 * texture2D(uTex, gl_FragCoord.xy / uSize).a - 15.0, 0.0, 1.0); gl_FragColor = vec4(uInk * a, a); }`);
+    const edge = program(`uniform sampler2D uTex; uniform vec2 uStep, uSize; uniform vec3 uInk;   // the vertical blur and the threshold in one, at full resolution
+        void main() {   // (stored in 8 bits and then multiplied by 35, the blurred alpha stepped in sevenths: a ragged, darker rim)
+            vec2 uv = gl_FragCoord.xy / uSize; float s = 0.0, w = 0.0;
+            for (int i = -${TAPS}; i <= ${TAPS}; i++) { float k = exp(-float(i * i) / ${(2 * (SIGMA / 2) ** 2).toFixed(1)}); s += texture2D(uTex, uv + uStep * float(i)).a * k; w += k; }
+            float a = clamp((s / w - ${(31 / 70).toFixed(5)}) * 12.0 + 0.5, 0.0, 1.0); gl_FragColor = vec4(uInk * a, a);   // the filter's 35a - 15, a third as steep
+        }`);
     if (!discs || !blur || !edge) return null;
     gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
@@ -211,18 +216,18 @@ function gooCanvas(host, onLost) {
         return { tex, fb };
     };
     const A = target(), B = target();
-    const buf = new Float32Array(N * 3), MAX_PX = 1024;   // a long flick stretches the trail across the screen: past MAX_PX device pixels the edge pass runs coarser
-    let box = 0, half = 0, pr = 0, lost = false, smallSince = 0;
-    function resize(size) {   // box: an even CSS size, so the half-resolution texture covers it exactly
-        box = size; half = box / 2;
-        pr = Math.min(devicePixelRatio || 1, 2, MAX_PX / box);   // read each time: the window may have moved to another display
-        canvas.width = canvas.height = Math.round(box * pr); canvas.style.width = canvas.style.height = box + 'px';
-        for (const t of [A, B]) { gl.bindTexture(gl.TEXTURE_2D, t.tex); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, half, half, 0, gl.RGBA, gl.UNSIGNED_BYTE, null); }
+    const buf = new Float32Array(N * 3), MAX_PX = 2048;   // per side: only a flick across a large screen reaches it, and only then does the edge pass run coarser
+    let bw = 0, bh = 0, pr = 0, lost = false, smallSince = 0;
+    function resize(w, h) {   // a rectangle round the trail (a long trail is thin), even in CSS px so the half-resolution textures cover it exactly
+        bw = w; bh = h;
+        pr = Math.min(devicePixelRatio || 1, 2, MAX_PX / Math.max(bw, bh));   // read each time: the window may have moved to another display
+        canvas.width = Math.round(bw * pr); canvas.height = Math.round(bh * pr); canvas.style.width = bw + 'px'; canvas.style.height = bh + 'px';
+        for (const t of [A, B]) { gl.bindTexture(gl.TEXTURE_2D, t.tex); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, bw / 2, bh / 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, null); }
     }
-    const pass = (prog, to, from, size) => {
-        gl.useProgram(prog.pr); gl.bindFramebuffer(gl.FRAMEBUFFER, to ? to.fb : null); gl.viewport(0, 0, size, size);
+    const pass = (prog, to, from, w, h) => {
+        gl.useProgram(prog.pr); gl.bindFramebuffer(gl.FRAMEBUFFER, to ? to.fb : null); gl.viewport(0, 0, w, h);
         if (from) { gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, from.tex); gl.uniform1i(prog.u.uTex, 0); }
-        if (prog.u.uSize) gl.uniform2f(prog.u.uSize, size, size);
+        if (prog.u.uSize) gl.uniform2f(prog.u.uSize, w, h);
         return prog;
     };
     canvas.addEventListener('webglcontextlost', () => { lost = true; canvas.remove(); onLost(); }, { once: true });
@@ -232,17 +237,19 @@ function gooCanvas(host, onLost) {
             if (lost) return;
             let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;   // the trail's extent, dot centres
             for (const d of dots) { const cx = d.x + r0, cy = d.y + r0; if (cx < x0) x0 = cx; if (cx > x1) x1 = cx; if (cy < y0) y0 = cy; if (cy > y1) y1 = cy; }
-            const need = 2 * Math.ceil((Math.max(x1 - x0, y1 - y0) + 2 * (r0 * 1.6 + MARGIN)) / 2);   // r0 * 1.6: the head swells over links
-            const now = performance.now(); if (need >= box * 0.5) smallSince = now;
-            const fit = Math.max(120, 32 * Math.ceil(need * 1.25 / 32));   // grows with room to spare, shrinks once the trail has stayed well inside for half a second
-            if (need > box || (fit < box && now - smallSince > 500)) resize(fit); else if (Math.min(devicePixelRatio || 1, 2, MAX_PX / box) !== pr) resize(box);
-            const dp = devicePixelRatio || 1, ox = Math.round(((x0 + x1) / 2 - box / 2) * dp) / dp, oy = Math.round(((y0 + y1) / 2 - box / 2) * dp) / dp;   // on whole device pixels
+            const pad = 2 * (r0 * 1.6 + MARGIN), fit = v => Math.max(96, 32 * Math.ceil(v * 1.25 / 32));   // r0 * 1.6: the head swells over links
+            const nw = x1 - x0 + pad, nh = y1 - y0 + pad, now = performance.now();
+            const grow = nw > bw || nh > bh, slack = fit(nw) < bw * 0.75 || fit(nh) < bh * 0.75;
+            if (grow || !slack) smallSince = now;
+            if (grow) resize(Math.max(fit(nw), bw), Math.max(fit(nh), bh));   // grows with room to spare, shrinks once the trail has stayed well inside for half a second
+            else if (now - smallSince > 500) resize(fit(nw), fit(nh));
+            else if (Math.min(devicePixelRatio || 1, 2, MAX_PX / Math.max(bw, bh)) !== pr) resize(bw, bh);
+            const dp = devicePixelRatio || 1, ox = Math.round(((x0 + x1) / 2 - bw / 2) * dp) / dp, oy = Math.round(((y0 + y1) / 2 - bh / 2) * dp) / dp;   // on whole device pixels
             canvas.style.transform = `translate(${ox}px, ${oy}px)`;
-            dots.forEach((d, i) => { buf[i * 3] = d.x + r0 - ox; buf[i * 3 + 1] = box - (d.y + r0 - oy); buf[i * 3 + 2] = d.r; });
-            gl.uniform3fv(pass(discs, A, null, half).u.uDots, buf); gl.drawArrays(gl.TRIANGLES, 0, 3);
-            gl.uniform2f(pass(blur, B, A, half).u.uStep, 1 / half, 0); gl.drawArrays(gl.TRIANGLES, 0, 3);
-            gl.uniform2f(pass(blur, A, B, half).u.uStep, 0, 1 / half); gl.drawArrays(gl.TRIANGLES, 0, 3);
-            gl.uniform3f(pass(edge, null, A, canvas.width).u.uInk, ink[0], ink[1], ink[2]); gl.drawArrays(gl.TRIANGLES, 0, 3);
+            dots.forEach((d, i) => { buf[i * 3] = d.x + r0 - ox; buf[i * 3 + 1] = bh - (d.y + r0 - oy); buf[i * 3 + 2] = d.r; });
+            gl.uniform3fv(pass(discs, A, null, bw / 2, bh / 2).u.uDots, buf); gl.drawArrays(gl.TRIANGLES, 0, 3);
+            gl.uniform2f(pass(blur, B, A, bw / 2, bh / 2).u.uStep, 2 / bw, 0); gl.drawArrays(gl.TRIANGLES, 0, 3);
+            pass(edge, null, B, canvas.width, canvas.height); gl.uniform2f(edge.u.uStep, 0, 2 / bh); gl.uniform3f(edge.u.uInk, ink[0], ink[1], ink[2]); gl.drawArrays(gl.TRIANGLES, 0, 3);
         },
     };
 }
