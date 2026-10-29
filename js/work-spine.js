@@ -100,7 +100,7 @@ const pcfg = section ? {
 if (pcfg) for (const [k, v] of new URLSearchParams(location.search)) if (k in pcfg && v !== '') pcfg[k] = Number.isNaN(+v) ? v : +v;   // dev aid: ?shipWorkTilt=45&boat=off
 let layer = null;
 const THEME_ROW = false;   // the ship-style icon row under the colour picker (and the stored choice it writes): off for now
-const MOD_V = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '?t=' + Date.now() : '?v=2026-10-29i';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache): never cached on a local server, versioned elsewhere (bump when they change)
+const MOD_V = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '?t=' + Date.now() : '?v=2026-10-29j';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache): never cached on a local server, versioned elsewhere (bump when they change)
 import('./ink-cursor.js' + MOD_V).catch(e => console.warn('ink cursor', e));   // the pointer as a trail of ink in the picked colour (it checks for a real mouse and reduced motion itself)
 
 const SIM_NOISE = `
@@ -572,17 +572,17 @@ const STAR_N = 12;
 // on a fast machine and several times that on a phone). Nothing it registers (listeners, observers, the frame loop) exists before the last yield.
 const yieldTask = () => new Promise(r => setTimeout(r, 0));
 async function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD, PRE) {
-    if (!GPUC) return heroStill('GPUComputationRenderer did not load');   // (this used to return without any hero at all: a blank hero)
+    if (!GPUC) return heroStill('GPUComputationRenderer did not load', true);   // (this used to return without any hero at all: a blank hero)
     if (!FOLD || !BOAT || pcfg.boat === 'off') return heroStill('no hero sea');
-    if (!webgl2(true)) return heroStill('no WebGL2, or only a software one');
+    if (!webgl2(true)) return heroStill('no WebGL2, or only a software one', true);
     const canvas = document.createElement('canvas');
     canvas.id = 'ws-particles'; canvas.setAttribute('aria-hidden', 'true');
     canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100vh;height:100lvh;z-index:-1;pointer-events:none;opacity:0;transition:opacity 1.6s ease';   // the LARGE viewport's height: a phone's address bar sliding in and out never resizes the layer (it only covers or uncovers its bottom edge)
     document.body.appendChild(canvas);   // appended last: z-index does the layering, and nothing else on the page sees it as the first canvas
     let gl;
     // failIfMajorPerformanceCaveat: a software renderer (a blocklisted GPU) would run the sea at a few frames a second; the plain hero is better
-    try { gl = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: 'high-performance', failIfMajorPerformanceCaveat: true }); } catch (e) { canvas.remove(); heroStill('no WebGL, or only a software one'); return; }
-    const giveUp = why => { dead = true; try { gl.dispose(); gl.forceContextLoss(); } catch (e) {} canvas.remove(); heroStill(why); };
+    try { gl = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: 'high-performance', failIfMajorPerformanceCaveat: true }); } catch (e) { canvas.remove(); heroStill('no WebGL, or only a software one', true); return; }
+    const giveUp = why => { dead = true; try { gl.dispose(); gl.forceContextLoss(); } catch (e) {} canvas.remove(); heroStill(why, true); };
     let dead = false;
     if (!gl.capabilities.isWebGL2) return giveUp('no WebGL2');
     // the simulation renders into float (or half-float) targets; three's GPUComputationRenderer does not check that they are renderable, and
@@ -1859,7 +1859,12 @@ onmessage = e => { const b = buildBoatLevels(e.data, 1), t = new Set([...b.pos, 
     });
 }
 
-function heroStill(why) { if (why) console.info('work-spine: the hero stays without the sea (' + why + ')'); }
+// frames: the sea cannot run here for good (no GPU WebGL, a module or the simulation failed), so the recorded one plays instead (js/sea-frames.js).
+// Reduced motion, a context the browser may restore, and the config switches keep the plain hero.
+function heroStill(why, frames) {
+    if (why) console.info('work-spine: the hero ' + (frames ? 'plays its recording' : 'stays without the sea') + ' (' + why + ')');
+    if (frames) import('./sea-frames.js' + MOD_V).then(m => m.start()).catch(e => console.warn('work-spine: sea-frames did not load', e));
+}
 
 if (section && !reduced && 'IntersectionObserver' in window) boot(); else heroStill(reduced ? 'reduced motion' : 'no IntersectionObserver');
 
@@ -1885,7 +1890,7 @@ async function boot() {
         [THREE, CSS3D] = await core;
     } catch (err) {
         console.warn('work-spine: three.js did not load, keeping the flat list.', err);
-        heroStill('three.js did not load');
+        heroStill('three.js did not load', true);
         return;
     }
     const GPUC = await gpucP;

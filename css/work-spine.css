@@ -175,7 +175,7 @@
 
 /* The voyage: the page-wide particle layer sits behind the page (z-index -1), so a section that paints its own ground hides
    the ship. The manifesto's ground is the page colour anyway; letting it stay transparent keeps the ship sailing under the words. */
-body:has(#ws-particles) .reader { background-color: transparent; }
+body:has(#ws-particles) .reader, body:has(#sea-frames) .reader { background-color: transparent; }   /* #sea-frames: the recorded sea (js/sea-frames.js) */
 
 /* data-ship-grounds="translucent" on the section: the sections after it paint their own ground, which would hide the ship;
    thinned to 45% they keep their tint and the ship sails behind them like everywhere else. (The alternative, "overlay",
