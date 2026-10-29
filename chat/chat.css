@@ -135,10 +135,6 @@
   padding: 0.6em 0.8em 0.7em;
 }
 .fjc[data-state="docked"] .fjc-bar { display: flex; align-items: center; gap: 0.6em; padding: 0.2em 0.2em 0.5em; }
-.fjc button.fjc-bar-text {
-  flex: 1 1 auto; min-width: 0; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  font-weight: 300 !important;
-}
 .fjc button.fjc-toggle {
   flex: 0 0 2em; width: 2em !important; height: 2em !important; opacity: 0.7 !important;
   display: grid; place-items: center; transition: transform 0.2s ease !important;
@@ -148,7 +144,6 @@
 .fjc[data-state="docked"] .fjc-earlier { display: none !important; }
 .fjc[data-state="docked"] .fjc-thread { display: none; }
 .fjc[data-state="docked"] .fjc-bot { background: var(--fjc-field); backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none; }
-.fjc[data-state="docked"][data-open="1"] .fjc-bar-text { display: none; }
 /* One AI chip at a time: the bar's chip hides once the bubbles (each with a chip) are showing. */
 .fjc[data-state="docked"][data-open="1"] .fjc-bar .fjc-badge { display: none; }
 .fjc[data-state="docked"][data-open="1"] .fjc-bar { justify-content: flex-end; padding-bottom: 0.2em; }
@@ -157,17 +152,17 @@
 }
 .fjc[data-state="docked"][data-open="1"] .fjc-msg.fjc-folded { display: flex; }
 
-/* Closed with no reply yet, the preview line would only repeat the placeholder:
-   drop it and put the chip, field, send and toggle on one line. Phones already
-   show only the field when closed. */
+/* Closed, one line: chip, field, send and toggle. The field's placeholder shows the
+   start of the last reply (chat.js). Phones already show only the field when closed. */
 @media (min-width: 768px) {
-  .fjc[data-state="docked"][data-open="0"].fjc-noreply { display: flex; align-items: center; gap: 0.6em; padding: 0.5em 0.6em 0.5em 0.9em; }
-  .fjc[data-state="docked"][data-open="0"].fjc-noreply .fjc-bar { display: contents; }
-  .fjc[data-state="docked"][data-open="0"].fjc-noreply .fjc-bar-text { display: none !important; }
-  .fjc[data-state="docked"][data-open="0"].fjc-noreply .fjc-badge { order: 0; }
-  .fjc[data-state="docked"][data-open="0"].fjc-noreply .fjc-form { order: 1; flex: 1 1 auto; align-items: center; }
-  .fjc[data-state="docked"][data-open="0"].fjc-noreply .fjc-toggle { order: 2; }
+  .fjc[data-state="docked"][data-open="0"] { display: flex; align-items: center; gap: 0.6em; padding: 0.5em 0.6em 0.5em 0.9em; }
+  .fjc[data-state="docked"][data-open="0"] .fjc-bar { display: contents; }
+  .fjc[data-state="docked"][data-open="0"] .fjc-badge { order: 0; }
+  .fjc[data-state="docked"][data-open="0"] .fjc-form { order: 1; flex: 1 1 auto; align-items: center; }
+  .fjc[data-state="docked"][data-open="0"] .fjc-toggle { order: 2; }
 }
+/* A long placeholder (the last reply) stays on its line, cut at the field edge. */
+.fjc[data-state="docked"][data-open="0"] .fjc-form textarea:placeholder-shown { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Reserved space for the first line while the posting lookup is in flight. */
 .fjc-msg.fjc-pending { min-height: 4.4em; }
@@ -200,7 +195,7 @@
   .fjc[data-state="docked"] .fjc-form textarea { border-radius: 16px; }
   .fjc[data-state="docked"] button.fjc-send { border-radius: 16px; }
   .fjc[data-state="docked"][data-open="1"] .fjc-thread { max-height: 60vh; }
-  /* Compact when closed: just the field and send. The preview line, the AI chip
+  /* Compact when closed: just the field and send. The AI chip
      and the toggle are desktop affordances; on a phone they cost screen for
      little. Tapping the field opens the conversation. */
   .fjc[data-state="docked"][data-open="0"] .fjc-bar { display: none; }

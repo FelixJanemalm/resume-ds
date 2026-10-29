@@ -10,7 +10,8 @@
  *   hero    - sits in the hero where "View Work" was (the button moves beside
  *             the input). Shows the latest exchange only; earlier turns fold.
  *   docked  - once the hero slot scrolls out of view the same node becomes a
- *             slim bar at the bottom: last reply on one line plus the input.
+ *             slim one-line bar at the bottom: the input, whose placeholder shows
+ *             the start of the last reply.
  *             Focus expands it into a sheet with the whole thread, never more
  *             than about half the viewport, so the page stays visible while
  *             the assistant scrolls it or recolors it.
@@ -318,9 +319,8 @@
   var hasHero = !!viewWork;
 
   var root = el("div", { "class": "fjc", "data-state": hasHero ? "hero" : "docked", "data-open": "0" });
-  var barText = el("button", { "class": "fjc-bar-text", type: "button", text: "Ask anything about Felix" });
   var toggle = el("button", { "class": "fjc-toggle", type: "button", "aria-label": "Show the conversation", html: CHEVRON });
-  var bar = el("div", { "class": "fjc-bar" }, [el("span", { "class": "fjc-badge", text: "AI" }), barText, toggle]);
+  var bar = el("div", { "class": "fjc-bar" }, [el("span", { "class": "fjc-badge", text: "AI" }), toggle]);
   var earlier = el("button", { "class": "fjc-earlier", type: "button", hidden: "" });
   var thread = el("div", { "class": "fjc-thread", role: "log", "aria-live": "polite" });
   // Placeholder by available width: the full ask on wide screens, a line that fits on phones.
@@ -339,8 +339,14 @@
   });
   function syncPlaceholder() {
     placeholder = narrowMq && narrowMq.matches ? PLACEHOLDERS.narrow : PLACEHOLDERS.wide;
-    input.setAttribute("placeholder", placeholder);
-    if (typeof updateFold === "function" && !lastBotText()) barText.textContent = placeholder;
+    syncHint();
+  }
+  // Docked and closed, the bar is one line, so the field's placeholder carries the
+  // start of the last reply once there is one; otherwise it asks the question.
+  function syncHint() {
+    var last = typeof lastBotText === "function" ? lastBotText() : "";
+    var closed = root.getAttribute("data-state") === "docked" && root.getAttribute("data-open") !== "1";
+    input.setAttribute("placeholder", closed && last ? last.replace(/\s+/g, " ").slice(0, 140) : placeholder);
   }
   if (narrowMq) {
     if (narrowMq.addEventListener) narrowMq.addEventListener("change", syncPlaceholder);
@@ -415,9 +421,7 @@
     }
     earlier.hidden = unfolded || hidden === 0;
     earlier.textContent = hidden + (hidden === 1 ? " earlier message" : " earlier messages");
-    var last = lastBotText();
-    barText.textContent = last ? last.replace(/\s+/g, " ").slice(0, 140) : placeholder;
-    root.classList.toggle("fjc-noreply", !last);   // docked: no preview line repeating the placeholder
+    syncHint();
   }
   function lastBotText() {
     for (var i = history.length - 1; i >= 0; i--) {
@@ -679,6 +683,7 @@
     root.setAttribute("data-open", open ? "1" : "0");
     toggle.setAttribute("aria-label", open ? "Hide the conversation" : "Show the conversation");
     if (open) { unfolded = true; updateFold(); scrollThread(); }
+    syncHint();
     if (typeof tuckAtFooter === "function") tuckAtFooter();
   }
   // Docked, the bar moves to <body>. Inside the hero it sits in the hero column's
@@ -701,6 +706,7 @@
     root.setAttribute("data-state", state);
     if (slot) place(state === "docked" ? document.body : slot);
     if (state === "hero") { setOpen(false); unfolded = false; updateFold(); }
+    syncHint();
     tuckAtFooter();
   }
   // Dock exactly when the input has scrolled fully above the top of the screen,
@@ -743,7 +749,6 @@
   window.addEventListener("resize", function () { syncState(); tuckAtFooter(); });
   syncState();
 
-  barText.addEventListener("click", function () { setOpen(root.getAttribute("data-open") !== "1"); });
   toggle.addEventListener("click", function () { setOpen(root.getAttribute("data-open") !== "1"); });
   input.addEventListener("focus", function () {
     if (root.getAttribute("data-state") === "docked") setOpen(true);
