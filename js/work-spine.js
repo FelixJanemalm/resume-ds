@@ -32,7 +32,8 @@ const coarse = matchMedia('(pointer: coarse)').matches;
 // Can this browser give us a WebGL2 context (fast = not a software renderer)? Asked once per kind with a throwaway canvas, so a
 // browser without WebGL never gets a THREE.WebGLRenderer at all: three logs every failed attempt as a console error.
 const glProbe = {};
-// ?sea=cpu: accept a software WebGL (the sea on the CPU), to test how it runs there.
+// ?sea=cpu: accept a software WebGL (the sea on the CPU), to test how it runs there; ?sea=2d: the 2D-canvas sea (js/sea-2d.js) instead of WebGL;
+// ?sea=track: expose the pose the scroll decides (window.__seaTrack), for recording js/sea-2d.js's track.
 const SEA = new URLSearchParams(location.search).get('sea');
 function webgl2(fast) {
     if (SEA === 'cpu') fast = false;
@@ -103,7 +104,7 @@ const pcfg = section ? {
 if (pcfg) for (const [k, v] of new URLSearchParams(location.search)) if (k in pcfg && v !== '') pcfg[k] = Number.isNaN(+v) ? v : +v;   // dev aid: ?shipWorkTilt=45&boat=off
 let layer = null;
 const THEME_ROW = false;   // the ship-style icon row under the colour picker (and the stored choice it writes): off for now
-const MOD_V = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '?t=' + Date.now() : '?v=2026-10-29n';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache): never cached on a local server, versioned elsewhere (bump when they change)
+const MOD_V = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '?t=' + Date.now() : '?v=2026-10-29o';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache): never cached on a local server, versioned elsewhere (bump when they change)
 import('./ink-cursor.js' + MOD_V).catch(e => console.warn('ink cursor', e));   // the pointer as a trail of ink in the picked colour (it checks for a real mouse and reduced motion itself)
 
 const SIM_NOISE = `
@@ -575,6 +576,7 @@ const STAR_N = 12;
 // on a fast machine and several times that on a phone). Nothing it registers (listeners, observers, the frame loop) exists before the last yield.
 const yieldTask = () => new Promise(r => setTimeout(r, 0));
 async function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD, PRE) {
+    if (SEA === '2d') { import('./sea-2d.js' + MOD_V).then(m => m.start()).catch(e => console.warn('work-spine: sea-2d did not load', e)); return heroStill('?sea=2d: the sea drawn on the CPU'); }
     if (!GPUC) return heroStill('GPUComputationRenderer did not load');   // (this used to return without any hero at all: a blank hero)
     if (!FOLD || !BOAT || pcfg.boat === 'off') return heroStill('no hero sea');
     if (!webgl2(true)) return heroStill('no WebGL2, or only a software one');
@@ -1662,6 +1664,12 @@ async function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD, PRE) {
         shipU.wave.set(amp * pcfg.shipWave * (1 + 1.5 * storm), ship.lambda, foamGain, foamLen);
         shipU.sea.set(A, ks, ph, plunge);
         shipU.motion.set(M.degToRad(heel), pitch, heave, squat);
+        if (SEA === 'track') window.__seaTrack = {   // ?sea=track: the scroll's part of the pose, for js/sea-2d.js (recorded by a tool; the time-driven sway, bob and ride are recomputed there)
+            scroll: scrollY, seaS: ship.seaF ? ship.seaF.p.s : scrollY, x: P.x, y: P.y, size: P.size, turn: P.turn, tilt: P.tilt, heel: P.heel, level: P.level, lo, hi, mix, LS, lvn, scale, restW, way,
+            visW, visH, foldK, foldTheta, foldAmt, foldW, silkW, seaYaw: seaYawAt(ship.seaF ? ship.seaF.p.s : scrollY), zoom: P.size / Math.max(1e-4, ship.keys[0].k.size),
+            misc: shipU.misc.x, cam: camera.position.toArray(), fov: camera.fov, aspect: camera.aspect,
+            pc: { shipSway: pcfg.shipSway, shipBob: pcfg.shipBob, shipSwell: pcfg.shipSwell, foldSway: pcfg.foldSway, foldRide: pcfg.foldRide, shipSwellDir: pcfg.shipSwellDir },
+        };
         shipU.sail.set(bellyMul, flapAmp, ship.flutPh, fill);
         shipU.clock.set(ship.flick, ship.churnPh, sprayGain, churnGain);
         if (hw) { shipU.hull.set(hwA.stem + (hwB.stem - hwA.stem) * mix, hwA.stern + (hwB.stern - hwA.stern) * mix, entryGain, hwA.sternHalf + (hwB.sternHalf - hwA.sternHalf) * mix); for (let k = 0; k < 17; k++) shipU.beam[k] = hwA.beam[k] + (hwB.beam[k] - hwA.beam[k]) * mix; }
