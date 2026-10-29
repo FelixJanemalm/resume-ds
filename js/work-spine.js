@@ -100,7 +100,7 @@ const pcfg = section ? {
 if (pcfg) for (const [k, v] of new URLSearchParams(location.search)) if (k in pcfg && v !== '') pcfg[k] = Number.isNaN(+v) ? v : +v;   // dev aid: ?shipWorkTilt=45&boat=off
 let layer = null;
 const THEME_ROW = false;   // the ship-style icon row under the colour picker (and the stored choice it writes): off for now
-const MOD_V = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '?t=' + Date.now() : '?v=2026-10-29j';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache): never cached on a local server, versioned elsewhere (bump when they change)
+const MOD_V = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '?t=' + Date.now() : '?v=2026-10-29k';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache): never cached on a local server, versioned elsewhere (bump when they change)
 import('./ink-cursor.js' + MOD_V).catch(e => console.warn('ink cursor', e));   // the pointer as a trail of ink in the picked colour (it checks for a real mouse and reduced motion itself)
 
 const SIM_NOISE = `
@@ -582,7 +582,8 @@ async function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD, PRE) {
     let gl;
     // failIfMajorPerformanceCaveat: a software renderer (a blocklisted GPU) would run the sea at a few frames a second; the plain hero is better
     try { gl = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: 'high-performance', failIfMajorPerformanceCaveat: true }); } catch (e) { canvas.remove(); heroStill('no WebGL, or only a software one', true); return; }
-    const giveUp = why => { dead = true; try { gl.dispose(); gl.forceContextLoss(); } catch (e) {} canvas.remove(); heroStill(why, true); };
+    let everShown = false;   // once the live sea has shown, a later failure (after a restored context) keeps the plain hero: it may come back
+    const giveUp = why => { dead = true; try { gl.dispose(); gl.forceContextLoss(); } catch (e) {} canvas.remove(); heroStill(why, !everShown); };
     let dead = false;
     if (!gl.capabilities.isWebGL2) return giveUp('no WebGL2');
     // the simulation renders into float (or half-float) targets; three's GPUComputationRenderer does not check that they are renderable, and
@@ -1750,7 +1751,7 @@ async function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD, PRE) {
     function verify(dt) {
         check.t += dt; if (check.n++ % 6 !== 5) return;
         let ok = false; try { ok = frameVisible(); } catch (e) {}
-        if (ok) { shown = true; canvas.style.opacity = '1'; return; }
+        if (ok) { shown = everShown = true; canvas.style.opacity = '1'; return; }
         if (check.t > 6) giveUp('no visible frame in 6 s');
     }
     // A lost context (iOS drops them in background tabs and under memory pressure): the canvas fades out at once; when the browser restores it,
