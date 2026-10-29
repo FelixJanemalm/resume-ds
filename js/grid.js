@@ -1,9 +1,14 @@
+/* grid.js — the hero's pinstripe grid, and the ripple it makes under the pointer.
+ *
+ * There used to be a scroll listener here that wrote window.scrollY to --scroll on <html> on every scroll
+ * event. Nothing reads --scroll: cards.css's parallax rule, the one the old comment pointed at, is inside a
+ * commented-out block. It was not free either. Writing an inline style on <html> invalidates style for the
+ * whole document, and the MutationObserver below — which watches that same element's style attribute for
+ * the colour picker — fired on every one of those writes and called getComputedStyle, forcing a synchronous
+ * style recalc per scroll tick. If the parallax is ever switched back on in cards.css, the writer has to
+ * come back with it, coalesced into a frame.
+ */
 document.addEventListener("DOMContentLoaded", function () {
-  // cards.css reads --scroll for its parallax, so this runs on every device.
-  document.addEventListener("scroll", () => {
-      document.documentElement.style.setProperty("--scroll", window.scrollY + "px");
-  });
-
   const canvas = document.getElementById('grid');
   if (!canvas) return;
 
@@ -35,11 +40,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function drawGrid() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
+
     ctx.lineWidth = 1;
     ctx.strokeStyle = gridColor;
     ctx.imageSmoothingEnabled = false;
-    
+
     ctx.beginPath();
 
     for (let y = 0.5; y <= canvas.height; y += gridSize) {
@@ -103,19 +108,42 @@ document.addEventListener("DOMContentLoaded", function () {
       ctx.stroke();
   }
 
-  canvas.addEventListener('mousemove', (event) => {
-      distortGrid(event.offsetX, event.offsetY);
-  });
+  /* One redraw per frame, whatever the pointer's report rate: a full distort is ~2,400 iterations of sqrt and
+     exp at 1440p, and a 120 Hz mouse fires far more often than the screen can show the result. The current
+     state decides what gets drawn rather than each event queueing its own job, so whichever event lands last
+     in a frame is the one that shows — a mouseout arriving behind a mousemove cannot be swallowed. */
+  let frame = 0, pointer = null, needsResize = false;
 
-  canvas.addEventListener('mouseout', drawGrid);
+  function render() {
+      frame = 0;
+      if (needsResize) {
+          needsResize = false;
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+      }
+      if (pointer) distortGrid(pointer[0], pointer[1]); else drawGrid();
+  }
+
+  function schedule() {
+      if (!frame) frame = requestAnimationFrame(render);
+  }
+
+  canvas.addEventListener('mousemove', (event) => {
+      pointer = [event.offsetX, event.offsetY];
+      schedule();
+  }, { passive: true });
+
+  canvas.addEventListener('mouseout', () => {
+      pointer = null;
+      schedule();
+  }, { passive: true });
 
   function observeColorChanges() {
       const observer = new MutationObserver(() => {
           const newColor = getGridColor();
-          if (newColor !== gridColor) {
-              gridColor = newColor;
-              drawGrid(); // Redraw grid with new color
-          }
+          if (newColor === gridColor) return;   // the picker writes ~15 properties per change; only this one matters
+          gridColor = newColor;
+          schedule();
       });
 
       observer.observe(document.documentElement, {
@@ -124,63 +152,11 @@ document.addEventListener("DOMContentLoaded", function () {
       });
   }
 
-  window.addEventListener('resize', resizeCanvas);
+  window.addEventListener('resize', () => {
+      needsResize = true;
+      schedule();
+  }, { passive: true });
+
   resizeCanvas(); // Initial draw
   observeColorChanges(); // Start observing changes to the CSS variable
 });
-
-
-/*
-
-const grid = document.querySelector('.dot-grid');
-const dotSize = 1;
-const padding = 40;
-const sizes = [0, 0, 0, 0, 1.5, 1.5, 1.5, 1.5, 3, 4, 5];
-let animationReq;
-let increment = 0;
-let dots = [];
-window.addEventListener('resize', createGrid);
-
-createGrid();
-
-function createGrid (event) {
-	clearGrid();
-	
-	const gridR = grid.getBoundingClientRect();
-	const width = (gridR.width - (padding * 2)) / (padding - (dotSize / 2));
-	const height = (gridR.height - (padding * 2)) / (padding - (dotSize / 2));
-
-	for	(let i = 0; i < width; i++) {
-		for	(let j = 0; j < height; j++) {
-			const dot = document.createElement('div');
-			dot.className = 'dot';
-			dot.style.top = j * padding + padding + 'px';
-			dot.style.left = i * padding + padding + 'px';
-			grid.appendChild(dot);
-			dots.push(dot);
-		}
-	}
-	
-	animationReq = window.requestAnimationFrame(animateGrid);
-}
-
-function clearGrid () {
-	window.cancelAnimationFrame(animationReq);
-	while (grid.firstChild) { grid.removeChild(grid.firstChild); }
-	dots = [];
-}
-
-
-function animateGrid () {
-	const dot = dots[Math.floor(Math.random() * dots.length)];
-	const scale = sizes[Math.floor(Math.random() * sizes.length)];
-    const timeoutTime = Math.floor(Math.random() * (5000 - 10 + 1)) + 10;
-	dot.style.transform =  `scale(${scale})`;
-	const st1 = setTimeout(() =>{
-		dot.style.transform = `scale(1)`;
-		clearTimeout(st1);
-	}, 600);
-	
-	animationReq = window.requestAnimationFrame(animateGrid);
-}
-    */

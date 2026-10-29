@@ -28,6 +28,7 @@
     <!-- Third-party fonts never block the first paint: Lato (testimonials) and Caveat (the chat widget's note) load as a print sheet and
          switch on when it arrives (display=swap). They used to be @imports inside testimonials.css and chat.css, a render-blocking chain to
          fonts.googleapis.com. Permanent Marker and css/figma-iframe.css were dropped: nothing on this page uses them. -->
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600&family=Lato:ital,wght@0,400;0,700;1,400&display=swap" media="print" onload="this.media='all'">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600&family=Lato:ital,wght@0,400;0,700;1,400&display=swap"></noscript>
@@ -359,21 +360,28 @@
             </span>
     </footer>
    
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tinycolor/1.4.2/tinycolor.min.js"></script>
-    <script src="js/color-shade-calculator.js"></script>
-    <script src="js/heroanimation.js"></script>
+    <!-- defer on the classic scripts below: they all sat at the end of body, so they already had the DOM, but each one
+         still stopped the parser where it stood — tinycolor worst of all, being a cross-origin fetch the parser had to
+         wait out before it could finish the document. defer keeps their relative order, so tinycolor is still in place
+         before color-shade-calculator reads it and Wallop before testimonials.js constructs one.
+         js/heroanimation.js is no longer loaded: it does nothing. Its whole body is guarded by `if (c && s)` on
+         getElementById("c")/("s"), and no page on this site has either id — nor does images/testhue.png, the texture it
+         would slice. The file is still in js/. -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tinycolor/1.4.2/tinycolor.min.js" defer></script>
+    <script src="js/color-shade-calculator.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/wallop/2.4.1/js/Wallop.min.js" defer></script>
     <script src="js/testimonials.js" defer></script>
     <script src="js/cards.js?v=2" defer></script>
     <script src="js/video-lazy.js?v=1" defer></script>
     <script type="module" src="js/principle-clouds.js?v=5" async></script>
-    <script src="js/header.js"></script>
-    <script src="js/drawer.js"></script>
-    <script src="js/reader.js"></script>
-    <script src="js/grid.js"></script>
-    <script src="/track/beacon.js?v=2" data-endpoint="https://jobmachine.felixacat.workers.dev/v"></script>
+    <script src="js/header.js" defer></script>
+    <script src="js/drawer.js" defer></script>
+    <script src="js/reader.js" defer></script>
+    <script src="js/grid.js" defer></script>
+    <script src="/track/beacon.js?v=2" data-endpoint="https://jobmachine.felixacat.workers.dev/v" defer></script>
     <script src="/chat/chat.js?v=22" data-endpoint="https://jobmachine-chat.felixacat.workers.dev" defer></script>
     <script type="module" src="js/work-spine.js?v=2026-10-29b"></script>
+    <script type="module">/* dev only: ?waves=1 opens the hero sea's controls (js/fold-lab.js) */ if (/[?&]waves=1/.test(location.search)) import('./js/fold-lab.js?t=' + Date.now()).then(m => m.mountFoldLab()).catch(e => console.warn('fold lab', e));</script>
 
 </body>
 </html>

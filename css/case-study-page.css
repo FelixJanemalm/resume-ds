@@ -106,6 +106,7 @@ body:has(.cs-page) {
 .cs-hero video,
 .cs-hero img {
     width: 100%;
+    height: auto;   /* the width/height attributes give the ratio only, not a fixed height */
     border-radius: var(--cs-radius-surface);
     display: block;
     box-shadow:

@@ -39,30 +39,49 @@ document.addEventListener('DOMContentLoaded', function () {
       readerSection.style.setProperty('--text-container-height', textContainerHeight + 'px');
     });
     
-    // Fallback for devices without CSS scroll animation support
+    // Fallback for devices without CSS scroll animation support.
+    // This used to re-run querySelectorAll, read offsetTop (a forced layout) and write an opacity to every word on
+    // every scroll event — read, write, read, write, unthrottled. The sections and their words do not change after
+    // setup, so they are collected once; offsetTop is measured outside the handler and re-measured on resize; the
+    // handler itself is coalesced into a frame and only writes to a word whose state actually flipped.
     if (!CSS.supports('animation-timeline: scroll()')) {
-      window.addEventListener('scroll', function () {
-        var scrollPosition = window.scrollY;
-        
-        // Handle each reader section separately
-        document.querySelectorAll('.reader, .reader2').forEach(function(section) {
-          var sectionTop = section.offsetTop;
-          var sectionHeight = section.offsetHeight;
-          var splitElement = section.querySelector('[data-split]');
-          
-          if (splitElement) {
-            Array.prototype.forEach.call(splitElement.children, function (word) {
-              var start = parseFloat(word.dataset.start) * 5; // Using the PPC value (5)
-              var threshold = scrollPosition - sectionTop;
-              
-              if (threshold > start - 100) { // Expands range progressively
-                word.style.opacity = 1;
-              } else {
-                word.style.opacity = 0.2;
-              }
+      var sections = [].map.call(document.querySelectorAll('.reader, .reader2'), function (section) {
+        var splitElement = section.querySelector('[data-split]');
+        return {
+          section: section,
+          top: 0,
+          words: splitElement ? [].map.call(splitElement.children, function (word) {
+            return { el: word, start: parseFloat(word.dataset.start) * 5, lit: null };   // PPC is 5
+          }) : []
+        };
+      }).filter(function (s) { return s.words.length; });
+
+      if (sections.length) {
+        var measure = function () {
+          sections.forEach(function (s) { s.top = s.section.offsetTop; });
+        };
+
+        var paint = function () {
+          frame = 0;
+          var scrollPosition = window.scrollY;
+          sections.forEach(function (s) {
+            var threshold = scrollPosition - s.top;
+            s.words.forEach(function (word) {
+              var lit = threshold > word.start - 100;   // Expands range progressively
+              if (lit === word.lit) return;
+              word.lit = lit;
+              word.el.style.opacity = lit ? 1 : 0.2;
             });
-          }
-        });
-      });
+          });
+        };
+
+        var frame = 0;
+        var schedule = function () { if (!frame) frame = requestAnimationFrame(paint); };
+
+        measure();
+        schedule();
+        window.addEventListener('scroll', schedule, { passive: true });
+        window.addEventListener('resize', function () { measure(); schedule(); }, { passive: true });
+      }
     }
   });

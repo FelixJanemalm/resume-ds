@@ -11,6 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;1,8..60,400&display=swap" rel="stylesheet">
     <link rel="preload" href="../fonts/woff2/RNSPhysis-Medium.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="../fonts/woff2/RNSPhysis-Light.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
     <link rel="stylesheet" href="../css/tokens/Ref/yds.css">
     <link rel="stylesheet" href="../css/tokens/Ref/mui.css">
     <link rel="stylesheet" href="../css/tokens/theme.css">
@@ -96,8 +97,12 @@
 
         <div class="cs-hero">
             <div class="cs-hero__surface">
-                <video class="hue-shift" autoplay muted loop playsinline>
-                    <source src="../images/v7-demo.mp4" type="video/mp4">
+                <!-- width/height on every <video> below: intrinsic dimensions, so the browser reserves the right box before the
+                     file arrives. Without them a video that has not loaded is the default 300x150, which both shifts the page as
+                     each one loads and makes everything read as far higher up than it really is — the lazy loader measured the
+                     second video at 758px when it truly sits at 1475px, and fetched 2 MB that was a screen below the fold. -->
+                <video class="hue-shift" muted loop playsinline data-poster="../images/posters/v7-demo.webp" width="1326" height="848">
+                    <source data-src="../images/v7-demo.mp4" type="video/mp4">
                 </video>
             </div>
         </div>
@@ -249,16 +254,12 @@
                     <video
                         width="1258"
                         height="534"
-                        autoplay
                         muted
                         loop
                         playsinline
-                        preload="metadata"
-                        loading="lazy"
                         disablepictureinpicture
-                        aria-label="Recording: internal brown bag on the Yubico design system"
-                    >
-                        <source src="../images/case-studies/ds-brown-bag-yubico.mp4" type="video/mp4">
+                        aria-label="Recording: internal brown bag on the Yubico design system" data-poster="../images/posters/ds-brown-bag-yubico.webp">
+                        <source data-src="../images/case-studies/ds-brown-bag-yubico.mp4" type="video/mp4">
                     </video>
                 </div>
                 <p class="cs-caption">Video of a brown bag session</p>
@@ -452,11 +453,16 @@
         startCycle();
     })();
     </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tinycolor/1.4.2/tinycolor.min.js"></script>
-    <script src="../js/color-shade-calculator.js"></script>
-    <script src="../js/header.js"></script>
-    <script src="../js/drawer.js"></script>
-    <script src="../js/case-study-swipe-hint.js"></script>
+    <!-- defer: these all sat at the end of body so they already had the DOM, but each one still stopped the parser
+         where it stood, and three of them are cross-origin fetches the parser had to wait out. Every script here
+         either guards on document.readyState or does its work in DOMContentLoaded, which fires after deferred
+         scripts run, so the libraries are still in place before the inline code below uses them. -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tinycolor/1.4.2/tinycolor.min.js" defer></script>
+    <script src="../js/color-shade-calculator.js" defer></script>
+    <script src="../js/header.js" defer></script>
+    <script src="../js/drawer.js" defer></script>
+    <script src="../js/video-lazy.js?v=1" defer></script>
+    <script src="../js/case-study-swipe-hint.js" defer></script>
 
 </body>
 </html>

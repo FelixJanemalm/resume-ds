@@ -26,7 +26,13 @@ document.addEventListener("DOMContentLoaded", function () {
         lastScrollY = currentScrollY;
     }
 
-    window.addEventListener("scroll", updateHeader);
+    // Coalesced into a frame and passive: the handler only toggles classes, but it used to run on every scroll
+    // event and the listener blocked the scroll until it returned.
+    let frame = 0;
+    window.addEventListener("scroll", function () {
+        if (frame) return;
+        frame = requestAnimationFrame(function () { frame = 0; updateHeader(); });
+    }, { passive: true });
     updateHeader(); // Run once on load
 });
 
@@ -45,12 +51,14 @@ document.addEventListener("DOMContentLoaded", function () {
         scrollArrow.style.pointerEvents = "auto";
     }, 3500);
 
+    // The arrow only ever hides, so the listener retires itself on the first scroll instead of writing the same
+    // two inline styles on every scroll event for the rest of the visit.
     function hideArrowOnScroll() {
-        if (window.scrollY > 0) {
-            scrollArrow.style.opacity = "0";
-            scrollArrow.style.pointerEvents = "none";
-        }
+        if (window.scrollY <= 0) return;
+        scrollArrow.style.opacity = "0";
+        scrollArrow.style.pointerEvents = "none";
+        window.removeEventListener("scroll", hideArrowOnScroll);
     }
 
-    window.addEventListener("scroll", hideArrowOnScroll);
+    window.addEventListener("scroll", hideArrowOnScroll, { passive: true });
 });

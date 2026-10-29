@@ -8,12 +8,15 @@
     <title>One Color Change, Six Platforms Updated – Felix Janemalm</title>
     <link rel="preload" href="../fonts/woff2/RNSPhysis-Medium.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="../fonts/woff2/RNSPhysis-Light.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
     <link rel="stylesheet" href="../css/tokens/Ref/yds.css">
     <link rel="stylesheet" href="../css/tokens/Ref/mui.css">
     <link rel="stylesheet" href="../css/tokens/theme.css">
     <link rel="stylesheet" href="../css/master.css">
     <link rel="stylesheet" href="../css/typography.css">
-    <link rel="stylesheet" href="../css/materials.css">
+    <!-- css/materials.css is not linked here: none of its classes (.glass, .box, .grid-bg, .shadow, .gradient,
+         .hue-shift) appears on this page, and the --line custom property it defines is read by no rule on the
+         site. It stays linked from design-system.html, which does use .hue-shift. -->
     <link rel="stylesheet" href="../css/header.css">
     <link rel="stylesheet" href="../css/drawer.css">
     <link rel="stylesheet" href="../css/case-study-page.css">
@@ -93,8 +96,12 @@
 
         <div class="cs-hero">
             <div class="cs-hero__surface">
-                <video autoplay muted loop playsinline>
-                    <source src="../images/tokens-v3-export.mp4" type="video/mp4">
+                <!-- width/height on every <video> below: intrinsic dimensions, so the browser reserves the right box before the
+                     file arrives. Without them a video that has not loaded is the default 300x150, which both shifts the page as
+                     each one loads and makes everything read as far higher up than it really is — the lazy loader measured the
+                     second video at 758px when it truly sits at 1475px, and fetched 2 MB that was a screen below the fold. -->
+                <video muted loop playsinline data-poster="../images/posters/tokens-v3-export.webp" width="1280" height="945">
+                    <source data-src="../images/tokens-v3-export.mp4" type="video/mp4">
                 </video>
             </div>
         </div>
@@ -319,8 +326,8 @@
                     </div>
                 </div>
                 <div class="cs-media cs-media--learn-outro">
-                    <video autoplay muted loop playsinline preload="auto" poster="../images/case-studies/tokens-yubico-full-page-figma.png" aria-label="Figma: Yubico full-page frame in the editor">
-                        <source src="../images/case-studies/tokens-learn-outro.mp4" type="video/mp4">
+                    <video muted loop playsinline data-poster="../images/case-studies/tokens-yubico-full-page-figma.png" aria-label="Figma: Yubico full-page frame in the editor" width="766" height="1080">
+                        <source data-src="../images/case-studies/tokens-learn-outro.mp4" type="video/mp4">
                     </video>
                 </div>
             </div>
@@ -330,8 +337,8 @@
                 <h2 class="cs-section-title">New designs inherit responsive behavior automatically</h2>
                 <p class="cs-section-text cs-section--delivery-bridge__lead">Because every element down to the layout is wired to size tokens on an atomic level, any new design already knows how to behave at every breakpoint. No redesigning for mobile — just switch and preview.</p>
                 <div class="cs-media cs-media--brown-bag-video cs-media--natural-ratio">
-                    <video controls autoplay muted loop playsinline preload="metadata" aria-label="Demo: assembling a module from components in Figma, then previewing all breakpoints with a single theme toggle">
-                        <source src="../images/slides/tokens-theme-size-export.mp4" type="video/mp4">
+                    <video controls muted loop playsinline aria-label="Demo: assembling a module from components in Figma, then previewing all breakpoints with a single theme toggle" data-poster="../images/posters/tokens-theme-size-export.webp" width="1600" height="900">
+                        <source data-src="../images/slides/tokens-theme-size-export.mp4" type="video/mp4">
                     </video>
                 </div>
             </div>
@@ -408,13 +415,18 @@
             </span>
     </footer>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tinycolor/1.4.2/tinycolor.min.js"></script>
-    <script src="../js/color-shade-calculator.js"></script>
-    <script src="../js/header.js"></script>
-    <script src="../js/drawer.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <script src="../js/revenue-impact-chart.js"></script>
-    <script src="../js/token-hierarchy-diagram.js"></script>
+    <!-- defer: these all sat at the end of body so they already had the DOM, but each one still stopped the parser
+         where it stood, and three of them are cross-origin fetches the parser had to wait out. Every script here
+         either guards on document.readyState or does its work in DOMContentLoaded, which fires after deferred
+         scripts run, so the libraries are still in place before the inline code below uses them. -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tinycolor/1.4.2/tinycolor.min.js" defer></script>
+    <script src="../js/color-shade-calculator.js" defer></script>
+    <script src="../js/header.js" defer></script>
+    <script src="../js/drawer.js" defer></script>
+    <script src="../js/video-lazy.js?v=1" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
+    <script src="../js/revenue-impact-chart.js" defer></script>
+    <script src="../js/token-hierarchy-diagram.js" defer></script>
     <script>
         (function () {
             var v = document.querySelector('.cs-media--learn-outro video');

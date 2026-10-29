@@ -8,17 +8,26 @@
     <title>Built the Sourcing OS – Felix Janemalm</title>
     <link rel="preload" href="../fonts/woff2/RNSPhysis-Medium.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="../fonts/woff2/RNSPhysis-Light.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preconnect" href="https://d3js.org" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="stylesheet" href="../css/tokens/Ref/yds.css">
     <link rel="stylesheet" href="../css/tokens/Ref/mui.css">
     <link rel="stylesheet" href="../css/tokens/theme.css">
     <link rel="stylesheet" href="../css/master.css">
     <link rel="stylesheet" href="../css/typography.css">
-    <link rel="stylesheet" href="../css/materials.css">
+    <!-- css/materials.css is not linked here: none of its classes (.glass, .box, .grid-bg, .shadow, .gradient,
+         .hue-shift) appears on this page, and the --line custom property it defines is read by no rule on the
+         site. It stays linked from design-system.html, which does use .hue-shift. -->
     <link rel="stylesheet" href="../css/header.css">
     <link rel="stylesheet" href="../css/drawer.css">
     <link rel="stylesheet" href="../css/case-study-page.css">
     <link rel="stylesheet" href="../css/footer.css">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Leaflet is not loaded. Its only use is initJourneyMap() further down, which is reached solely through
+         switchDemoTab('map', ...) — and nothing calls switchDemoTab any more: the demo tab strip is gone from this
+         page (only its CSS is left) and there is no #cs-journey-map element for the map to mount on. So the
+         stylesheet and the ~140 KB of script were fetched from a third origin on every view of this case study to
+         draw a map that cannot appear. initJourneyMap() is left in place; put the tab markup back and these two
+         tags with it. -->
     <style>
         /* ─── Rejected-constraint list (things the solution does NOT assume) ─── */
         .cs-constraint-tags {
@@ -726,8 +735,12 @@
 
         <div class="cs-hero">
             <div class="cs-hero__surface">
-                <video autoplay muted loop playsinline>
-                    <source src="../images/case-studies/sourcing-platform-overview.mp4" type="video/mp4">
+                <!-- width/height on every <video> below: intrinsic dimensions, so the browser reserves the right box before the
+                     file arrives. Without them a video that has not loaded is the default 300x150, which both shifts the page as
+                     each one loads and makes everything read as far higher up than it really is — the lazy loader measured the
+                     second video at 758px when it truly sits at 1475px, and fetched 2 MB that was a screen below the fold. -->
+                <video muted loop playsinline data-poster="../images/posters/sourcing-platform-overview.webp" width="1600" height="900">
+                    <source data-src="../images/case-studies/sourcing-platform-overview.mp4" type="video/mp4">
                 </video>
             </div>
         </div>
@@ -782,8 +795,8 @@
                         <p class="cs-section-text">The raw data could be anything from a photo of a swatch in the warehouse to a note in an email. Our goal was to convert this into something customers could easily understand with just 1 scan.</p>
                     </div>
                     <div class="cs-media cs-media--brown-bag-video cs-media--natural-ratio">
-                        <video autoplay muted loop playsinline preload="metadata" aria-label="Customer-facing garment story page built from a real batch — Sankey of materials, world map of the journey, certifications, and CO₂ footprint">
-                            <source src="../images/case-studies/sourcing-garment-story.mp4" type="video/mp4">
+                        <video muted loop playsinline aria-label="Customer-facing garment story page built from a real batch — Sankey of materials, world map of the journey, certifications, and CO₂ footprint" data-poster="../images/posters/sourcing-garment-story.webp" width="1726" height="908" style="aspect-ratio: 1726 / 908;">
+                            <source data-src="../images/case-studies/sourcing-garment-story.mp4" type="video/mp4">
                         </video>
                     </div>
                 </div>
@@ -1023,8 +1036,8 @@
             <!-- HUMAN IN THE LOOP -->
             <div class="cs-section cs-section--split cs-section--reverse">
                 <div class="cs-media">
-                    <video autoplay muted loop playsinline preload="metadata" aria-label="Proposals review screen: AI-proposed database changes shown as side-by-side diffs (current vs. proposed) for human approval, with confidence score and source document reference">
-                        <source src="../images/case-studies/sourcing-proposals.mp4" type="video/mp4">
+                    <video muted loop playsinline aria-label="Proposals review screen: AI-proposed database changes shown as side-by-side diffs (current vs. proposed) for human approval, with confidence score and source document reference" data-poster="../images/posters/sourcing-proposals.webp" width="1600" height="900">
+                        <source data-src="../images/case-studies/sourcing-proposals.mp4" type="video/mp4">
                     </video>
                 </div>
                 <div>
@@ -1054,8 +1067,8 @@
                 <h2 class="cs-section-title">Messy data made useful</h2>
                 <p class="cs-section-text cs-section--delivery-bridge__lead">Locking a batch generates a QR code. Scan it, and the page builds itself from the batch record. A Sankey diagram of every material that was used. A world map of the journey. A family tree of materials with certifications. A CO₂ footprint calculated for the specific batch. It also conforms to the EU Digital Product Passport format — three years before 2027 makes it mandatory.</p>
                 <div class="cs-media cs-media--brown-bag-video cs-media--natural-ratio">
-                    <video autoplay muted loop playsinline preload="metadata" aria-label="Customer-facing garment story page built from a real batch — Sankey of materials, world map of the journey, certifications, and CO₂ footprint">
-                        <source src="../images/case-studies/sourcing-garment-story.mp4" type="video/mp4">
+                    <video muted loop playsinline aria-label="Customer-facing garment story page built from a real batch — Sankey of materials, world map of the journey, certifications, and CO₂ footprint" data-poster="../images/posters/sourcing-garment-story.webp" width="1726" height="908" style="aspect-ratio: 1726 / 908;">
+                        <source data-src="../images/case-studies/sourcing-garment-story.mp4" type="video/mp4">
                     </video>
                 </div>
             </div>
@@ -1072,8 +1085,8 @@
                     </div>
                 </div>
                 <div class="cs-media cs-media--learn-outro">
-                    <video autoplay muted loop playsinline preload="auto" aria-label="AI chat interface querying the sourcing knowledge base — answers come from actual records, not hallucinations">
-                        <source src="../images/case-studies/sourcing-ai-chat.mp4" type="video/mp4">
+                    <video muted loop playsinline aria-label="AI chat interface querying the sourcing knowledge base — answers come from actual records, not hallucinations" data-poster="../images/posters/sourcing-ai-chat.webp" width="1600" height="900">
+                        <source data-src="../images/case-studies/sourcing-ai-chat.mp4" type="video/mp4">
                     </video>
                 </div>
             </div>
@@ -1120,12 +1133,16 @@
     </footer>
 
     <!-- ─── Scripts ─── -->
-    <script src="../js/header.js"></script>
-    <script src="../js/drawer.js"></script>
-    <script src="../js/case-study-swipe-hint.js"></script>
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- defer: these all sat at the end of body so they already had the DOM, but each one still stopped the parser
+         where it stood, and three of them are cross-origin fetches the parser had to wait out. Every script here
+         either guards on document.readyState or does its work in DOMContentLoaded, which fires after deferred
+         scripts run, so the libraries are still in place before the inline code below uses them. -->
+    <script src="../js/header.js" defer></script>
+    <script src="../js/drawer.js" defer></script>
+    <script src="../js/video-lazy.js?v=1" defer></script>
+    <script src="../js/case-study-swipe-hint.js" defer></script>
+    <script src="https://d3js.org/d3.v7.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js" defer></script>
 
     <script>
     // ─── Demo tab switcher ────────────────────────────────────────────────────
