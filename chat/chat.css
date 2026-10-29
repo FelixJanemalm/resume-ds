@@ -132,9 +132,17 @@
   background: var(--fjc-glass); color: var(--fjc-text);
   backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--fjc-line); border-radius: 18px; box-shadow: var(--fjc-shadow);
-  padding: 0.6em 0.8em 0.7em;
+  padding: 0.5em 0.6em 0.5em 0.9em;
 }
-.fjc[data-state="docked"] .fjc-bar { display: flex; align-items: center; gap: 0.6em; padding: 0.2em 0.2em 0.5em; }
+/* One row for the controls, open or closed: chip, field, send, toggle. The bar has
+   no row of its own (display: contents); open, the thread wraps onto a full-width
+   row above. The field's placeholder shows the start of the last reply (chat.js). */
+.fjc[data-state="docked"] { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6em; }
+.fjc[data-state="docked"] .fjc-bar { display: contents; }
+.fjc[data-state="docked"] .fjc-badge { order: 0; }
+.fjc[data-state="docked"] .fjc-thread { order: 0; flex: 1 0 100%; }
+.fjc[data-state="docked"] .fjc-form { order: 1; flex: 1 1 0; align-items: center; }
+.fjc[data-state="docked"] .fjc-toggle { order: 2; }
 .fjc button.fjc-toggle {
   flex: 0 0 2em; width: 2em !important; height: 2em !important; opacity: 0.7 !important;
   display: grid; place-items: center; transition: transform 0.2s ease !important;
@@ -146,23 +154,14 @@
 .fjc[data-state="docked"] .fjc-bot { background: var(--fjc-field); backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none; }
 /* One AI chip at a time: the bar's chip hides once the bubbles (each with a chip) are showing. */
 .fjc[data-state="docked"][data-open="1"] .fjc-bar .fjc-badge { display: none; }
-.fjc[data-state="docked"][data-open="1"] .fjc-bar { justify-content: flex-end; padding-bottom: 0.2em; }
 .fjc[data-state="docked"][data-open="1"] .fjc-thread {
-  display: flex; max-height: min(50vh, 460px); overflow-y: auto; padding: 0.2em 0.2em 0.6em; margin-bottom: 0.4em;
+  display: flex; max-height: min(50vh, 460px); overflow-y: auto; padding: 0.2em 0.2em 0.2em 0;
 }
+.fjc[data-state="docked"][data-open="1"] .fjc-thread:empty { display: none; }
 .fjc[data-state="docked"][data-open="1"] .fjc-msg.fjc-folded { display: flex; }
 
-/* Closed, one line: chip, field, send and toggle. The field's placeholder shows the
-   start of the last reply (chat.js). Phones already show only the field when closed. */
-@media (min-width: 768px) {
-  .fjc[data-state="docked"][data-open="0"] { display: flex; align-items: center; gap: 0.6em; padding: 0.5em 0.6em 0.5em 0.9em; }
-  .fjc[data-state="docked"][data-open="0"] .fjc-bar { display: contents; }
-  .fjc[data-state="docked"][data-open="0"] .fjc-badge { order: 0; }
-  .fjc[data-state="docked"][data-open="0"] .fjc-form { order: 1; flex: 1 1 auto; align-items: center; }
-  .fjc[data-state="docked"][data-open="0"] .fjc-toggle { order: 2; }
-}
 /* A long placeholder (the last reply) stays on its line, cut at the field edge. */
-.fjc[data-state="docked"][data-open="0"] .fjc-form textarea:placeholder-shown { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fjc[data-state="docked"] .fjc-form textarea:placeholder-shown { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Reserved space for the first line while the posting lookup is in flight. */
 .fjc-msg.fjc-pending { min-height: 4.4em; }
@@ -190,7 +189,7 @@
   .fjc[data-state="docked"] {
     left: max(14px, env(safe-area-inset-left)); right: max(14px, env(safe-area-inset-right));
     bottom: calc(14px + env(safe-area-inset-bottom)); width: auto; transform: none;
-    padding: 0.55em 0.7em 0.7em; border-radius: 26px;
+    padding: 0.55em 0.7em; border-radius: 26px;
   }
   .fjc[data-state="docked"] .fjc-form textarea { border-radius: 16px; }
   .fjc[data-state="docked"] button.fjc-send { border-radius: 16px; }
