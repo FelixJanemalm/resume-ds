@@ -32,7 +32,11 @@ const coarse = matchMedia('(pointer: coarse)').matches;
 // Can this browser give us a WebGL2 context (fast = not a software renderer)? Asked once per kind with a throwaway canvas, so a
 // browser without WebGL never gets a THREE.WebGLRenderer at all: three logs every failed attempt as a console error.
 const glProbe = {};
+// ?sea=cpu: accept a software WebGL (the sea on the CPU), to test how it runs there; ?sea=recorded: the recorded sea (js/sea-frames.js),
+// which no longer starts on its own (it could not keep the sea moving).
+const SEA = new URLSearchParams(location.search).get('sea');
 function webgl2(fast) {
+    if (SEA === 'cpu') fast = false;
     const k = fast ? 'fast' : 'any'; if (k in glProbe) return glProbe[k];
     let ok = false;
     try { const g = document.createElement('canvas').getContext('webgl2', fast ? { failIfMajorPerformanceCaveat: true } : undefined); ok = !!g; if (g) { const x = g.getExtension('WEBGL_lose_context'); if (x) x.loseContext(); } } catch (e) {}
@@ -572,7 +576,7 @@ const STAR_N = 12;
 // on a fast machine and several times that on a phone). Nothing it registers (listeners, observers, the frame loop) exists before the last yield.
 const yieldTask = () => new Promise(r => setTimeout(r, 0));
 async function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD, PRE) {
-    if (new URLSearchParams(location.search).get('sea') === 'recorded') return heroStill('?sea=recorded', true);   // the recording in any browser, to review it
+    if (SEA === 'recorded') return heroStill('?sea=recorded', true);   // the recording in any browser, to review it
     if (!GPUC) return heroStill('GPUComputationRenderer did not load', true);   // (this used to return without any hero at all: a blank hero)
     if (!FOLD || !BOAT || pcfg.boat === 'off') return heroStill('no hero sea');
     if (!webgl2(true)) return heroStill('no WebGL2, or only a software one', true);
@@ -582,7 +586,7 @@ async function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD, PRE) {
     document.body.appendChild(canvas);   // appended last: z-index does the layering, and nothing else on the page sees it as the first canvas
     let gl;
     // failIfMajorPerformanceCaveat: a software renderer (a blocklisted GPU) would run the sea at a few frames a second; the plain hero is better
-    try { gl = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: 'high-performance', failIfMajorPerformanceCaveat: true }); } catch (e) { canvas.remove(); heroStill('no WebGL, or only a software one', true); return; }
+    try { gl = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: 'high-performance', failIfMajorPerformanceCaveat: SEA !== 'cpu' }); } catch (e) { canvas.remove(); heroStill('no WebGL, or only a software one', true); return; }
     let everShown = false;   // once the live sea has shown, a later failure (after a restored context) keeps the plain hero: it may come back
     const giveUp = why => { dead = true; try { gl.dispose(); gl.forceContextLoss(); } catch (e) {} canvas.remove(); heroStill(why, !everShown); };
     let dead = false;
@@ -1062,10 +1066,11 @@ async function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD, PRE) {
                 { at: '#work:center@0.5', x: 0.05, y: -0.22, size: 0.52, turn: 85, tilt: 24, heel: 5, level: L1, wake: 0.65, cam: 0.3 },
                 { at: '#work:center@0.25', x: -0.02, y: -0.4, size: 0.42, turn: 92, tilt: 50, heel: 5, level: L1, wake: 0.85, cam: 0.5 },              // one arc from the hero into the column (it used to climb to 0.12 and dive)
                 // the column, as on desktop: a small ship seen from above in the band below the centred card, sailing down the column's axis
-                { at: 'stage@0.14', x: 0, y: -0.74, size: 0.28, turn: 70, tilt: 54, heel: 4, level: L1, wake: 0.9, cam: 1 },
-                { at: 'stage@0.92', x: 0, y: -0.76, size: 0.22, turn: 84, tilt: 63, heel: 4, level: L2, wake: 1, cam: 0.8 },
-                { at: 'stage-release', x: 0, y: -0.76, size: 0.24, turn: 78, tilt: 56, heel: 7, level: L2, wake: 0.95, cam: 0.8 },
-                { at: 'stage-release+450', x: -0.06, y: -0.74, size: 0.28, turn: 45, tilt: 26, heel: 7, level: L2, wake: 0.9, cam: 0.8 },   // the column's gentle exit into the side shot, as on desktop
+                // (the column lifted 0.06-0.07 and its ship a touch smaller, 2026-10-29: the docked chat bar covers the bottom ~10%; the side shot below already clears it)
+                { at: 'stage@0.14', x: 0, y: -0.68, size: 0.25, turn: 70, tilt: 54, heel: 4, level: L1, wake: 0.9, cam: 1 },
+                { at: 'stage@0.92', x: 0, y: -0.69, size: 0.2, turn: 84, tilt: 63, heel: 4, level: L2, wake: 1, cam: 0.8 },
+                { at: 'stage-release', x: 0, y: -0.69, size: 0.22, turn: 78, tilt: 56, heel: 7, level: L2, wake: 0.95, cam: 0.8 },
+                { at: 'stage-release+450', x: -0.06, y: -0.67, size: 0.28, turn: 45, tilt: 26, heel: 7, level: L2, wake: 0.9, cam: 0.8 },   // the column's gentle exit into the side shot, as on desktop
                 { at: '#read:top@0', x: -0.02, y: -0.7, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L2, wake: 0.85, cam: 1 },                                           // the side shot below the sticky quote
                 { at: '#read:top@0+180', x: -0.02, y: -0.7, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L3, wake: 0.9, cam: 1 },
                 { at: '#read:top@0+360', x: -0.02, y: -0.7, size: 0.32, turn: 0, tilt: 0, heel: 3, level: L4, wake: 0.95, cam: 1 },
@@ -1865,7 +1870,7 @@ onmessage = e => { const b = buildBoatLevels(e.data, 1), t = new Set([...b.pos, 
 // Reduced motion, a context the browser may restore, and the config switches keep the plain hero.
 function heroStill(why, frames) {
     if (why) console.info('work-spine: the hero ' + (frames ? 'plays its recording' : 'stays without the sea') + ' (' + why + ')');
-    if (frames) import('./sea-frames.js' + MOD_V).then(m => m.start()).catch(e => console.warn('work-spine: sea-frames did not load', e));
+    if (frames && SEA === 'recorded') import('./sea-frames.js' + MOD_V).then(m => m.start()).catch(e => console.warn('work-spine: sea-frames did not load', e));
 }
 
 if (section && !reduced && 'IntersectionObserver' in window) boot(); else heroStill(reduced ? 'reduced motion' : 'no IntersectionObserver');
