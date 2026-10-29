@@ -255,7 +255,7 @@ export function createFold(THREE, { scene, pixelRatio = 1, light = false, dots: 
     // transparent canvas an alpha written per dot would darken the page under every faint dot into a dark speck)
     let dots = null;
     if (withDots) {
-        const ND = 60000, dp = new Float32Array(ND * 3), ds = new Float32Array(ND);
+        const ND = light ? 26000 : 60000, dp = new Float32Array(ND * 3), ds = new Float32Array(ND);
         for (let i = 0; i < ND; i++) { const r = dotsRadius * Math.sqrt(Math.random()), a = Math.random() * Math.PI * 2; dp[i * 3] = dotsAt[0] + Math.cos(a) * r; dp[i * 3 + 2] = dotsAt[1] + Math.sin(a) * r; ds[i] = Math.pow(Math.random(), 2.2); }
         const dotGeo = new THREE.BufferGeometry(); dotGeo.setAttribute('position', new THREE.BufferAttribute(dp, 3)); dotGeo.setAttribute('aSeed', new THREE.BufferAttribute(ds, 1));
         dots = new THREE.Points(dotGeo, new THREE.ShaderMaterial({ uniforms: U, vertexShader: DOTS_VS, fragmentShader: DOTS_FS, transparent: true, depthWrite: false,
