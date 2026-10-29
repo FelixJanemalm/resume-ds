@@ -104,7 +104,7 @@ const pcfg = section ? {
 if (pcfg) for (const [k, v] of new URLSearchParams(location.search)) if (k in pcfg && v !== '') pcfg[k] = Number.isNaN(+v) ? v : +v;   // dev aid: ?shipWorkTilt=45&boat=off
 let layer = null;
 const THEME_ROW = false;   // the ship-style icon row under the colour picker (and the stored choice it writes): off for now
-const MOD_V = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '?t=' + Date.now() : '?v=2026-10-29l';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache): never cached on a local server, versioned elsewhere (bump when they change)
+const MOD_V = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '?t=' + Date.now() : '?v=2026-10-29m';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache): never cached on a local server, versioned elsewhere (bump when they change)
 import('./ink-cursor.js' + MOD_V).catch(e => console.warn('ink cursor', e));   // the pointer as a trail of ink in the picked colour (it checks for a real mouse and reduced motion itself)
 
 const SIM_NOISE = `
@@ -587,6 +587,12 @@ async function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD, PRE) {
     let gl;
     // failIfMajorPerformanceCaveat: a software renderer (a blocklisted GPU) would run the sea at a few frames a second; the plain hero is better
     try { gl = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: 'high-performance', failIfMajorPerformanceCaveat: SEA !== 'cpu' }); } catch (e) { canvas.remove(); heroStill('no WebGL, or only a software one', true); return; }
+    if (SEA === 'cpu') {   // a readout for testing on any device: the renderer and the frame rate
+        const ctx = gl.getContext(), dbg = ctx.getExtension('WEBGL_debug_renderer_info'), name = dbg ? ctx.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : ctx.getParameter(ctx.RENDERER);
+        const box = document.createElement('div'); box.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:2147483647;font:12px/1.4 monospace;color:#fff;background:rgba(0,0,0,.75);padding:6px 8px;border-radius:6px;max-width:90vw;pointer-events:none';
+        document.body.appendChild(box); let n = 0, t0 = performance.now();
+        (function tick(t) { n++; if (t - t0 >= 1000) { box.textContent = `${Math.round(n * 1000 / (t - t0))} fps · ${name}`; n = 0; t0 = t; } requestAnimationFrame(tick); })(t0);
+    }
     let everShown = false;   // once the live sea has shown, a later failure (after a restored context) keeps the plain hero: it may come back
     const giveUp = why => { dead = true; try { gl.dispose(); gl.forceContextLoss(); } catch (e) {} canvas.remove(); heroStill(why, !everShown); };
     let dead = false;
@@ -1869,7 +1875,7 @@ onmessage = e => { const b = buildBoatLevels(e.data, 1), t = new Set([...b.pos, 
 // frames: the sea cannot run here for good (no GPU WebGL, a module or the simulation failed), so the recorded one plays instead (js/sea-frames.js).
 // Reduced motion, a context the browser may restore, and the config switches keep the plain hero.
 function heroStill(why, frames) {
-    if (why) console.info('work-spine: the hero ' + (frames ? 'plays its recording' : 'stays without the sea') + ' (' + why + ')');
+    if (why) console.info('work-spine: the hero ' + (frames && SEA === 'recorded' ? 'plays its recording' : 'stays without the sea') + ' (' + why + ')');
     if (frames && SEA === 'recorded') import('./sea-frames.js' + MOD_V).then(m => m.start()).catch(e => console.warn('work-spine: sea-frames did not load', e));
 }
 
