@@ -29,6 +29,15 @@ const section = document.querySelector('[data-work-spine]');
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const numAttr = (v, d) => (v !== undefined && v !== '' && !Number.isNaN(+v)) ? +v : d;
 const coarse = matchMedia('(pointer: coarse)').matches;
+// Can this browser give us a WebGL2 context (fast = not a software renderer)? Asked once per kind with a throwaway canvas, so a
+// browser without WebGL never gets a THREE.WebGLRenderer at all: three logs every failed attempt as a console error.
+const glProbe = {};
+function webgl2(fast) {
+    const k = fast ? 'fast' : 'any'; if (k in glProbe) return glProbe[k];
+    let ok = false;
+    try { const g = document.createElement('canvas').getContext('webgl2', fast ? { failIfMajorPerformanceCaveat: true } : undefined); ok = !!g; if (g) { const x = g.getExtension('WEBGL_lose_context'); if (x) x.loseContext(); } } catch (e) {}
+    return (glProbe[k] = ok);
+}
 const DPR_MAX = Math.min(devicePixelRatio || 1, coarse ? 1.5 : 2);   // the hero layer's pixel ratio: 2 on desktop; phones 1.5 (their 3x screens drew 2x before, 78% more pixels than 1.5, for dots that are drawn at the same CSS size either way)
 
 // Particle settings, shared by the page-wide layer and the tune panel (data-p-* on the section)
@@ -560,13 +569,14 @@ const FIGURES = [
 const STAR_N = 12;
 function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
     if (!GPUC) return heroStill('GPUComputationRenderer did not load');   // (this used to return without any hero at all: a blank hero)
-    if (!FOLD || !BOAT || pcfg.boat === 'off') return heroStill('no hero sea');   // the still is the sea alone; the live layer is the sea and its ship, or nothing
+    if (!FOLD || !BOAT || pcfg.boat === 'off') return heroStill('no hero sea');
+    if (!webgl2(true)) return heroStill('no WebGL2, or only a software one');
     const canvas = document.createElement('canvas');
     canvas.id = 'ws-particles'; canvas.setAttribute('aria-hidden', 'true');
     canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100vh;height:100lvh;z-index:-1;pointer-events:none;opacity:0;transition:opacity 1.6s ease';   // the LARGE viewport's height: a phone's address bar sliding in and out never resizes the layer (it only covers or uncovers its bottom edge)
     document.body.appendChild(canvas);   // appended last: z-index does the layering, and nothing else on the page sees it as the first canvas
     let gl;
-    // failIfMajorPerformanceCaveat: a software renderer (a blocklisted GPU) would run the sea at a few frames a second; the still is better
+    // failIfMajorPerformanceCaveat: a software renderer (a blocklisted GPU) would run the sea at a few frames a second; the plain hero is better
     try { gl = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: 'high-performance', failIfMajorPerformanceCaveat: true }); } catch (e) { canvas.remove(); heroStill('no WebGL, or only a software one'); return; }
     const giveUp = why => { dead = true; try { gl.dispose(); gl.forceContextLoss(); } catch (e) {} canvas.remove(); heroStill(why); };
     let dead = false;
@@ -1429,8 +1439,6 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
             foldW = on ? 1 - M.smoothstep(sS, ship.foldFadeY || 480, ship.foldGoneY || 790) : 0;
             const linesW = 1 - M.smoothstep(sS, ship.foldFadeY || 480, ship.silkGoneY || 1040);   // the silk lines outlast the wall a little: gone as the work section pins
             silkW = on && !ship.overlay && rocketMix < 0.5 ? Math.max(foldW, linesW, M.clamp(pcfg.silk, 0, 1)) : 0;   // (with data-silk="1" they stay on down the page until the ending)
-            const live = on && shown && !ctxLost;   // the live sea replaces the still (it fades out as the layer fades in) once a frame is verified
-            if (live !== ship.posterHidden) { ship.posterHidden = live; if (live) heroLive(); else heroStill(); }
         }
         // gust: wind the sails feel before the hull has answered it (sails shake, the ship luffs and heels), smoothed and floored so a one-notch wheel does not twitch the sails
         const squall = storm * 0.6 * (0.5 + 0.5 * Math.sin(t * 1.1 + 0.6 * Math.sin(t * 0.37)));   // the storm's gusts: the sails shake, the ship luffs and heels, in squalls
@@ -1714,9 +1722,9 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         if (!shown && !ctxLost) verify(dt);   // straight after the render: the drawing buffer is still there to read
         requestAnimationFrame(frame);
     }
-    // The canvas is shown, and the still faded out, only once a drawn frame is verifiably there: pixels read back across the sea and at the
+    // The canvas fades in only once a drawn frame is verifiably there: pixels read back across the sea and at the
     // ship. "The first frame drew" is not enough: a context whose simulation writes nothing draws frames too, and hid the old hero behind an
-    // empty canvas. Every 6th frame (each read stalls the GPU a little) until it passes; after 6 s of frames, the still stays for good.
+    // empty canvas. Every 6th frame (each read stalls the GPU a little) until it passes; after 6 s of frames, the hero stays without it for good.
     const check = { t: 0, n: 0 }, shipNdc = new THREE.Vector3();
     function litShare(c, x, y, w, rows, h) {
         const buf = new Uint8Array(w * 4); let lit = 0, all = 0;
@@ -1739,7 +1747,7 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
         if (ok) { shown = true; canvas.style.opacity = '1'; return; }
         if (check.t > 6) giveUp('no visible frame in 6 s');
     }
-    // A lost context (iOS drops them in background tabs and under memory pressure): back to the still at once; when the browser restores it,
+    // A lost context (iOS drops them in background tabs and under memory pressure): the canvas fades out at once; when the browser restores it,
     // three rebuilds its own state, the simulation's targets come back empty and are re-seeded, and the canvas returns after a verified frame.
     let ctxLost = false;
     canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); if (dead) return; ctxLost = true; shown = false; check.t = 0; check.n = 0; canvas.style.opacity = '0'; heroStill('the GPU context was lost'); });
@@ -1814,20 +1822,17 @@ function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD) {
     };
 }
 
-// The hero's still (index.html .hero-poster, images/hero/) is the hero until the live sea has drawn a frame that is verifiably on screen, and
-// stays the hero where that never happens: reduced motion (a still, no motion at all), no IntersectionObserver, no WebGL2 or only a software
-// one, no float render targets, a module that failed to load, a lost GPU context. It is first-party and in the HTML, so the hero is never blank.
-// It replaced the dotLottie fallback (the retired hero design, fetched from unpkg and lottie.host only after everything else had failed).
-const heroPoster = document.querySelector('.hero-poster');
-function heroStill(why) { if (why) console.info('work-spine: the hero keeps its still (' + why + ')'); if (heroPoster) heroPoster.style.opacity = ''; }
-function heroLive() { if (heroPoster) heroPoster.style.opacity = '0'; }
+// No still image in the hero (Felix, 2026-10-29): until the live sea has drawn a frame that is verifiably on screen, and for good where
+// that never happens (reduced motion, no IntersectionObserver, no WebGL2 or only a software one, no float render targets, a module that
+// failed to load, a lost GPU context), the hero is the page's own background with the headline and the picker. heroStill only says why.
+function heroStill(why) { if (why) console.info('work-spine: the hero stays without the sea (' + why + ')'); }
 
 if (section && !reduced && 'IntersectionObserver' in window) boot(); else heroStill(reduced ? 'reduced motion' : 'no IntersectionObserver');
 
 async function boot() {
     // Every module the voyage needs is requested now, all at once (they used to be fetched one after another, and only after the load event
     // and an idle callback: seven round trips before the hero sea could start). The work itself still waits for the load event and an idle
-    // moment, so it never competes with the page's first paint; the still holds the hero meanwhile.
+    // moment, so it never competes with the page's first paint.
     const soft = (pr, what) => pr.catch(e => { console.warn('work-spine: ' + what + ' did not load', e); return null; });
     const core = Promise.all([import('three'), import('three/addons/renderers/CSS3DRenderer.js'), import('three/addons/environments/RoomEnvironment.js')]);
     core.catch(() => {});   // handled below
@@ -1861,7 +1866,7 @@ async function boot() {
     let FOLD = null;
     if (pcfg.fold && BOAT) FOLD = await foldP;
     if (pcfg.mode === 'page') startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD); else heroStill('no page layer');
-    if (FOLD && pcfg.silkBg > 0) FOLD.mountSilk(THREE, document.getElementById('scalability'), { style: pcfg.silkBgStyle, light: coarse, strength: pcfg.silkBg });   // the silk ground behind the principles (it starts drawing when the section comes near)
+    if (FOLD && pcfg.silkBg > 0 && webgl2(false)) FOLD.mountSilk(THREE, document.getElementById('scalability'), { style: pcfg.silkBgStyle, light: coarse, strength: pcfg.silkBg });   // the silk ground behind the principles (it starts drawing when the section comes near)
     if (layer && new URLSearchParams(location.search).get('route') === '1') import('./voyage-editor.js' + MOD_V).then(m => m.mountRouteEditor(layer.routeApi)).catch(e => console.warn('work-spine: route editor', e));
     if (cards.length < 2) return;
     // the work section itself waits until it is within 1.5 viewports
@@ -1943,7 +1948,7 @@ function init(THREE, { CSS3DRenderer, CSS3DObject }, { RoomEnvironment }, GPUC, 
     /* ---------- WebGL layer: the spine ---------- */
     let gl = null, glScene = null, spineParts = [], particles = null, keyLight = null;
     const world = new THREE.Group();          // spine + particles, scaled to S each layout
-    const needGL = cfg.mode === 'stage' || ['spine', 'axis', 'polystar'].includes(cfg.centerpiece);   // 'ship' and 'none' draw nothing here: no second WebGL context
+    const needGL = (cfg.mode === 'stage' || ['spine', 'axis', 'polystar'].includes(cfg.centerpiece)) && webgl2(false);   // (no WebGL2: cards only, without a failed renderer)   // 'ship' and 'none' draw nothing here: no second WebGL context
     if (!needGL) glCanvas.remove();
     else try {
         gl = new THREE.WebGLRenderer({ canvas: glCanvas, alpha: true, antialias: true, powerPreference: 'high-performance' });

@@ -16,7 +16,7 @@
     <link rel="stylesheet" href="css/materials.css"> 
     <link rel="stylesheet" href="css/header.css">
     <link rel="stylesheet" href="css/drawer.css">
-    <link rel="stylesheet" href="css/hero.css?v=2026-10-29">
+    <link rel="stylesheet" href="css/hero.css?v=2026-10-29b">
     <link rel="stylesheet" href="css/tools.css">
     <link rel="stylesheet" href="css/testimonials.css?v=2026-10-29">
     <link rel="stylesheet" href="css/cards.css?v=3">
@@ -38,35 +38,8 @@
         "three/addons/": "/vendor/three-0.170.0/addons/"
     } }
     </script>
-    <script>
-    /* The hero's still (images/hero/): tinted to the picked colour before the first paint, the way the live sea takes it. The stills were
-       rendered at hue 210 (the picker's first-visit blue); a light colour turns the page pale, so the still turns to dark ink on it. */
-    (function () {
-        function tint(hex) {
-            var m = /^#?([0-9a-f]{6})$/i.exec((hex || '').trim()); if (!m) return;
-            var n = parseInt(m[1], 16), r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
-            var mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn, h = 0;
-            if (d) h = mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
-            var e = document.documentElement;
-            e.style.setProperty('--hero-poster-hue', (h * 60 - 210).toFixed(1) + 'deg');
-            e.classList.toggle('hero-poster-light', (mx + mn) / 2 > 0.5);
-        }
-        try { tint(localStorage.getItem('portfolio-theme-primary')); } catch (e) {}
-        document.addEventListener('portfolioThemePrimaryChanged', function (ev) {
-            var c = ev.detail && ev.detail.color;
-            tint(/^#?[0-9a-f]{6}$/i.test(String(c || '').trim()) ? String(c) : getComputedStyle(document.documentElement).getPropertyValue('--primary-color'));
-        });
-    })();
-    </script>
 </head>
 <body>
-    <!-- The hero's sea as a still, without the ship (Felix, 2026-10-29: no ship still while it loads): a frame of the live scene
-         (js/work-spine.js) with the ship's particles off, drawn light-on-black and screen-blended, so it sits on any dark ground. It is the hero for everyone until the live canvas has drawn a frame that is verifiably there (pixels read back), and
-         for good where that never happens: no WebGL, reduced motion, a failed module, a lost GPU context. -->
-    <picture>
-        <source media="(orientation: portrait)" srcset="images/hero/hero-sea-only-portrait.webp" width="786" height="1704">
-        <img class="hero-poster" src="images/hero/hero-sea-only-landscape.webp" width="1920" height="1200" alt="" aria-hidden="true" fetchpriority="high">
-    </picture>
 
     <header class="at-top"><!-- the state header.js sets at the top of the page, in the markup so the first paint already has it (it moved the hero 8 px: a 0.23 layout shift) -->
         <nav>
@@ -393,14 +366,14 @@
     <script src="js/testimonials.js" defer></script>
     <script src="js/cards.js?v=2" defer></script>
     <script src="js/video-lazy.js?v=1" defer></script>
-    <script type="module" src="js/principle-clouds.js?v=4" async></script>
+    <script type="module" src="js/principle-clouds.js?v=5" async></script>
     <script src="js/header.js"></script>
     <script src="js/drawer.js"></script>
     <script src="js/reader.js"></script>
     <script src="js/grid.js"></script>
     <script src="/track/beacon.js?v=2" data-endpoint="https://jobmachine.felixacat.workers.dev/v"></script>
     <script src="/chat/chat.js?v=22" data-endpoint="https://jobmachine-chat.felixacat.workers.dev" defer></script>
-    <script type="module" src="js/work-spine.js?v=2026-10-29"></script>
+    <script type="module" src="js/work-spine.js?v=2026-10-29b"></script>
 
 </body>
 </html>

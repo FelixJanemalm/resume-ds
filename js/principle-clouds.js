@@ -188,7 +188,14 @@ const PEOPLE = {
 
 const SCENES = { people: PEOPLE, focus: FOCUS };
 
+// No WebGL2 at all: no renderer is tried (three logs each failed attempt as a console error); the card keeps its plain ground.
+let gl2 = null;
+function hasWebGL2() {
+    if (gl2 === null) { try { const g = document.createElement('canvas').getContext('webgl2'); gl2 = !!g; if (g) { const x = g.getExtension('WEBGL_lose_context'); if (x) x.loseContext(); } } catch (e) { gl2 = false; } }
+    return gl2;
+}
 function mount(host, def) {
+    if (!hasWebGL2()) return null;
     const item = host.closest('.item') || host;
     const canvas = document.createElement('canvas');
     canvas.setAttribute('aria-hidden', 'true');
