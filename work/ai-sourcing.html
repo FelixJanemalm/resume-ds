@@ -8,7 +8,6 @@
     <title>Built the Sourcing OS – Felix Janemalm</title>
     <link rel="preload" href="../fonts/woff2/RNSPhysis-Medium.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="../fonts/woff2/RNSPhysis-Light.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="preconnect" href="https://d3js.org" crossorigin>
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="stylesheet" href="../css/tokens/Ref/yds.css">
     <link rel="stylesheet" href="../css/tokens/Ref/mui.css">
@@ -1060,7 +1059,11 @@
     <script src="../js/drawer.js" defer></script>
     <script src="../js/video-lazy.js?v=1" defer></script>
     <script src="../js/case-study-swipe-hint.js" defer></script>
-    <script src="https://d3js.org/d3.v7.min.js" defer></script>
+    <!-- Only the d3 modules the Sankey uses (~70 KB, the full d3 bundle is 273 KB): selection draws it, d3-sankey needs array and shape (shape needs path) -->
+    <script src="https://cdn.jsdelivr.net/npm/d3-array@3.2.4/dist/d3-array.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-path@3.1.0/dist/d3-path.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-shape@3.2.0/dist/d3-shape.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-selection@3.0.0/dist/d3-selection.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js" defer></script>
 
     <script>
@@ -1114,9 +1117,8 @@
             { source: 11, target: 12, value: 928, label: '928g' },
         ];
 
-        const colorScale = d3.scaleOrdinal()
-            .domain(['fiber', 'yarn', 'fabric', 'component', 'assembly', 'final'])
-            .range(['#CB945C', '#2f8112', '#2f8112', '#2f8112', '#3b82f6', '#9333ea']);
+        const categoryColor = { fiber: '#CB945C', yarn: '#2f8112', fabric: '#2f8112', component: '#2f8112', assembly: '#3b82f6', final: '#9333ea' };
+        const colorScale = c => categoryColor[c];
 
         // Legend
         const legend = document.createElement('div');
