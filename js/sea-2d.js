@@ -19,7 +19,6 @@
 import { DEFAULTS, LAB } from './voyage-fold.js';
 import { buildBoatLevels, WATERLINE } from './voyage-boat.js';
 
-const PROF = new URLSearchParams(location.search).has('prof');   // ?sea=2d&prof: the frame's parts timed in window.__s2dP
 const D2R = Math.PI / 180, NDOTS = 60000, SHIP_N = 128 * 128;
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const rx = a => { const c = Math.cos(a), s = Math.sin(a); return [1, 0, 0, 0, c, -s, 0, s, c]; };   // row-major 3x3
@@ -41,30 +40,81 @@ export function seaField(o, t) {
 }
 const hsl = (h, s, l) => { const k = n => (n + h * 12) % 12, a = s * Math.min(l, 1 - l), f = n => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1)); return [f(0), f(8), f(4)]; };
 
+/* the page's side: a canvas where the live one sits, drawn by a worker when the browser can hand a canvas to one (the page's own thread then
+   only passes on the scroll, the size and the colour, and stays free for the scroll itself), else drawn here. ?sea=2d&main: always here */
 export async function start() {
     if (document.getElementById('sea-2d')) return;
     let T;
     try { T = await (await fetch('images/sea/hero-track.json')).json(); } catch (e) { console.warn('sea-2d: no track', e); return; }
-    const o = DEFAULTS, rows = T.rows, K = Object.fromEntries(T.keys.map((k, i) => [k, i])), pc = T.pc;
+    let canvas = null;
+    const mount = () => {
+        canvas?.remove(); canvas = document.createElement('canvas');
+        canvas.id = 'sea-2d'; canvas.setAttribute('aria-hidden', 'true');
+        canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100vh;height:100lvh;z-index:1;pointer-events:none;';
+        document.body.appendChild(canvas);
+    };
+    mount();
+    const colour = () => getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim();
+    const box = () => ({ w: Math.max(1, Math.round(innerWidth)), h: Math.max(1, Math.round(canvas.getBoundingClientRect().height || innerHeight)) });
+    const show = v => { const s = v ? '' : 'hidden'; if (canvas.style.visibility !== s) canvas.style.visibility = s; };   // (hidden, not display:none: it keeps its size for a resize down the page)
+    const S = { y: scrollY, vh: innerHeight, ...box(), colour: colour(), hidden: document.hidden, prof: new URLSearchParams(location.search).has('prof') };
+    const here = () => {   // drawn on the page (a canvas handed to a worker never comes back: a failed worker leaves a fresh one here)
+        if (canvas.dataset.sent) mount();
+        Object.assign(S, { y: scrollY, vh: innerHeight, ...box(), colour: colour(), hidden: document.hidden });
+        const api = draw(canvas, T, S, show, n => { const c = document.createElement('canvas'); c.width = c.height = n; return c; }, p => { window.__s2dP = p; });
+        send = m => api.set(m);
+    };
+    let send = () => {};
+    if (canvas.transferControlToOffscreen && typeof Worker === 'function' && typeof OffscreenCanvas === 'function' && !new URLSearchParams(location.search).has('main')) {
+        let wk = null, ok = false;
+        const fail = why => { if (!wk) return; console.warn('sea-2d: the worker failed, drawing on the page', why); wk.terminate(); wk = null; here(); };
+        try {
+            wk = new Worker(import.meta.url, { type: 'module' });
+            const off = canvas.transferControlToOffscreen(); canvas.dataset.sent = '1';
+            wk.onmessage = e => { const m = e.data; if (m.ready) ok = true; if (m.failed) fail(m.failed); if ('show' in m) show(m.show); if (m.prof) window.__s2dP = m.prof; };
+            wk.onerror = e => { e.preventDefault?.(); fail(e.message || 'did not load'); };
+            wk.postMessage({ init: true, canvas: off, T, S }, [off]);
+            send = m => wk && wk.postMessage(m);
+            setTimeout(() => { if (!ok) fail('no answer in 8 s'); }, 8000);
+        } catch (e) { wk?.terminate(); wk = null; console.warn('sea-2d: no worker, drawing on the page', e); here(); }
+    } else here();
+    addEventListener('scroll', () => send({ y: scrollY }), { passive: true });
+    addEventListener('resize', () => send({ y: scrollY, vh: innerHeight, ...box() }));
+    document.addEventListener('visibilitychange', () => send({ hidden: document.hidden }));
+    let c0 = S.colour; setInterval(() => { const c = colour(); if (c !== c0) { c0 = c; send({ colour: c }); } }, 300);   // the picker
+}
 
-    const canvas = document.createElement('canvas');
-    canvas.id = 'sea-2d'; canvas.setAttribute('aria-hidden', 'true');
-    canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100vh;height:100lvh;z-index:1;pointer-events:none;';
-    document.body.appendChild(canvas);
+/* the worker's side: the same drawing on the canvas the page handed over */
+if (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope) {
+    let api = null;
+    self.onmessage = e => {
+        const m = e.data;
+        if (m.init) {
+            try { api = draw(m.canvas, m.T, m.S, v => self.postMessage({ show: v }), n => new OffscreenCanvas(n, n), p => self.postMessage({ prof: p })); self.postMessage({ ready: true }); }
+            catch (err) { self.postMessage({ failed: String(err && err.message || err) }); }
+        } else if (api) api.set(m);
+    };
+    self.addEventListener('error', e => self.postMessage({ failed: e.message || 'error' }));   // a frame that throws: the page takes over
+}
+
+/* the drawing, on either side: S holds what the page reports (scroll, its height, the canvas's size, the colour, whether the tab is hidden) */
+function draw(canvas, T, S, show, newCanvas, report) {
+    const o = DEFAULTS, rows = T.rows, K = Object.fromEntries(T.keys.map((k, i) => [k, i])), pc = T.pc;
     const ctx = canvas.getContext('2d');
     let W = 0, H = 0;
     const PR = 1;   // CSS pixels: on a 2x screen 1.25x looked the same and cost a fifth more of each frame
     let accS, accI, img, px32, lit1;   // the light buffer: the sea's dots and the ship's specks, summed per pixel, and the pixels they are written through
     function size() {
-        W = canvas.width = Math.max(1, Math.round(innerWidth * PR)); H = canvas.height = Math.max(1, Math.round(canvas.getBoundingClientRect().height * PR || innerHeight * PR));
+        if (W === Math.max(1, Math.round(S.w * PR)) && H === Math.max(1, Math.round(S.h * PR))) return;   // (a phone's bar sliding fires resizes at the same size)
+        W = canvas.width = Math.max(1, Math.round(S.w * PR)); H = canvas.height = Math.max(1, Math.round(S.h * PR));
         accS = new Float32Array(W * H); accI = new Float32Array(W * H); img = ctx.createImageData(W, H); px32 = new Uint32Array(img.data.buffer); lit1 = new Int32Array(W * H);
     }
-    size(); addEventListener('resize', size);
+    size();
 
     /* ---- colour: the picked hue, as the live layer takes it (the sea at the lab's saturation and lightness, the ship's ink pushed vivid) */
     let sea = [0.3, 0.5, 0.8], ink = [0.4, 0.6, 1], colorKey = null;
     function color() {
-        const c = getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim(); if (c === colorKey) return; colorKey = c;
+        const c = S.colour; if (c === colorKey) return; colorKey = c;
         const m = /^#?([0-9a-f]{6})$/i.exec(c), rgb = m ? [0, 2, 4].map(k => parseInt(m[1].slice(k, k + 2), 16) / 255) : [0.08, 0.4, 0.72];
         const mx = Math.max(...rgb), mn = Math.min(...rgb), d = mx - mn, [r, g, b] = rgb;
         const h = !d ? 0 : (mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4) / 6;
@@ -86,7 +136,7 @@ export async function start() {
     const SPR_MAX = 16, sprites = [];
     function dotSprites(c) {
         for (let n = KMAX + 1; n <= SPR_MAX * 4; n = n < SPR_MAX ? n + 1 : n === SPR_MAX ? SPR_MAX * 4 : Infinity) {
-            const s = sprites[n] || (sprites[n] = document.createElement('canvas')); s.width = s.height = n;
+            const s = sprites[n] || (sprites[n] = newCanvas(n));
             const g = s.getContext('2d'), im = g.createImageData(n, n);
             for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
                 const a = disc(n, x, y), q = (y * n + x) * 4;
@@ -105,7 +155,7 @@ export async function start() {
        quickest, then framing, then the angles and the sea; here the scroll itself is chased three times and each key read where its own lag has
        got to */
     const LAGS = { pos: 0.6, size: 0.8, ang: 0.9 }, GROUP = { x: 'pos', y: 'pos', size: 'size', level: 'size', lo: 'size', hi: 'size', mix: 'size', LS: 'size', lvn: 'size', scale: 'size', zoom: 'size', foldK: 'size' };
-    const lag = {}; for (const g in LAGS) lag[g] = { p: scrollY, v: 0 };
+    const lag = {}; for (const g in LAGS) lag[g] = { p: S.y, v: 0 };
     function follow(f, target, L, dt) {
         const w = 4.7 / Math.max(0.05, L), x = w * dt, ex = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
         const d = f.p - target, tmp = (f.v + w * d) * dt;
@@ -123,10 +173,13 @@ export async function start() {
 
     const on = new Int32Array(NDOTS); let nOn = 0, onAge = 0, onK = 0, onAt = [0, 0, 0], onWH = '';   // the dots on the screen
     const VMIN = 0.012, big = [], paths = [];   // a dot fainter than this adds under 2 of 255 to a pixel | this frame's big dots (x, y, size, light) | the lines' paths
-    let fps = 60, judge = { n: 0, work: 0, late: 0 }, last = 0, prevRaf = 0, vs = 0, tick = 0, t0 = performance.now(), raf = 0;
+    let fps = 60, judge = { n: 0, work: 0, late: 0 }, last = 0, prevRaf = 0, vs = 0, tick = 0, t0 = performance.now(), raf = 0, shown = true, prof = null;
+    // a worker has requestAnimationFrame where it can draw to a canvas the page handed over (Chrome, Firefox); else a timer at the refresh
+    const RAF = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : f => setTimeout(() => f(performance.now()), 1000 / 60);
+    const CAF = typeof cancelAnimationFrame === 'function' ? cancelAnimationFrame : clearTimeout;
     const P2 = [0, 0, 0];
     function frame(now) {
-        raf = requestAnimationFrame(frame);
+        raf = RAF(frame);
         // the screen's refresh interval (the usual gap between callbacks), and every how many refreshes a frame is drawn to come near fps
         const raw = now - prevRaf; prevRaf = now;
         if (raw > 2 && raw < 50) vs = vs ? vs * 0.95 + Math.min(raw, vs * 1.5) * 0.05 : raw;
@@ -134,9 +187,8 @@ export async function start() {
         tick = 0;
         const w0 = performance.now();
         const dt = Math.min(0.1, (now - (last || now)) / 1000); last = now;
-        if (scrollY > T.until + innerHeight * 0.2) { if (canvas.style.visibility !== 'hidden') canvas.style.visibility = 'hidden'; return; }   // (hidden, not display:none: it keeps its size for a resize down the page)
-        if (canvas.style.visibility === 'hidden') canvas.style.visibility = '';
-        for (const g in lag) follow(lag[g], scrollY, LAGS[g], dt);
+        const vis = S.y <= T.until + S.vh * 0.2; if (vis !== shown) { shown = vis; show(vis); } if (!vis) return;
+        for (const g in lag) follow(lag[g], S.y, LAGS[g], dt);
         const r = pose(), t = (now - t0) / 1000, tt = t * o.clock;
         color();
         const visH = 2 * cam[2] * tanH, visW = visH * W / H;
@@ -168,7 +220,7 @@ export async function start() {
         }
         const heel = 24 * Math.tanh((r.heel + rollSea + (r.foldRoll || 0)) / 24) * D2R;
 
-        const tA = PROF && performance.now();
+        const tA = S.prof && performance.now();
         ctx.globalCompositeOperation = 'source-over'; ctx.clearRect(0, 0, W, H);
         const ax = o.axis * D2R, d = [Math.cos(ax), Math.sin(ax)], pp = [-d[1], d[0]];
         const wob = o.wander * D2R * Math.sin(tt * o.wanderRate), a1 = ax + o.swellRot * D2R + wob, d1 = [Math.cos(a1), Math.sin(a1)], bf = o.bandFollow;
@@ -203,7 +255,7 @@ export async function start() {
                 if (X < x0) x0 = X; if (Y < y0) y0 = Y; if (X + n > x1) x1 = X + n; if (Y + n > y1) y1 = Y + n;
             }
         }
-        const tB = PROF && performance.now();
+        const tB = S.prof && performance.now();
 
         /* the ship: the model's particles posed as the shader poses them (about the waterline: pitch, then heel, then heave; then the hull's
            rotation, scale and place: one matrix and an offset per frame), summed as light into the buffer's ship layer */
@@ -232,7 +284,7 @@ export async function start() {
             }
             ctx.putImageData(img, 0, 0, x0, y0, x1 - x0, y1 - y0); for (let j = 0; j < nLit; j++) px32[lit1[j]] = 0;
         }
-        const tC = PROF && performance.now();
+        const tC = S.prof && performance.now();
 
         ctx.globalCompositeOperation = 'lighter';
         /* crest lines: q * bands = m along the across axis (closed form), each lifted by the swell and faded with distance; added like the dots */
@@ -276,8 +328,15 @@ export async function start() {
             judge.work += performance.now() - w0; if (raw > vs * 1.6) judge.late++;
             if (judge.n === 120) { if (judge.work / 90 > 6 || judge.late > 25) fps = 30; judge = null; }
         }
-        if (PROF) { const tD = performance.now(), P = window.__s2dP || (window.__s2dP = { n: 0, dots: 0, ship: 0, lines: 0 }); P.n++; P.dots += tB - tA; P.ship += tC - tB; P.lines += tD - tC; }
+        if (S.prof) { const tD = performance.now(), P = prof || (prof = { n: 0, dots: 0, ship: 0, lines: 0 }); P.n++; P.dots += tB - tA; P.ship += tC - tB; P.lines += tD - tC; if (P.n % 30 === 0) report({ ...P, fps }); }
     }
-    raf = requestAnimationFrame(frame);
-    document.addEventListener('visibilitychange', () => { if (document.hidden) { cancelAnimationFrame(raf); raf = 0; } else if (!raf) raf = requestAnimationFrame(frame); });
+    if (!S.hidden) raf = RAF(frame);
+    return {
+        set(m) {
+            Object.assign(S, m);
+            if ('w' in m) size();
+            if ('hidden' in m) { if (m.hidden) { CAF(raf); raf = 0; } else if (!raf) { last = 0; raf = RAF(frame); } }
+            if ('prof' in m) prof = null;
+        },
+    };
 }
