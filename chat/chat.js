@@ -531,7 +531,10 @@
       linkCard(msg, TRACK[target] + " version of this site", href);
       return;
     }
-    if (target === "resume") { linkCard(msg, "Resume.pdf", "/Resume.pdf"); return; }
+    if (target === "resume") {   // on a signed link: the base resume this application was sent (worker GET /resume)
+      linkCard(msg, "Resume.pdf", appRef ? endpoint + "/resume?a=" + encodeURIComponent(appRef) : "/Resume.pdf");
+      return;
+    }
     if (target === "contact") {
       var f = document.querySelector("footer");
       if (go && f) { markOwnScroll(); f.scrollIntoView({ behavior: "smooth", block: "end" }); }
