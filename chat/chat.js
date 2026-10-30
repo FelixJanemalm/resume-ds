@@ -653,7 +653,10 @@
     addMsg("user", text);
     history.push({ role: "user", text: text });
     save();
-    var prior = history.slice(0, -1);
+    // Assistant turns go back exactly as the worker signed them (ht + sig); unsigned ones are dropped there.
+    var prior = history.slice(0, -1).map(function (m) {
+      return m.role === "assistant" ? { role: m.role, text: m.ht || m.text, sig: m.sig } : { role: m.role, text: m.text };
+    });
     var bot = addMsg("assistant", "");
     showDots(bot);
     if (root.getAttribute("data-state") === "docked") setOpen(true);
@@ -671,7 +674,7 @@
           renderText(bot, line);
           stored = line + (stored ? "\n" + stored : "");
         }
-        history.push({ role: "assistant", text: stored || "…" });
+        history.push({ role: "assistant", text: stored || "…", ht: done && done.history_text, sig: done && done.sig });
         save();
         updateFold();
       })
