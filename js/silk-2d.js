@@ -1,5 +1,5 @@
 /* silk-2d.js: the principles section's silk ribbon (voyage-fold.js mountSilk, style 'ribbon') drawn on the CPU, for a browser without
- * graphics acceleration. Reached with ?sea=2d while it is reviewed.
+ * graphics acceleration. Started by work-spine.js when there is no hardware WebGL (or with ?sea=2d).
  *
  * The same sheet from the same numbers (voyage-fold.js's RIBBON): its centre line, its roll from edge-on to facing, its slow breathing on simplex noise, its
  * colour fanned out from the picked hue, the sheen where it turns edge-on and the soft edges, worked out at the corners of a grid over the

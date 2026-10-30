@@ -1,6 +1,6 @@
 /* sea-2d.js: the page's particle voyage drawn on the CPU, on a plain 2D canvas, for a browser that gives the page no WebGL at all (graphics
  * acceleration off or crashed, a remote desktop, a virtual machine): the hero's sea and ship, the ship's voyage down the page, the fleet at
- * the quote and the armada at the end. Reached with ?sea=2d while it is reviewed.
+ * the quote and the armada at the end. Started by work-spine.js when there is no hardware WebGL (or with ?sea=2d).
  *
  * Not a copy of pixels: the same scene, computed again. The pose the scroll decides (where the ship sits, its size, course, tilt and level,
  * where the hero's sea lies, the way on, the fleet, the launch and where the layer sits) comes from images/sea/voyage-track.json, recorded

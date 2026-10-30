@@ -42,6 +42,10 @@ function webgl2(fast) {
     try { const g = document.createElement('canvas').getContext('webgl2', fast ? { failIfMajorPerformanceCaveat: true } : undefined); ok = !!g; if (g) { const x = g.getExtension('WEBGL_lose_context'); if (x) x.loseContext(); } } catch (e) {}
     return (glProbe[k] = ok);
 }
+// the sea, the voyage and the ribbon drawn on the CPU (js/sea-2d.js, js/silk-2d.js): for a desktop browser with no hardware WebGL (graphics
+// acceleration off, a blocked GPU, a virtual machine), or anywhere with ?sea=2d. (Not on a phone by itself: its route was never recorded for
+// sea-2d's track, and a phone without a GPU is rare.)
+const cpuSea = () => SEA === '2d' || (!SEA && !coarse && !webgl2(true));
 const DPR_MAX = Math.min(devicePixelRatio || 1, coarse ? 1.5 : 2);   // the hero layer's pixel ratio: 2 on desktop; phones 1.5 (their 3x screens drew 2x before, 78% more pixels than 1.5, for dots that are drawn at the same CSS size either way)
 
 // Particle settings, shared by the page-wide layer and the tune panel (data-p-* on the section)
@@ -104,7 +108,7 @@ const pcfg = section ? {
 if (pcfg) for (const [k, v] of new URLSearchParams(location.search)) if (k in pcfg && v !== '') pcfg[k] = Number.isNaN(+v) ? v : +v;   // dev aid: ?shipWorkTilt=45&boat=off
 let layer = null;
 const THEME_ROW = false;   // the ship-style icon row under the colour picker (and the stored choice it writes): off for now
-const MOD_V = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '?t=' + Date.now() : '?v=2026-10-30j';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache): never cached on a local server, versioned elsewhere (bump when they change)
+const MOD_V = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '?t=' + Date.now() : '?v=2026-10-30k';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache): never cached on a local server, versioned elsewhere (bump when they change)
 import('./ink-cursor.js' + MOD_V).catch(e => console.warn('ink cursor', e));   // the pointer as a trail of ink in the picked colour (it checks for a real mouse and reduced motion itself)
 
 const SIM_NOISE = `
@@ -582,7 +586,7 @@ const STAR_N = 12;
 // on a fast machine and several times that on a phone). Nothing it registers (listeners, observers, the frame loop) exists before the last yield.
 const yieldTask = () => new Promise(r => setTimeout(r, 0));
 async function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD, PRE) {
-    if (SEA === '2d') { import('./sea-2d.js' + MOD_V).then(m => m.start()).catch(e => console.warn('work-spine: sea-2d did not load', e)); return heroStill('?sea=2d: the sea drawn on the CPU'); }
+    if (cpuSea() && pcfg.boat !== 'off') { import('./sea-2d.js' + MOD_V).then(m => m.start()).catch(e => console.warn('work-spine: sea-2d did not load', e)); return heroStill('no hardware WebGL (or ?sea=2d): the sea drawn on the CPU'); }
     if (!GPUC) return heroStill('GPUComputationRenderer did not load');   // (this used to return without any hero at all: a blank hero)
     if (!FOLD || !BOAT || pcfg.boat === 'off') return heroStill('no hero sea');
     if (!webgl2(true)) return heroStill('no WebGL2, or only a software one');
@@ -1928,7 +1932,7 @@ async function boot() {
     if (pcfg.fold && BOAT) FOLD = await foldP;
     let PRE = await preP; if (PRE) PRE.mod = THEMES && THEMES.atlantic;   // the worker built the default lineage's ship; another one is built on the page
     if (pcfg.mode === 'page') await startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD, PRE); else heroStill('no page layer');
-    if (SEA === '2d' && FOLD && pcfg.silkBg > 0 && (pcfg.silkBgStyle || 'ribbon') === 'ribbon') {   // ?sea=2d: the ribbon drawn on the CPU
+    if (cpuSea() && FOLD && pcfg.silkBg > 0 && (pcfg.silkBgStyle || 'ribbon') === 'ribbon') {   // no hardware WebGL (or ?sea=2d): the ribbon drawn on the CPU
         import('./silk-2d.js' + MOD_V).then(m => m.mountSilk2D(document.getElementById('scalability'), { strength: pcfg.silkBg, ribbon: FOLD.RIBBON })).catch(e => console.warn('work-spine: silk-2d did not load', e));
     } else if (FOLD && pcfg.silkBg > 0 && webgl2(false)) {   // the silk ground behind the principles (it starts drawing when the section comes near), built in the next idle moment: the section is far below the first screen
         const silk = () => FOLD.mountSilk(THREE, document.getElementById('scalability'), { style: pcfg.silkBgStyle, light: coarse, strength: pcfg.silkBg });
