@@ -346,7 +346,7 @@
   function syncHint() {
     var last = typeof lastBotText === "function" ? lastBotText() : "";
     var closed = root.getAttribute("data-state") === "docked" && root.getAttribute("data-open") !== "1";
-    input.setAttribute("placeholder", closed && last ? last.replace(/\s+/g, " ").slice(0, 140) : placeholder);
+    input.setAttribute("placeholder", closed && last ? last.replace(/\*\*/g, "").replace(/\s+/g, " ").slice(0, 140) : placeholder);
   }
   if (narrowMq) {
     if (narrowMq.addEventListener) narrowMq.addEventListener("change", syncPlaceholder);
