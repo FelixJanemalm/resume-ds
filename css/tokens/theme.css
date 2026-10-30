@@ -7,7 +7,7 @@
     --sysPrimaryDefault: #4faad1;
     --sysPrimarySubtle: #0073a5;
     --sysPrimaryTint: #004461;
-    --primaryBg: red;
+    --primaryBg: var(--sysPrimaryDefault);   /* was red: --line (materials.css) is computed here on :root, below the body classes that set the real one */
     --link-color:#4faad1;
 
     /* Grayscale */   
