@@ -57,7 +57,7 @@ export async function start() {
     };
     mount();
     // the picked colour, and the page's ground under the canvas (on a pale one the sea is drawn in dark ink: see color() below)
-    const colour = () => getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim() + '|' + getComputedStyle(document.body).backgroundColor + '|' + (document.body.classList.contains('default-light') || document.body.classList.contains('default-light-colorblind') ? 'light' : '');
+    const colour = () => getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim() + '|' + getComputedStyle(document.body).backgroundColor + '|' + (document.body.classList.contains('default-light') || document.body.classList.contains('default-light-colorblind') ? 'light' : '') + '|' + getComputedStyle(document.documentElement).getPropertyValue('--primary-hue').trim();
     const box = () => ({ w: Math.max(1, Math.round(innerWidth)), h: Math.max(1, Math.round(canvas.getBoundingClientRect().height || innerHeight)) });
     // z: where the live layer sits (over the hero, behind the page below it, over the page at the ending); blend: at the ending the canvas is
     // screened over a dark ground, multiplied over a pale one, as live's
@@ -130,10 +130,11 @@ function draw(canvas, T, S, show, newCanvas, report) {
     let hueNow = 0.58, sea = [0.3, 0.5, 0.8], ink = [0.4, 0.6, 1], pale = false, blendPale = false, dark = null, colorKey = null;
     function color() {
         if (S.colour === colorKey) return; colorKey = S.colour;
-        const [c, bg = '', theme = ''] = S.colour.split('|'), gm = /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/.exec(bg), ground = gm ? [gm[1] / 255, gm[2] / 255, gm[3] / 255] : [0.26, 0.26, 0.26];
+        const [c, bg = '', theme = '', ph = ''] = S.colour.split('|'), gm = /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/.exec(bg), ground = gm ? [gm[1] / 255, gm[2] / 255, gm[3] / 255] : [0.26, 0.26, 0.26];
         const m = /^#?([0-9a-f]{6})$/i.exec(c), rgb = m ? [0, 2, 4].map(k => parseInt(m[1].slice(k, k + 2), 16) / 255) : [0.08, 0.4, 0.72];
         const mx = Math.max(...rgb), mn = Math.min(...rgb), d = mx - mn, [r, g, b] = rgb;
-        const h = !d ? 0 : (mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4) / 6; hueNow = h;
+        const h = d < 0.04 && isFinite(parseFloat(ph)) ? parseFloat(ph) / 360   // a grey pick has no hue of its own (it reads as 0, red): the picker keeps the chosen one in --primary-hue
+            : !d ? 0 : (mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4) / 6; hueNow = h;
         sea = hsl(h, o.sat, o.lum); ink = hsl(h, 0.85, 0.62);
         const lin = v => { v = Math.min(1, v); return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };   // as the live layer judges it (groundLum; dark ink past half of smoothstep(0.06, 0.4))
         const lum = 0.2126 * lin(ground[0]) + 0.7152 * lin(ground[1]) + 0.0722 * lin(ground[2]); pale = theme === 'light' || lum > 0.23; blendPale = theme === 'light' || lum > 0.2;   // (the ending's blend: live's own test) dark = { sea: hsl(h, o.sat, 0.28), ink: hsl(h, 0.85, 0.22) };
