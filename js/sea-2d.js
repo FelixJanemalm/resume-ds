@@ -19,7 +19,7 @@
 import { DEFAULTS, LAB } from './voyage-fold.js';
 import { buildBoatLevels, WATERLINE } from './voyage-boat.js';
 
-const D2R = Math.PI / 180, NDOTS = 42000, DOT_BOOST = 1.2, SHIP_N = 128 * 128;   // the first 42,000 of the shader's 60,000 dots (the same layout, thinned), each a fifth brighter for the light the rest carried
+const D2R = Math.PI / 180, NDOTS = 30000, DOT_BOOST = 1.4, SHIP_N = Math.floor(256 * 256 * 0.2);   // the first 30,000 of the shader's 60,000 dots (the same layout, thinned), each 1.4 x brighter for the light the rest carried | the layer's ship share (13,107 on a desktop)
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const rx = a => { const c = Math.cos(a), s = Math.sin(a); return [1, 0, 0, 0, c, -s, 0, s, c]; };   // row-major 3x3
 const ry = a => { const c = Math.cos(a), s = Math.sin(a); return [c, 0, s, 0, 1, 0, -s, 0, c]; };
@@ -255,6 +255,9 @@ function draw(canvas, T, S, show, newCanvas, report) {
                 onAge = 30; onWH = W + 'x' + H; onK = k; onAt = camL.slice(); nOn = 0; onNew = true; const mx = W * 0.15, my = H * 0.15;
                 for (let i = 0; i < NDOTS; i++) if (toWorld(dots[i * 3], 0, dots[i * 3 + 1], P2) && P2[0] > -mx && P2[0] < W + mx && P2[1] > -my && P2[1] < H + my) on[nOn++] = i;
             }
+            // toWorld then proj, folded for the frame: world = full k p + (at - full k S); the camera's offset taken off; the screen's scales
+            const m0 = full[0] * k, m1 = full[1] * k, m2 = full[2] * k, m3 = full[3] * k, m4 = full[4] * k, m5 = full[5] * k, m6 = full[6] * k, m7 = full[7] * k, m8 = full[8] * k;
+            const vc0 = at[0] - m0 * S0 - m2 * S1 - cam[0], vc1 = at[1] - m3 * S0 - m5 * S1 - cam[1], vc2 = cam[2] - (at[2] - m6 * S0 - m8 * S1), gx = 0.5 / (tanH * W / H), gy = 0.5 / tanH;
             const half = ++dotTick & 1, all = onNew || now - dotAt > 100; onNew = false; dotAt = now;
             for (let c = 0; c < nOn; c++) {
                 const i = on[c], x = dots[i * 3], z = dots[i * 3 + 1], sd = dots[i * 3 + 2];
@@ -266,10 +269,11 @@ function draw(canvas, T, S, show, newCanvas, report) {
                         dH[i] = h; dV[i] = top / 1.08 * (0.18 + 0.9 * BAND_T[((1 - (qB - Math.floor(qB))) * 1024) | 0]) * far(Math.sqrt(ex * ex + ey * ey + ez * ez));
                     }
                 }
-                const vB = dV[i], h = dH[i];
-                if (vB < VMIN || !toWorld(x, h, z, P2)) continue;
-                const px = pxK * (0.6 + 0.9 * sd) / Math.max(1, P2[2] / k), n = Math.max(1, Math.round(px));
-                const X = Math.round(P2[0] - n / 2), Y = Math.round(P2[1] - n / 2);
+                const vB = dV[i]; if (vB < VMIN) continue;
+                const h = dH[i], vz = vc2 - (m6 * x + m7 * h + m8 * z); if (vz < 0.1) continue;   // the lab's point to the screen in one step (toWorld and proj folded)
+                const iv = 1 / vz, sxp = ((m0 * x + m1 * h + m2 * z + vc0) * iv * gx + 0.5) * W, syp = (0.5 - (m3 * x + m4 * h + m5 * z + vc1) * iv * gy) * H;
+                const px = pxK * (0.6 + 0.9 * sd) / Math.max(1, vz / k), n = Math.max(1, Math.round(px));
+                const X = Math.round(sxp - n / 2), Y = Math.round(syp - n / 2);
                 if (n > KMAX) { if (X + n > 0 && Y + n > 0 && X < W && Y < H) big.push(X, Y, n, vB); continue; }   // a sprite: clipped by the canvas
                 if (X < 0 || Y < 0 || X + n >= W || Y + n >= H) continue;   // off the screen (or on its very edge)
                 const kn = kern[n];
