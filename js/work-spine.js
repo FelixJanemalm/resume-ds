@@ -104,7 +104,7 @@ const pcfg = section ? {
 if (pcfg) for (const [k, v] of new URLSearchParams(location.search)) if (k in pcfg && v !== '') pcfg[k] = Number.isNaN(+v) ? v : +v;   // dev aid: ?shipWorkTilt=45&boat=off
 let layer = null;
 const THEME_ROW = false;   // the ship-style icon row under the colour picker (and the stored choice it writes): off for now
-const MOD_V = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '?t=' + Date.now() : '?v=2026-10-30e';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache): never cached on a local server, versioned elsewhere (bump when they change)
+const MOD_V = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '?t=' + Date.now() : '?v=2026-10-30f';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache): never cached on a local server, versioned elsewhere (bump when they change)
 import('./ink-cursor.js' + MOD_V).catch(e => console.warn('ink cursor', e));   // the pointer as a trail of ink in the picked colour (it checks for a real mouse and reduced motion itself)
 
 const SIM_NOISE = `
@@ -1674,6 +1674,7 @@ async function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD, PRE) {
             scroll: scrollY, seaS: ship.seaF ? ship.seaF.p.s : scrollY, x: P.x, y: P.y, size: P.size, turn: P.turn, tilt: P.tilt, heel: P.heel, level: P.level, lo, hi, mix, LS, lvn, scale, restW, way,
             visW, visH, foldK, foldTheta, foldAmt, foldW, silkW, seaYaw: seaYawAt(ship.seaF ? ship.seaF.p.s : scrollY), zoom: P.size / Math.max(1e-4, ship.keys[0].k.size),
             misc: shipU.misc.x, cam: camera.position.toArray(), fov: camera.fov, aspect: camera.aspect,
+            wake: P.wake, camW: P.cam, storm, fleet: fleetForm, rocket: rocketMix, layerZ: +ship.layerZ || 0, overlay: ship.overlay ? 1 : 0, clipTop,   // (below the hero: the voyage's speed, weather, fleet, launch and where the layer sits)
             pc: { shipSway: pcfg.shipSway, shipBob: pcfg.shipBob, shipSwell: pcfg.shipSwell, foldSway: pcfg.foldSway, foldRide: pcfg.foldRide, shipSwellDir: pcfg.shipSwellDir },
         };
         shipU.sail.set(bellyMul, flapAmp, ship.flutPh, fill);

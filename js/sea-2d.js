@@ -45,7 +45,7 @@ const hsl = (h, s, l) => { const k = n => (n + h * 12) % 12, a = s * Math.min(l,
 export async function start() {
     if (document.getElementById('sea-2d')) return;
     let T;
-    try { T = await (await fetch('images/sea/hero-track.json')).json(); } catch (e) { console.warn('sea-2d: no track', e); return; }
+    try { T = await (await fetch('images/sea/voyage-track.json')).json(); } catch (e) { console.warn('sea-2d: no track', e); return; }
     let canvas = null;
     const mount = () => {
         canvas?.remove(); canvas = document.createElement('canvas');
@@ -57,7 +57,7 @@ export async function start() {
     // the picked colour, and the page's ground under the canvas (on a pale one the sea is drawn in dark ink: see color() below)
     const colour = () => getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim() + '|' + getComputedStyle(document.body).backgroundColor + '|' + (document.body.classList.contains('default-light') || document.body.classList.contains('default-light-colorblind') ? 'light' : '');
     const box = () => ({ w: Math.max(1, Math.round(innerWidth)), h: Math.max(1, Math.round(canvas.getBoundingClientRect().height || innerHeight)) });
-    const show = v => { const s = v ? '' : 'hidden'; if (canvas.style.visibility !== s) canvas.style.visibility = s; };   // (hidden, not display:none: it keeps its size for a resize down the page)
+    const show = (v, z) => { const s = v ? '' : 'hidden'; if (canvas.style.visibility !== s) canvas.style.visibility = s; if (z !== undefined && canvas.style.zIndex !== String(z)) canvas.style.zIndex = z; };   // z: where the live layer sits (over the hero, behind the page below it)   // (hidden, not display:none: it keeps its size for a resize down the page)
     const S = { y: scrollY, vh: innerHeight, ...box(), colour: colour(), hidden: document.hidden, prof: new URLSearchParams(location.search).has('prof') };
     const here = () => {   // drawn on the page (a canvas handed to a worker never comes back: a failed worker leaves a fresh one here)
         if (canvas.dataset.sent) mount();
@@ -72,7 +72,7 @@ export async function start() {
         try {
             wk = new Worker(import.meta.url, { type: 'module' });
             const off = canvas.transferControlToOffscreen(); canvas.dataset.sent = '1';
-            wk.onmessage = e => { const m = e.data; if (m.ready) ok = true; if (m.failed) fail(m.failed); if ('show' in m) show(m.show); if (m.prof) window.__s2dP = m.prof; };
+            wk.onmessage = e => { const m = e.data; if (m.ready) ok = true; if (m.failed) fail(m.failed); if ('show' in m) show(m.show, m.z); if (m.prof) window.__s2dP = m.prof; };
             wk.onerror = e => { e.preventDefault?.(); fail(e.message || 'did not load'); };
             wk.postMessage({ init: true, canvas: off, T, S }, [off]);
             send = m => wk && wk.postMessage(m);
@@ -91,7 +91,7 @@ if (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScop
     self.onmessage = e => {
         const m = e.data;
         if (m.init) {
-            try { api = draw(m.canvas, m.T, m.S, v => self.postMessage({ show: v }), n => new OffscreenCanvas(n, n), p => self.postMessage({ prof: p })); self.postMessage({ ready: true }); }
+            try { api = draw(m.canvas, m.T, m.S, (v, z) => self.postMessage({ show: v, z }), n => new OffscreenCanvas(n, n), p => self.postMessage({ prof: p })); self.postMessage({ ready: true }); }
             catch (err) { self.postMessage({ failed: String(err && err.message || err) }); }
         } else if (api) api.set(m);
     };
@@ -130,6 +130,13 @@ function draw(canvas, T, S, show, newCanvas, report) {
 
     /* ---- the ship's particles, both levels the hero passes through (lo, hi), the shader-built water and wake left out */
     const boat = buildBoatLevels(SHIP_N, 1), role = i => Math.round(boat.meta[0][i * 4]);
+    /* the fleet at the quote (live's): nine small copies of the ship in three waves, each made of an even sample of its particles (40% for the
+       first wave's three, 22% for the rest), every member with its own threshold on the route's fleet key, so a copy forms a few particles at a
+       time; per copy its place in the formation (hull lengths aft, toward the horizon, across) and its size */
+    const FLEET_WAVE = [0, 0, 0, 1, 1, 1, 2, 2, 2], FLEET_SAMPLE = [0.4, 0.4, 0.4, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22];
+    const FLEET_POS = [[-1.1, 0.30, -0.8, 0.30], [-1.2, 0.55, 0.8, 0.24], [0.9, 0.45, 0.9, 0.26], [-2.3, 0.80, -1.4, 0.18], [-0.4, 0.95, 1.9, 0.16], [2.0, 0.85, -1.2, 0.17], [-3.2, 1.10, 0.4, 0.13], [1.2, 1.20, 2.6, 0.12], [3.1, 1.15, 1.6, 0.12]];
+    const fleetM = []; { let a = 20261030; const rf = () => (a = (a * 16807) % 2147483647) / 2147483647;
+        for (let k = 0; k < 9; k++) { const cnt = Math.floor(SHIP_N * FLEET_SAMPLE[k]); for (let j = 0; j < cnt; j++) { const src = Math.floor(j * SHIP_N / cnt), rl = Math.round(boat.meta[0][src * 4]); if (rl !== 6 && rl !== 7) fleetM.push(src, k, FLEET_WAVE[k] + 0.999 * rf()); } } }
     const shipIdx = [], refl = new Uint8Array(SHIP_N); for (let i = 0; i < SHIP_N; i++) { const r = role(i); if (r !== 6 && r !== 7) shipIdx.push(i); refl[i] = r === 8 ? 1 : 0; }
 
     /* ---- the sea's dots: a seeded disc of the shader's own layout (radius 34 lab units round the lab's middle, denser in the middle) */
@@ -170,11 +177,18 @@ function draw(canvas, T, S, show, newCanvas, report) {
         if ((d < 0) === (out > target)) { out = target; v = 0; }   // never past the mark
         f.v = v; f.p = out;
     }
-    const rowsAt = s => { const f = Math.min(rows.length - 1, Math.max(0, s / T.step)), i = Math.min(rows.length - 2, Math.floor(f)); return [rows[i], rows[i + 1], f - i]; };
+    // the row at or before a scroll (the track's rows are 12 px apart over the hero, 24 px below it), and how far on to the next
+    const ys = T.ys, rowsAt = s => {
+        if (s <= ys[0]) return [rows[0], rows[1], 0]; if (s >= ys[ys.length - 1]) return [rows[rows.length - 1], rows[rows.length - 1], 0];
+        let a = 0, b = ys.length - 1; while (b - a > 1) { const m = (a + b) >> 1; if (ys[m] <= s) a = m; else b = m; }
+        return [rows[a], rows[b], (s - ys[a]) / (ys[b] - ys[a])];
+    };
     function pose() {
         const R = {}, w = {}; for (const g in lag) w[g] = rowsAt(lag[g].p);
         for (const k of T.keys) { const [A, B, u] = w[GROUP[k] || 'ang'], j = K[k]; R[k] = A[j] + (B[j] - A[j]) * u; }
-        const [A] = w.size; R.lo = A[K.lo]; R.hi = A[K.hi];   // the two levels being blended are the row's, not a blend of them
+        // the two levels being blended, from the level itself (lo + mix): a row's own lo would hold the old pair while the mix runs on to the next
+        R.lo = Math.min(Math.floor(R.level + 1e-6), boat.pos.length - 2); R.hi = R.lo + 1; R.mix = Math.min(1, Math.max(0, R.level - R.lo));
+        for (const k of ['way', 'fleet', 'rocket']) R[k] = R[k] || 0;   // (a track without them: the hero at rest)
         return R;
     }
 
@@ -188,7 +202,7 @@ function draw(canvas, T, S, show, newCanvas, report) {
     for (let i = 0; i <= 4096; i++) FAR_T[i] = Math.exp(-i / 16 / o.dotFar);
     const far = d => { const u = d * 16; return u < 4096 ? FAR_T[u | 0] : 0; };
     const VMIN = 0.012, big = [], paths = [];   // a dot fainter than this adds under 2 of 255 to a pixel | this frame's big dots (x, y, size, light) | the lines' paths
-    let fps = 60, judge = { n: 0, work: 0, late: 0 }, last = 0, prevRaf = 0, vs = 0, tick = 0, t0 = performance.now(), raf = 0, shown = true, prof = null;
+    let phE = 0, phR = 0, shownZ = 1, fps = 60, judge = { n: 0, work: 0, late: 0 }, last = 0, prevRaf = 0, vs = 0, tick = 0, t0 = performance.now(), raf = 0, shown = true, prof = null;
     // a worker has requestAnimationFrame where it can draw to a canvas the page handed over (Chrome, Firefox); else a timer at the refresh
     const RAF = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : f => setTimeout(() => f(performance.now()), 1000 / 60);
     const CAF = typeof cancelAnimationFrame === 'function' ? cancelAnimationFrame : clearTimeout;
@@ -202,9 +216,12 @@ function draw(canvas, T, S, show, newCanvas, report) {
         tick = 0;
         const w0 = performance.now();
         const dt = Math.min(0.1, (now - (last || now)) / 1000); last = now;
-        const vis = S.y <= T.until + S.vh * 0.2; if (vis !== shown) { shown = vis; show(vis); } if (!vis) return;
         for (const g in lag) follow(lag[g], S.y, LAGS[g], dt);
         const r = pose(), t = (now - t0) / 1000, tt = t * o.clock;
+        // over the hero the layer sits above the page, below it behind the page (as live's flips, at once, by the scroll); the launch and the
+        // armada at the page's end are not drawn here yet
+        const z = K.layerZ !== undefined ? rowsAt(S.y)[0][K.layerZ] : 1, vis = r.rocket < 0.5 && z < 2;
+        if (vis !== shown || z !== shownZ) { shown = vis; shownZ = z; show(vis, z); } if (!vis) return;
         color();
         const visH = 2 * cam[2] * tanH, visW = visH * W / H;
 
@@ -212,10 +229,10 @@ function draw(canvas, T, S, show, newCanvas, report) {
         const sway = pc.shipSway * pc.shipBob * r.restW, sceneTilt = sway * 3.44 * Math.sin(t * 0.6), swayYaw = (1.5 + 3.7 * sway) * Math.sin(t * 0.21);
         const turn = r.turn + swayYaw, tilt = r.tilt + sceneTilt, scale = r.size * visW * r.LS;
         const at = [r.x * visW / 2, r.y * visH / 2 + r.restW * pc.shipBob * 0.04 * Math.sin(t * 0.8), 0];
-        const omegaE = 0.9 * (1.2 - 0.15 * r.lvn), ph = t * omegaE, ks = 2 * Math.PI / 2.4, sinc = Math.sin(ks / 2) / (ks / 2), A = 0.008 / r.LS * pc.shipSwell;
+        const omegaE = (0.9 + 1.5 * r.way) * (1.2 - 0.15 * r.lvn), ph = (phE += dt * omegaE), ks = 2 * Math.PI / 2.4, sinc = Math.sin(ks / 2) / (ks / 2), A = 0.008 / r.LS * pc.shipSwell;
         const thetaA = 1.4 * A * ks * sinc * pc.shipBob, hA = A * sinc * pc.shipBob;
         let pitch = -thetaA * (Math.sin(ph) + 0.35 * Math.sin(1.83 * ph + 1.1)) / 1.35, heave = hA * (Math.cos(ph) + 0.35 * Math.cos(1.83 * ph + 1.1)) / 1.35;
-        const phiR = 0.6 * omegaE * t, pF = (1.5 - 0.33 * r.lvn) * pc.shipBob * pc.shipSwell, rollSea = 0.8 * pF * (Math.sin(phiR) + 0.4 * Math.sin(1.7 * phiR + 0.9)) / 1.4;
+        const phiR = (phR += dt * 0.6 * omegaE), pF = (1.5 - 0.33 * r.lvn) * pc.shipBob * pc.shipSwell, rollSea = 0.8 * pF * (Math.sin(phiR) + 0.4 * Math.sin(1.7 * phiR + 0.9)) / 1.4;
         const shipRot = mul(rx(tilt * D2R), ry(-turn * D2R));
 
         /* the sea: the lab's sea in the ship's sea frame (world = at + full * (p - S) * k) */
@@ -289,19 +306,52 @@ function draw(canvas, T, S, show, newCanvas, report) {
         const m0 = r.misc, ride = sg => {   // the matrix and offset for the hull (sg 1) and for its reflection (sg -1: every motion reversed, as the shader mirrors it)
             const HP = mul([1, 0, 0, 0, ch, -sg * sh, 0, sg * sh, ch], [cp, -sg * sp, 0, sg * sp, cp, 0, 0, 0, 1]);
             const lx = m0 - HP[0] * m0, ly = -HP[3] * m0 + sg * heave, lz = -HP[6] * m0;   // m + (0, heave, 0) - HP m, in the hull's frame
-            return [mul(R, HP), at[0] + (R[0] * lx + R[1] * ly + R[2] * lz) * scale, at[1] + (R[3] * lx + R[4] * ly + R[5] * lz) * scale, at[2] + (R[6] * lx + R[7] * ly + R[8] * lz) * scale];
+            return [mul(R, HP), at[0] + (R[0] * lx + R[1] * ly + R[2] * lz) * scale, at[1] + (R[3] * lx + R[4] * ly + R[5] * lz) * scale, at[2] + (R[6] * lx + R[7] * ly + R[8] * lz) * scale, HP, lx, ly, lz];
         }, hull = ride(1), mirror = ride(-1);
+        // the reflection: whole over the hero; below it as live's (uReflect: gone as the ship gets way on and as the view tilts down)
+        const below = smooth((T.hero ?? 960) - 120, (T.hero ?? 960) + 120, lag.size.p), rW = 1 - below * (1 - (1 - smooth(0, 0.5, r.way)) * (1 - Math.min(1, Math.max(0, (r.tilt - 10) / 30))));
         for (const i of shipIdx) {
             const o4 = i * 4, wa = posA[o4 + 3], wb = posB[o4 + 3], shade = wa + (wb - wa) * mix; if (shade < 0.03) continue;
-            const [C, ox, oy, oz] = refl[i] ? mirror : hull;
+            if (refl[i] && rW < 0.02) continue; const [C, ox, oy, oz] = refl[i] ? mirror : hull;
             const x = posA[o4] + (posB[o4] - posA[o4]) * mix, y = posA[o4 + 1] + (posB[o4 + 1] - posA[o4 + 1]) * mix - WATERLINE, z = posA[o4 + 2] + (posB[o4 + 2] - posA[o4 + 2]) * mix;
             if (!proj(ox + (C[0] * x + C[1] * y + C[2] * z) * scale, oy + (C[3] * x + C[4] * y + C[5] * z) * scale, oz + (C[6] * x + C[7] * y + C[8] * z) * scale, P2)) continue;
             const X = P2[0] | 0, Y = P2[1] | 0; if (X < 0 || Y < 0 || X >= W - 1 || Y >= H - 1) continue;
             const q = Y * W + X; if (accS[q] === 0 && accI[q] === 0) lit1[nLit++] = q;
-            accI[q] += (0.25 + 0.6 * shade) * (P2[2] < 9 ? 2 : 1);   // nearer than the hull's plane: a 2 px speck's light
+            accI[q] += (0.25 + 0.6 * shade) * (P2[2] < 9 ? 2 : 1) * (refl[i] ? rW : 1);   // nearer than the hull's plane: a 2 px speck's light
             if (X < x0) x0 = X; if (Y < y0) y0 = Y; if (X + 1 > x1) x1 = X + 1; if (Y + 1 > y1) y1 = Y + 1;
         }
 
+        /* the fleet: each member is its source particle as the ship holds it (heel, pitch, heave: the hull's frame), rolled a little on its copy's
+           own clock about the keel line, scaled and set at its copy's place, then turned and placed with the ship on the sea */
+        const tS = S.prof && performance.now();
+        if (r.fleet > 0.001) {
+            // per copy and per side (hull, reflection) one matrix and offset for the frame: world = at + R scale (cw (Roll (HP p + l - wl) + wl) + c)
+            const cpM = []; for (let k = 0; k < 9; k++) {
+                const F = FLEET_POS[k], kq = k + 1, ro = 0.045 * Math.sin(t * (0.61 + 0.043 * kq) + kq * 2.1) + 0.02 * Math.sin(t * (1.13 + 0.031 * kq) + kq * 4.7), cr = Math.cos(ro), sr = Math.sin(ro);
+                const c = [F[0] + 0.06 * Math.sin(t * (0.19 + 0.02 * k) + k), F[1] + 0.015 * Math.sin(t * 0.23 + k), F[2] + 0.05 * Math.sin(t * 0.17 + 2 * k)], cw = F[3], Roll = [1, 0, 0, 0, cr, -sr, 0, sr, cr];
+                for (const side of [hull, mirror]) {
+                    const HP = side[4], RR = mul(R, Roll), M = mul(RR, HP).map(v => v * scale * cw);
+                    const l = [side[5], side[6] - WATERLINE, side[7]], rl = [Roll[0] * l[0] + Roll[1] * l[1] + Roll[2] * l[2], Roll[3] * l[0] + Roll[4] * l[1] + Roll[5] * l[2] + WATERLINE, Roll[6] * l[0] + Roll[7] * l[1] + Roll[8] * l[2]];
+                    const v = [cw * rl[0] + c[0], cw * rl[1] + c[1], cw * rl[2] + c[2]];
+                    cpM.push(M, at[0] + (R[0] * v[0] + R[1] * v[1] + R[2] * v[2]) * scale, at[1] + (R[3] * v[0] + R[4] * v[1] + R[5] * v[2]) * scale, at[2] + (R[6] * v[0] + R[7] * v[1] + R[8] * v[2]) * scale);
+                }
+            }
+            const fw = 0.85;   // a fleet member is drawn at 0.85 of the ship's weight, as live's
+            for (let j = 0; j < fleetM.length; j += 3) {
+                if (fleetM[j + 2] > r.fleet) continue;
+                const i = fleetM[j], o4 = i * 4, wa = posA[o4 + 3], wb = posB[o4 + 3], shade = wa + (wb - wa) * mix; if (shade < 0.03) continue;
+                const rf = refl[i]; if (rf && rW < 0.02) continue;
+                const b = (fleetM[j + 1] * 2 + rf) * 4, M = cpM[b];
+                const x = posA[o4] + (posB[o4] - posA[o4]) * mix, y = posA[o4 + 1] + (posB[o4 + 1] - posA[o4 + 1]) * mix - WATERLINE, z = posA[o4 + 2] + (posB[o4 + 2] - posA[o4 + 2]) * mix;
+                if (!proj(cpM[b + 1] + M[0] * x + M[1] * y + M[2] * z, cpM[b + 2] + M[3] * x + M[4] * y + M[5] * z, cpM[b + 3] + M[6] * x + M[7] * y + M[8] * z, P2)) continue;
+                const X = P2[0] | 0, Y = P2[1] | 0; if (X < 0 || Y < 0 || X >= W - 1 || Y >= H - 1) continue;
+                const q = Y * W + X; if (accS[q] === 0 && accI[q] === 0) lit1[nLit++] = q;
+                accI[q] += fw * (0.25 + 0.6 * shade) * (rf ? rW : 1);
+                if (X < x0) x0 = X; if (Y < y0) y0 = Y; if (X + 1 > x1) x1 = X + 1; if (Y + 1 > y1) y1 = Y + 1;
+            }
+        }
+
+        const tF = S.prof && performance.now();
         /* the buffer, written in one call: each pixel the sum of its light, as additive points on a clear canvas sum (a channel saturates to
            white, the alpha to opaque), and its layers cleared for the next frame as they are read */
         if (x1 > x0) {
@@ -357,7 +407,7 @@ function draw(canvas, T, S, show, newCanvas, report) {
             judge.work += performance.now() - w0; if (raw > vs * 1.6) judge.late++;
             if (judge.n === 120) { if (judge.work / 90 > 6 || judge.late > 25) fps = 30; judge = null; }
         }
-        if (S.prof) { const tD = performance.now(), P = prof || (prof = { n: 0, dots: 0, ship: 0, lines: 0 }); P.n++; P.dots += tB - tA; P.ship += tC - tB; P.lines += tD - tC; if (P.n % 30 === 0) report({ ...P, fps }); }
+        if (S.prof) { const tD = performance.now(), P = prof || (prof = { n: 0, dots: 0, ship: 0, fleet: 0, buf: 0, lines: 0 }); P.n++; P.dots += tB - tA; P.ship += tC - tB; P.fleet += tF - tS; P.buf += tC - tF; P.lines += tD - tC; if (P.n % 30 === 0) report({ ...P, fps }); }
     }
     if (!S.hidden) raf = RAF(frame);
     return {
