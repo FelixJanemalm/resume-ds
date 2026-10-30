@@ -32,7 +32,8 @@
             for (const it of items) {
                 const v = it.querySelector('video');
                 if (!v) continue;
-                if (it.classList.contains('active')) { const p = v.play(); if (p && p.catch) p.catch(() => {}); } else v.pause();
+                if (!it.classList.contains('active')) v.pause();
+                else if (window.siteNoGPU && !window.siteNoGPU()) { const p = v.play(); if (p && p.catch) p.catch(() => {}); }   // (without graphics acceleration the open card's video plays only on hover or a tap: video-lazy.js; before that script has run, video-lazy starts it once it has a source)
             }
         }
 

@@ -209,32 +209,43 @@ function sharedGL() {
     } catch (e) {}
     return shared;
 }
+// Without graphics acceleration (no hardware WebGL: the setting off, a blocked GPU; ?sea=2d forces it) the same specks are drawn on the CPU
+// (cpuDraw below): the scenes' motion is worked out on the CPU either way, only the drawing differs
+let noGPU = null;
+function cpuOnly() {
+    if (noGPU !== null) return noGPU;
+    if (/[?&]sea=2d\b/.test(location.search)) return (noGPU = true);
+    try { const c = document.createElement('canvas'), o = { failIfMajorPerformanceCaveat: true }, g = c.getContext('webgl2', o) || c.getContext('webgl', o); noGPU = !g; if (g) { const x = g.getExtension('WEBGL_lose_context'); if (x) x.loseContext(); } } catch (e) { noGPU = true; }
+    return noGPU;
+}
 function mount(host, def) {
-    if (!hasWebGL2()) return null;
-    const S = sharedGL(); if (!S) return null;
-    const gl = S.gl, item = host.closest('.item') || host;
+    const cpu = cpuOnly();
+    if (!cpu && !hasWebGL2()) return null;
+    const S = cpu ? null : sharedGL(); if (!cpu && !S) return null;
+    const gl = S && S.gl, item = host.closest('.item') || host;
     const canvas = document.createElement('canvas');
     canvas.setAttribute('aria-hidden', 'true');
     canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block;';
     const ctx = canvas.getContext('2d', { alpha: false }); if (!ctx) return null;
-    const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 60); camera.position.set(0, 0, CAM_Z);
+    const camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 60); camera.position.set(0, 0, CAM_Z);
+    const scene = cpu ? null : new THREE.Scene();
 
     const R = rng(def.seed), state = def.create(def.count, R), M = def.count + (def.extra || 0);
     const cur = { pos: new Float32Array(M * 3), col: new Float32Array(M * 3), size: new Float32Array(M), alpha: new Float32Array(M), blur: new Float32Array(M) };
     const tgt = { pos: new Float32Array(M * 3), col: new Float32Array(M * 3), size: new Float32Array(M), alpha: new Float32Array(M), blur: new Float32Array(M) };
     const lag = new Float32Array(M); for (let i = 0; i < M; i++) lag[i] = 0.7 + 0.6 * R();
-    const geo = new THREE.BufferGeometry();
-    const attr = (name, arr, n) => { const a = new THREE.BufferAttribute(arr, n); a.setUsage(THREE.DynamicDrawUsage); geo.setAttribute(name, a); return a; };
+    const geo = cpu ? null : new THREE.BufferGeometry();
+    const attr = (name, arr, n) => { if (cpu) return {}; const a = new THREE.BufferAttribute(arr, n); a.setUsage(THREE.DynamicDrawUsage); geo.setAttribute(name, a); return a; };
     const aPos = attr('position', cur.pos, 3), aCol = attr('aColor', cur.col, 3), aSize = attr('aSize', cur.size, 1), aAlpha = attr('aAlpha', cur.alpha, 1), aBlur = attr('aBlur', cur.blur, 1);
-    const mat = new THREE.ShaderMaterial({ uniforms: { uPR: { value: PR }, uScale: { value: 500 } }, vertexShader: VS, fragmentShader: FS, transparent: true, depthWrite: false, depthTest: false,
+    const mat = cpu ? { uniforms: { uScale: { value: 500 } } } : new THREE.ShaderMaterial({ uniforms: { uPR: { value: PR }, uScale: { value: 500 } }, vertexShader: VS, fragmentShader: FS, transparent: true, depthWrite: false, depthTest: false,
         blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor });
-    const points = new THREE.Points(geo, mat); points.frustumCulled = false; scene.add(points);
+    if (!cpu) { const points = new THREE.Points(geo, mat); points.frustumCulled = false; scene.add(points); }
     let streak = null;
     if (def.streaks) {
         const lg = new THREE.BufferGeometry(), lp = new Float32Array(M * 6), lc = new Float32Array(M * 6);
         lg.setAttribute('position', new THREE.BufferAttribute(lp, 3).setUsage(THREE.DynamicDrawUsage)); lg.setAttribute('color', new THREE.BufferAttribute(lc, 3).setUsage(THREE.DynamicDrawUsage));
-        const lines = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending }));
-        lines.frustumCulled = false; scene.add(lines);
+        if (!cpu) { const lines = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending }));
+            lines.frustumCulled = false; scene.add(lines); }
         streak = { lg, lp, lc, prev: new Float32Array(M * 3), vel: new Float32Array(M * 3), primed: false, mute: 0 };
     }
 
@@ -260,7 +271,7 @@ function mount(host, def) {
         const w = host.clientWidth, h = host.clientHeight; if (!w || !h) return false;
         const cw = Math.max(1, Math.round(w * PR)), ch = Math.max(1, Math.round(h * PR));
         if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }   // setting either clears the canvas, even to the same value
-        if (canvas.width > S.w || canvas.height > S.h) { S.w = Math.max(S.w, canvas.width); S.h = Math.max(S.h, canvas.height); gl.setSize(S.w, S.h, false); }
+        if (!cpu && (canvas.width > S.w || canvas.height > S.h)) { S.w = Math.max(S.w, canvas.width); S.h = Math.max(S.h, canvas.height); gl.setSize(S.w, S.h, false); }
         camera.aspect = w / h; camera.updateProjectionMatrix();
         mat.uniforms.uScale.value = h / (2 * Math.tan(FOV / 2 * Math.PI / 180));
         view.halfW = HALF_H * camera.aspect; view.halfH = HALF_H;
@@ -277,14 +288,73 @@ function mount(host, def) {
         view.cy = HALF_H * (1 - free / h); view.fit = Math.max(0.5, Math.min(1, free / h / 0.62));
     }
 
+    /* the CPU drawing: the shader's speck (a glow in focus, opening into a flat disc with a brighter rim as it blurs; its light spread
+       over the disc) summed per pixel as added light on the card's black, the canvas's pixel ratio as the shader's, the streaks as
+       one-pixel lines in a few brightness steps */
+    let img = null, buf = null, px32 = null, lit = null;
+    const GLOW = new Float32Array(257), DISC = new Float32Array(257);   // the two profiles against d^2 (0 .. 1) at 1/256 steps
+    for (let i = 0; i <= 256; i++) { const d = Math.sqrt(i / 256); GLOW[i] = Math.exp(-d * d * 4.5); DISC[i] = (1 - smooth(0.72, 1, d)) * (0.55 + 0.45 * smooth(0.3, 0.92, d)); }
+    const P = [0, 0];
+    function cpuDraw() {
+        const W = canvas.width, H = canvas.height; if (!W || !H) return;
+        if (!img || img.width !== W || img.height !== H) { img = ctx.createImageData(W, H); px32 = new Uint32Array(img.data.buffer); buf = new Float32Array(W * H * 3); lit = new Int32Array(W * H); }
+        const tH = Math.tan(FOV / 2 * Math.PI / 180), asp = W / H, scale = mat.uniforms.uScale.value * PR;
+        const { pos, col, size: sz, alpha, blur } = cur;
+        let nLit = 0;
+        for (let i = 0; i < M; i++) {
+            const a0 = alpha[i]; if (!(a0 > 0.002)) continue;
+            const i3 = i * 3, dz = CAM_Z - pos[i3 + 2]; if (dz < 0.1) continue;
+            const b = blur[i], grow = 1 + b * 4, s = Math.max(1, sz[i] * scale * grow / Math.max(0.5, dz)), va = a0 / (1 + b * grow * 0.8), wb = Math.min(1, b * 1.6);
+            const cx = (pos[i3] / (dz * tH * asp) * 0.5 + 0.5) * W, cy = (0.5 - pos[i3 + 1] / (dz * tH) * 0.5) * H;
+            const r = s / 2, x0 = Math.max(0, Math.ceil(cx - r - 0.5)), x1 = Math.min(W - 1, Math.floor(cx + r - 0.5)), y0 = Math.max(0, Math.ceil(cy - r - 0.5)), y1 = Math.min(H - 1, Math.floor(cy + r - 0.5));
+            const cr = col[i3] * va, cg = col[i3 + 1] * va, cb = col[i3 + 2] * va, ir2 = 256 / (r * r);
+            if (x1 < x0 || y1 < y0) {   // under a pixel: the point the GPU draws there, lit at its centre
+                const X = Math.floor(cx), Y = Math.floor(cy); if (X < 0 || Y < 0 || X >= W || Y >= H) continue;
+                const q = Y * W + X, w = (1 - wb) + wb * DISC[0]; if (buf[q * 3] === 0 && buf[q * 3 + 1] === 0 && buf[q * 3 + 2] === 0) lit[nLit++] = q;
+                buf[q * 3] += cr * w; buf[q * 3 + 1] += cg * w; buf[q * 3 + 2] += cb * w; continue;
+            }
+            for (let y = y0; y <= y1; y++) {
+                const dy = y + 0.5 - cy;
+                for (let x = x0; x <= x1; x++) {
+                    const dx = x + 0.5 - cx, k = (dx * dx + dy * dy) * ir2; if (k > 256) continue;
+                    const kk = k | 0, w = GLOW[kk] + (DISC[kk] - GLOW[kk]) * wb; if (w < 0.004) continue;
+                    const q = y * W + x; if (buf[q * 3] === 0 && buf[q * 3 + 1] === 0 && buf[q * 3 + 2] === 0) lit[nLit++] = q;
+                    buf[q * 3] += cr * w; buf[q * 3 + 1] += cg * w; buf[q * 3 + 2] += cb * w;
+                }
+            }
+        }
+        px32.fill(0xff000000);   // the card's black (opaque)
+        for (let j = 0; j < nLit; j++) {
+            const q = lit[j], q3 = q * 3, R = buf[q3], G = buf[q3 + 1], B = buf[q3 + 2]; buf[q3] = buf[q3 + 1] = buf[q3 + 2] = 0;
+            px32[q] = 0xff000000 | (B >= 1 ? 255 : B * 255) << 16 | (G >= 1 ? 255 : G * 255) << 8 | (R >= 1 ? 255 : R * 255);
+        }
+        ctx.putImageData(img, 0, 0);
+        if (streak) {   // the speed streaks: the shader's lines, by brightness step
+            const { lp, lc } = streak, NB = 6, paths = Array.from({ length: NB }, () => new Path2D()), sum = new Float32Array(NB * 4); let any = false;
+            for (let i = 0; i < def.count; i++) {
+                const i6 = i * 6, k = Math.max(lc[i6], lc[i6 + 1], lc[i6 + 2]); if (k < 0.02) continue;
+                const pa = proj(lp[i6], lp[i6 + 1], lp[i6 + 2], W, H, tH, asp), xa = P[0], ya = P[1]; if (!pa || !proj(lp[i6 + 3], lp[i6 + 4], lp[i6 + 5], W, H, tH, asp)) continue;
+                const bk = Math.min(NB - 1, (k * NB) | 0), p = paths[bk]; p.moveTo(xa, ya); p.lineTo(P[0], P[1]); any = true;
+                sum[bk * 4] += lc[i6] / k; sum[bk * 4 + 1] += lc[i6 + 1] / k; sum[bk * 4 + 2] += lc[i6 + 2] / k; sum[bk * 4 + 3]++;   // the specks' own colours, averaged per step
+            }
+            if (any) {
+                ctx.globalCompositeOperation = 'lighter'; ctx.lineWidth = 1;   // one device pixel, as the GPU's lines; fading head to tail, so half the head's light
+                for (let b = 0; b < NB; b++) { const n = sum[b * 4 + 3]; if (!n) continue; ctx.strokeStyle = `rgba(${sum[b * 4] / n * 255 | 0},${sum[b * 4 + 1] / n * 255 | 0},${sum[b * 4 + 2] / n * 255 | 0},${(b + 0.5) / NB * 0.5})`; ctx.stroke(paths[b]); }
+                ctx.globalCompositeOperation = 'source-over';
+            }
+        }
+    }
+    function proj(x, y, z, W, H, tH, asp) { const dz = CAM_Z - z; if (dz < 0.1) return false; P[0] = (x / (dz * tH * asp) * 0.5 + 0.5) * W; P[1] = (0.5 - y / (dz * tH) * 0.5) * H; return true; }
+
     const stillAt = () => reduced && def.still !== undefined ? def.still : def.rest;
     let playT = 0;
     let ct = def.rest, time = 0, raf = 0, last = 0, settle = 0, visible = false, hover = false, active = item.classList.contains('active'), polled = 0;
     const playing = () => !reduced && (freezeAt === null) && (active || hover);
     function compute(rest) { def.targets(state, ct, time, view, tgt, rest); }
     function snap() { if (streak) { streak.primed = false; streak.lc.fill(0); } const r = freezeAt === null && !playing(); compute(r); compute(r);   /* twice: the glow at the point reads the mass the first pass gathered */cur.pos.set(tgt.pos); cur.col.set(tgt.col); cur.size.set(tgt.size); cur.alpha.set(tgt.alpha); cur.blur.set(tgt.blur); }
-    function upload() { aPos.needsUpdate = aCol.needsUpdate = aSize.needsUpdate = aAlpha.needsUpdate = aBlur.needsUpdate = true; }
+    function upload() { if (cpu) return; aPos.needsUpdate = aCol.needsUpdate = aSize.needsUpdate = aAlpha.needsUpdate = aBlur.needsUpdate = true; }
     function render() {
+        if (cpu) { cpuDraw(); return; }
         const W = canvas.width, H = canvas.height;
         gl.setViewport(0, 0, W, H); gl.setScissor(0, 0, W, H); gl.render(scene, camera);
         ctx.drawImage(gl.domElement, 0, S.h - H, W, H, 0, 0, W, H);   // GL rows count from the bottom: the corner is the image's last H rows
@@ -344,7 +414,8 @@ function mount(host, def) {
     }
     // Rendering a material the first time links its shaders, and the link blocks the main thread until the driver is done (hundreds of ms on a
     // phone). compileAsync links them in parallel; the canvas goes in once they are ready, and until then the host's own black ground shows.
-    gl.compileAsync(scene, camera).catch(() => {}).then(() => { host.appendChild(canvas); start(); });
+    if (cpu) { host.appendChild(canvas); start(); }
+    else gl.compileAsync(scene, camera).catch(() => {}).then(() => { host.appendChild(canvas); start(); });
     return { host, get ct() { return ct; } };
 }
 

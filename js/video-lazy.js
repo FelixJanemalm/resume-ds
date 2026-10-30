@@ -27,6 +27,42 @@
 (function () {
     "use strict";
 
+    /* Without graphics acceleration (no WebGL, or only a software one: the setting off, a blocked GPU, a virtual machine) a playing video
+       holds the whole page at 30 frames a second, even after it has stopped. There a video shows its poster and plays only while the
+       pointer is over it, or after a tap. Shared with cards.js through window.siteNoGPU(); ?sea=2d forces it, for testing. */
+    var noGPU = null;
+    window.siteNoGPU = function () {
+        if (noGPU !== null) return noGPU;
+        if (/[?&]sea=2d\b/.test(location.search)) return (noGPU = true);
+        try {
+            var c = document.createElement('canvas'), o = { failIfMajorPerformanceCaveat: true };
+            var g = c.getContext('webgl2', o) || c.getContext('webgl', o); noGPU = !g;
+            if (g) { var x = g.getExtension('WEBGL_lose_context'); if (x) x.loseContext(); }   // (a probe: its context released at once)
+        } catch (e) { noGPU = true; }
+        return noGPU;
+    };
+    function onDemand(video) {   // the poster until a pointer comes over its card, or a tap; nothing else may start it
+        if (video.dataset.onDemand) return; video.dataset.onDemand = '1';
+        var fetchIt = function () { var src = video.querySelector('source[data-src]'); if (src) { src.src = src.dataset.src; delete src.dataset.src; video.load(); } };
+        if (video.controls) {   // a video with its own controls: its source comes with the first touch of it, the controls do the rest
+            ['pointerdown', 'focus'].forEach(function (ev) { video.addEventListener(ev, fetchIt, { once: true }); });
+            return;
+        }
+        var wanted = false;
+        var play = function () { fetchIt(); wanted = true; var p = video.play();   /* (wanted after the load: a load can fire a pause) */ if (p && p.catch) p.catch(function () {}); };
+        var stop = function () { wanted = false; video.pause(); };
+        video.addEventListener('play', function () { if (!wanted) video.pause(); });
+        video.addEventListener('pause', function () { wanted = false; });   // (its card closed under it, say: the next tap plays it again)   // (the spine and the rail start their front card's video: not here)
+        var host = video.closest('.ws-card, .item') || video.parentElement;   // the whole card answers (its overlays sit over the video)
+        host.addEventListener('pointerenter', function (e) { if (e.pointerType === 'mouse') play(); });
+        host.addEventListener('pointerleave', function (e) { if (e.pointerType === 'mouse') stop(); });
+        var down = null;   // a tap (not the start of a swipe or a scroll) toggles it
+        host.addEventListener('pointerdown', function (e) { if (e.pointerType !== 'mouse') down = [e.clientX, e.clientY]; }, { passive: true });
+        host.addEventListener('pointerup', function (e) { if (e.pointerType === 'mouse' || !down) return; var moved = Math.hypot(e.clientX - down[0], e.clientY - down[1]); down = null; if (moved < 10) { if (wanted) stop(); else play(); } });
+        host.addEventListener('pointercancel', function () { down = null; });
+        if (host.matches(':hover')) play();   // (a card opened under a pointer that is already on it)
+    }
+
     var lazy = [].slice.call(document.querySelectorAll('video source[data-src]'));
     if (!lazy.length) return;
 
@@ -44,6 +80,7 @@
         if (!source.dataset.src) return;
         var video = source.parentNode;
         dress(video);
+        if (window.siteNoGPU()) { onDemand(video); return; }
         source.src = source.dataset.src;
         delete source.dataset.src;
         video.load();
@@ -118,7 +155,7 @@
     });
 
     function pending(group) {
-        return group.sources.some(function (s) { return s.dataset.src; });
+        return group.sources.some(function (s) { return s.dataset.src && !s.parentNode.dataset.onDemand; });   // (one waiting for a hover is no longer the observer's)
     }
 
     function sync(group) {

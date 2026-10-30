@@ -104,7 +104,7 @@ const pcfg = section ? {
 if (pcfg) for (const [k, v] of new URLSearchParams(location.search)) if (k in pcfg && v !== '') pcfg[k] = Number.isNaN(+v) ? v : +v;   // dev aid: ?shipWorkTilt=45&boat=off
 let layer = null;
 const THEME_ROW = false;   // the ship-style icon row under the colour picker (and the stored choice it writes): off for now
-const MOD_V = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '?t=' + Date.now() : '?v=2026-10-30f';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache): never cached on a local server, versioned elsewhere (bump when they change)
+const MOD_V = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '?t=' + Date.now() : '?v=2026-10-30g';   // cache-buster for the modules imported after the page has loaded (a hard refresh does not reach them: they load after the idle callback, from the browser's cache): never cached on a local server, versioned elsewhere (bump when they change)
 import('./ink-cursor.js' + MOD_V).catch(e => console.warn('ink cursor', e));   // the pointer as a trail of ink in the picked colour (it checks for a real mouse and reduced motion itself)
 
 const SIM_NOISE = `
@@ -1928,7 +1928,9 @@ async function boot() {
     if (pcfg.fold && BOAT) FOLD = await foldP;
     let PRE = await preP; if (PRE) PRE.mod = THEMES && THEMES.atlantic;   // the worker built the default lineage's ship; another one is built on the page
     if (pcfg.mode === 'page') await startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD, PRE); else heroStill('no page layer');
-    if (FOLD && pcfg.silkBg > 0 && webgl2(false)) {   // the silk ground behind the principles (it starts drawing when the section comes near), built in the next idle moment: the section is far below the first screen
+    if (SEA === '2d' && FOLD && pcfg.silkBg > 0 && (pcfg.silkBgStyle || 'ribbon') === 'ribbon') {   // ?sea=2d: the ribbon drawn on the CPU
+        import('./silk-2d.js' + MOD_V).then(m => m.mountSilk2D(document.getElementById('scalability'), { strength: pcfg.silkBg, ribbon: FOLD.RIBBON })).catch(e => console.warn('work-spine: silk-2d did not load', e));
+    } else if (FOLD && pcfg.silkBg > 0 && webgl2(false)) {   // the silk ground behind the principles (it starts drawing when the section comes near), built in the next idle moment: the section is far below the first screen
         const silk = () => FOLD.mountSilk(THREE, document.getElementById('scalability'), { style: pcfg.silkBgStyle, light: coarse, strength: pcfg.silkBg });
         if ('requestIdleCallback' in window) requestIdleCallback(silk, { timeout: 1500 }); else setTimeout(silk, 200);
     }
