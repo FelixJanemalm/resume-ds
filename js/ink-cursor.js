@@ -87,7 +87,7 @@ function start() {
         const root = getComputedStyle(document.documentElement);
         const picked = parseColor(root.getPropertyValue('--primary-color')) || parseColor(root.getPropertyValue('--button-color')) || [79, 170, 209, 1];
         const ground = groundAt(Math.min(innerWidth - 1, Math.max(0, mouse.x + WIDTH / 2)), Math.min(innerHeight - 1, Math.max(0, mouse.y + WIDTH / 2)));
-        const [h, s0] = toHsl(picked), s = Math.max(s0, 0.75), dark = lum(ground) < 0.3;
+        const ph = parseFloat(root.getPropertyValue('--primary-hue')), [h0, s0] = toHsl(picked), h = s0 < 0.05 && isFinite(ph) ? ph / 360 : h0, s = Math.max(s0, 0.75), dark = lum(ground) < 0.3;
         let l = dark ? 0.58 : 0.42, rgb = toRgb([h, s, l]);
         for (let k = 0; k < 16 && contrast(rgb, ground) < CONTRAST; k++) { l = dark ? Math.min(0.94, l + 0.025) : Math.max(0.08, l - 0.025); rgb = toRgb([h, s, l]); }   // push the lightness away from the ground until it stands out
         // over a link what shows is |ground - ink|, so the ink sits that colour away from the ground in each channel, as far as 0-255 allows

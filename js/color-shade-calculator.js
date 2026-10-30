@@ -1,7 +1,15 @@
 const THEME_STORAGE_KEY = 'portfolio-theme-primary';
+const HUE_STORAGE_KEY = 'portfolio-theme-hue';
 const FALLBACK_THEME_COLOR = '#4faad1';
+const GREY_CHROMA = 0.04;   // below this spread (max - min channel, 0..1) a hex's own hue is noise: the picker's hue stands in (the page stays grey; the particles, ship, silk, clouds and ink take the hue from --primary-hue)
 
 let currentColor = null;
+let currentHue = null;   // the picker's hue, kept apart from the hex: a grey (the spectrum's left and bottom edges) has none, and reads back as 0, red
+
+try {
+    const h = parseFloat(localStorage.getItem(HUE_STORAGE_KEY));
+    if (isFinite(h)) currentHue = h;
+} catch (e) { /* private mode / quota */ }
 
 try {
     const stored = localStorage.getItem(THEME_STORAGE_KEY);
@@ -50,7 +58,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const initialColor = currentColor
             ? tinycolor(currentColor)
             : tinycolor(`hsl(${hue}, ${saturation * 80}%, ${lightness * 90}%)`);
-        createShadeSpectrum(colorToHue(initialColor.toHexString()));
         colorToPos(initialColor);
         setCurrentColor(initialColor);
     }
@@ -98,13 +105,12 @@ document.addEventListener('DOMContentLoaded', function() {
         hueHitbox.addEventListener('pointerdown', startGetHueColor);
     }
 
-    function colorToHue(color) {
-        return tinycolor(`hsl ${tinycolor(color).toHsl().h} 1 .5`).toHslString();
-    }
-
     function colorToPos(color) {
         const hsl = tinycolor(color).toHsl();
-        hue = hsl.h;
+        hue = isGrey(tinycolor(color).toHexString()) && currentHue !== null ? currentHue : hsl.h;
+        // the hue slider rebuilds the colour from these, so they start as the starting colour's (left at 100% / 50%, the first hue drag jumped to a pale, light-mode colour)
+        saturation = Math.min(Math.max(0.0001, hsl.s), 0.9999);
+        lightness = Math.min(Math.max(0.0001, hsl.l), 0.9999);
         const hsv = tinycolor(color).toHsv();
         const x = spectrumRect.width * hsv.s;
         const y = spectrumRect.height * (1 - hsv.v);
@@ -112,11 +118,13 @@ document.addEventListener('DOMContentLoaded', function() {
         updateSpectrumCursor(x, y);
         updateHueCursor(hueX);
         setCurrentColor(color);
-        createShadeSpectrum(colorToHue(color));
+        createShadeSpectrum(`hsl(${hue}, 100%, 50%)`);
     }
 
     function setCurrentColor(color) {
         color = tinycolor(color);
+        currentHue = hue;
+        try { localStorage.setItem(HUE_STORAGE_KEY, String(Math.round(hue * 10) / 10)); } catch (e) { /* ignore */ }
         window.currentColor = color.toHexString();
         document.body.style.backgroundColor = color;
         spectrumCursor.style.backgroundColor = color;
@@ -224,6 +232,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     new ColorPicker();
 });
+
+function isGrey(hex) {
+    const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+    return (Math.max(r, g, b) - Math.min(r, g, b)) / 255 < GREY_CHROMA;
+}
 
 function limitBrightness(color) {
     let r = parseInt(color.slice(1, 3), 16);
@@ -424,6 +437,7 @@ function updateColors(color, options) {
     document.documentElement.style.setProperty('--contrastRGB', contrastRGB);
 
     document.documentElement.style.setProperty('--primary-color', selectedColor);
+    document.documentElement.style.setProperty('--primary-hue', String(isGrey(selectedColor) && currentHue !== null ? currentHue : hexToHsl(selectedColor)[0]));
     document.documentElement.style.setProperty('--sysPrimaryStrong', shades.strong);
     document.documentElement.style.setProperty('--sysPrimaryDefault', shades.default);
     document.documentElement.style.setProperty('--sysPrimarySubtle', shades.subtle);

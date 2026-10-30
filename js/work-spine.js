@@ -546,8 +546,14 @@ const SILK_FS = SILK_NOISE + `
 function vividAccent(THREE, light, lightness) {
     const c = new THREE.Color();
     try { c.setStyle((getComputedStyle(document.body).getPropertyValue('--button-color') || '').trim() || '#4faad1'); } catch (e) { c.set(0x4faad1); }
-    const hsl = { h: 0, s: 0, l: 0 }; c.getHSL(hsl);
+    const hsl = { h: 0, s: 0, l: 0 }; c.getHSL(hsl); pickedHue(hsl);
     return c.setHSL(hsl.h, Math.max(hsl.s, 0.8), lightness !== undefined ? lightness : light ? 0.38 : 0.6);
+}
+/* A grey pick has no hue of its own (it reads as 0, red, and the callers push the saturation up): the picker keeps the one the visitor chose in --primary-hue. */
+function pickedHue(hsl) {
+    if (hsl.s >= 0.05) return hsl;
+    try { const h = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--primary-hue')); if (isFinite(h)) hsl.h = h / 360; } catch (e) {}
+    return hsl;
 }
 /* The page ground's relative luminance (0 black .. 1 white), from the body's computed background: the picker can land on a mid
    or pale ground while the body class still says "dark" (its threshold is the picked colour's lightness, not the ground's). */
@@ -1700,21 +1706,22 @@ async function startParticleLayer(THREE, GPUC, BOAT, THEMES, FOLD, PRE) {
         mat.blending = pale > 0.3 ? THREE.NormalBlending : THREE.AdditiveBlending; mat.needsUpdate = true;
         if (ship.overlay) canvas.style.mixBlendMode = light ? 'multiply' : 'screen';
         if (fold) {   // the hero sea: the picked colour's hue at the lab's saturation and lightness; the page's ground, which the wall's edges fade into
-            const c = new THREE.Color(), hsl = { h: 0, s: 0, l: 0 }; try { c.setStyle(foldColorKey() || '#1466B8'); } catch (e) { c.set(0x1466b8); } c.getHSL(hsl, THREE.SRGBColorSpace); fold.setHue(hsl.h);
+            const c = new THREE.Color(), hsl = { h: 0, s: 0, l: 0 }; try { c.setStyle(foldColorKey() || '#1466B8'); } catch (e) { c.set(0x1466b8); } c.getHSL(hsl, THREE.SRGBColorSpace); pickedHue(hsl); fold.setHue(hsl.h);
             let m = null; try { m = /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/.exec(getComputedStyle(document.body).backgroundColor || ''); } catch (e) {}
             if (m) fold.setGround(+m[1] / 255, +m[2] / 255, +m[3] / 255);
         }
         if (SILKS_ALL.length) {   // silkShip / silkArmadaShips: the silk's fan from the picked hue, as voyage-fold.js's ribbon sets it (raw into the shader); a little deeper on a pale ground
-            const c = new THREE.Color(), hsl = { h: 0, s: 0, l: 0 }; try { c.setStyle(foldColorKey() || '#1466B8'); } catch (e) { c.set(0x1466b8); } c.getHSL(hsl, THREE.SRGBColorSpace);
+            const c = new THREE.Color(), hsl = { h: 0, s: 0, l: 0 }; try { c.setStyle(foldColorKey() || '#1466B8'); } catch (e) { c.set(0x1466b8); } c.getHSL(hsl, THREE.SRGBColorSpace); pickedHue(hsl);
             for (const o of SILKS_ALL) { const u = o.material.uniforms; u.uColA.value.setHSL((hsl.h + SILK_SHIP.hueA + 1) % 1, 0.95, 0.66); u.uColB.value.setHSL(hsl.h, 0.95, 0.52); u.uColC.value.setHSL((hsl.h + SILK_SHIP.hueC + 1) % 1, 0.9, 0.4); u.uPale.value = pale; }
         }
-        try { groundKey = getComputedStyle(document.body).backgroundColor + foldColorKey(); } catch (e) {}
+        try { groundKey = getComputedStyle(document.body).backgroundColor + foldColorKey() + hueKey(); } catch (e) {}
     }
     function foldColorKey() { try { return fold || SILKS_ALL.length ? getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim() : ''; } catch (e) { return ''; } }
+    function hueKey() { try { return getComputedStyle(document.documentElement).getPropertyValue('--primary-hue').trim(); } catch (e) { return ''; } }   // a hue drag on a grey pick changes nothing else
     applyTheme();
     new MutationObserver(applyTheme).observe(document.body, { attributes: true, attributeFilter: ['class'] });
     let groundAt = 0;
-    function watchGround(now) { if (now - groundAt < 600) return; groundAt = now; let k = ''; try { k = getComputedStyle(document.body).backgroundColor + foldColorKey(); } catch (e) {} if (k !== groundKey) applyTheme(); }
+    function watchGround(now) { if (now - groundAt < 600) return; groundAt = now; let k = ''; try { k = getComputedStyle(document.body).backgroundColor + foldColorKey() + hueKey(); } catch (e) {} if (k !== groundKey) applyTheme(); }
     let last = performance.now();
     // adaptive quality: after the first 2.5 s, a slow device gets a lower pixel ratio, half the drawn particles and a half-rate simulation
     const qual = { acc: 0, frames: 0, done: false, half: false, tick: 0, simDt: 0 };

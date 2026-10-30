@@ -242,9 +242,10 @@ function mount(host, def) {
     const acc = { h: 0.56, s: 0.85, l: 0.6 }, tmp = new THREE.Color();
     let colorKey = null;
     function pollColor() {
-        let c = ''; try { c = getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim(); } catch (e) {}
-        if (c === colorKey) return false; colorKey = c;
+        let c = '', ph = NaN; try { c = getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim(); ph = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--primary-hue')); } catch (e) {}
+        if (c + ph === colorKey) return false; colorKey = c + ph;
         const hsl = { h: 0, s: 0, l: 0 }; try { tmp.setStyle(c || '#4faad1'); } catch (e) { tmp.set(0x4faad1); } tmp.getHSL(hsl);
+        if (hsl.s < 0.05 && isFinite(ph)) hsl.h = ph / 360;   // a grey pick has no hue of its own (it reads as 0, red): the picker keeps the chosen one in --primary-hue
         acc.h = hsl.h; acc.s = Math.max(hsl.s, 0.8); acc.l = 0.6;
         return true;
     }

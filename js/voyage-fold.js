@@ -441,9 +441,11 @@ export function mountSilk(THREE, host, { style = 'ribbon', colorVar = '--primary
     const view = style === 'beach' ? beachView(THREE, scene, { pixelRatio, light, strength, ...rest }) : ribbonView(THREE, scene, { ...RIBBON, light, strength, ...rest });
     let key = '', visible = false, raf = 0, t0 = performance.now(), polled = 0, ready = false;
     function color() {
-        let c = ''; try { c = getComputedStyle(document.documentElement).getPropertyValue(colorVar).trim(); } catch (e) {}
-        if (c === key) return; key = c;
-        const col = new THREE.Color(), hsl = { h: 0, s: 0, l: 0 }; try { col.setStyle(c || '#1466B8'); } catch (e) { col.set(0x1466b8); } col.getHSL(hsl, THREE.SRGBColorSpace); view.setHue(hsl.h);
+        let c = '', ph = NaN; try { c = getComputedStyle(document.documentElement).getPropertyValue(colorVar).trim(); ph = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--primary-hue')); } catch (e) {}
+        if (c + ph === key) return; key = c + ph;
+        const col = new THREE.Color(), hsl = { h: 0, s: 0, l: 0 }; try { col.setStyle(c || '#1466B8'); } catch (e) { col.set(0x1466b8); } col.getHSL(hsl, THREE.SRGBColorSpace);
+        if (hsl.s < 0.05 && isFinite(ph)) hsl.h = ph / 360;   // a grey pick has no hue of its own (it reads as 0, red): the picker keeps the chosen one in --primary-hue
+        view.setHue(hsl.h);
     }
     function size() { const w = host.clientWidth, h = host.clientHeight; if (!w || !h) return; gl.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); view.resize(w, h); }
     function frame(now) {
