@@ -77,7 +77,7 @@
       path: path,
       headline: (sub && sub.textContent.trim()) || document.title,
       application_id: appRef,                      // "<id>.<sig>", minted by chat/link.py
-      qa: local.get("fj_qa") === "1"
+      qa: local.get("fj_qa") === "1" || navigator.webdriver === true   // an automated test browser counts as QA
     };
   }
   var ctx = pageContext();

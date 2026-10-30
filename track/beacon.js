@@ -26,6 +26,8 @@
     if (params.get("qa") === "1") localStorage.setItem("fj_qa", "1");
     if (localStorage.getItem("fj_qa") === "1") return;
   } catch (e) { /* no storage: count normally */ }
+  // An automated browser (puppeteer, Playwright, Selenium: any test run that forgot ?qa=1) is never a visitor
+  if (navigator.webdriver) return;
 
   // Stable-ish per-browser id so a forwarded link is distinguishable from the
   // same person reloading. Random, first-party, never leaves this origin's store.
