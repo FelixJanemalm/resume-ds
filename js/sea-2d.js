@@ -1,9 +1,11 @@
-/* sea-2d.js: the hero's sea and ship drawn on the CPU, on a plain 2D canvas, for a browser that gives the page no WebGL at all (graphics
- * acceleration off or crashed, a remote desktop, a virtual machine). Reached with ?sea=2d while it is reviewed.
+/* sea-2d.js: the page's particle voyage drawn on the CPU, on a plain 2D canvas, for a browser that gives the page no WebGL at all (graphics
+ * acceleration off or crashed, a remote desktop, a virtual machine): the hero's sea and ship, the ship's voyage down the page, the fleet at
+ * the quote and the armada at the end. Reached with ?sea=2d while it is reviewed.
  *
  * Not a copy of pixels: the same scene, computed again. The pose the scroll decides (where the ship sits, its size, course, tilt and level,
- * and where the hero's sea lies) comes from images/sea/hero-track.json, recorded from the live page at every 12 px of the hero (the ship
- * settled at rest there); between rows it is interpolated, and each part of it chases the scroll through the live ship's own lags.
+ * where the hero's sea lies, the way on, the fleet, the launch and where the layer sits) comes from images/sea/voyage-track.json, recorded
+ * from the live page (every 12 px over the hero, the ship settled at rest; every 24 px below it, scrolled at a reading pace); between rows
+ * it is interpolated, and each part of it chases the scroll through the live ship's own lags.
  * Everything time drives is computed here with the live layer's own formulas: the scene's sway and bob, the hull's pitch, heave and roll on
  * the swell, and the sea itself (voyage-fold.js's seaHeight and the shader's crest-line phase), so the water runs on whether or not the
  * page scrolls.
@@ -57,12 +59,22 @@ export async function start() {
     // the picked colour, and the page's ground under the canvas (on a pale one the sea is drawn in dark ink: see color() below)
     const colour = () => getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim() + '|' + getComputedStyle(document.body).backgroundColor + '|' + (document.body.classList.contains('default-light') || document.body.classList.contains('default-light-colorblind') ? 'light' : '');
     const box = () => ({ w: Math.max(1, Math.round(innerWidth)), h: Math.max(1, Math.round(canvas.getBoundingClientRect().height || innerHeight)) });
-    const show = (v, z) => { const s = v ? '' : 'hidden'; if (canvas.style.visibility !== s) canvas.style.visibility = s; if (z !== undefined && canvas.style.zIndex !== String(z)) canvas.style.zIndex = z; };   // z: where the live layer sits (over the hero, behind the page below it)   // (hidden, not display:none: it keeps its size for a resize down the page)
-    const S = { y: scrollY, vh: innerHeight, ...box(), colour: colour(), hidden: document.hidden, prof: new URLSearchParams(location.search).has('prof') };
+    // z: where the live layer sits (over the hero, behind the page below it, over the page at the ending); blend: at the ending the canvas is
+    // screened over a dark ground, multiplied over a pale one, as live's
+    const show = (v, z, blend) => {
+        const s = v ? '' : 'hidden'; if (canvas.style.visibility !== s) canvas.style.visibility = s;
+        if (z !== undefined && canvas.style.zIndex !== String(z)) canvas.style.zIndex = z;
+        if (blend !== undefined && canvas.style.mixBlendMode !== blend) canvas.style.mixBlendMode = blend;
+    };
+    // the ending's block (the armada is drawn from its top edge down): where its top is on the screen
+    const block = document.querySelector('.testimonials-wrapper'), clip = () => block ? block.getBoundingClientRect().top : 1e9;
+    // the page's end (live's docEnd: the body or the footer's foot, whichever is lower), less a screen: the scroll at which the page ends
+    const foot = document.querySelector('footer'), end = () => Math.max(document.body.offsetHeight, foot ? foot.getBoundingClientRect().bottom + scrollY : 0) - innerHeight;   // z: where the live layer sits (over the hero, behind the page below it)   // (hidden, not display:none: it keeps its size for a resize down the page)
+    const S = { y: scrollY, vh: innerHeight, ...box(), clip: clip(), end: end(), colour: colour(), hidden: document.hidden, prof: new URLSearchParams(location.search).has('prof') };
     const here = () => {   // drawn on the page (a canvas handed to a worker never comes back: a failed worker leaves a fresh one here)
         if (canvas.dataset.sent) mount();
-        Object.assign(S, { y: scrollY, vh: innerHeight, ...box(), colour: colour(), hidden: document.hidden });
-        const api = draw(canvas, T, S, show, n => { const c = document.createElement('canvas'); c.width = c.height = n; return c; }, p => { window.__s2dP = p; });
+        Object.assign(S, { y: scrollY, vh: innerHeight, ...box(), clip: clip(), end: end(), colour: colour(), hidden: document.hidden });
+        const api = draw(canvas, T, S, show, (w, h = w) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }, p => { window.__s2dP = p; });
         send = m => api.set(m);
     };
     let send = () => {};
@@ -72,15 +84,15 @@ export async function start() {
         try {
             wk = new Worker(import.meta.url, { type: 'module' });
             const off = canvas.transferControlToOffscreen(); canvas.dataset.sent = '1';
-            wk.onmessage = e => { const m = e.data; if (m.ready) ok = true; if (m.failed) fail(m.failed); if ('show' in m) show(m.show, m.z); if (m.prof) window.__s2dP = m.prof; };
+            wk.onmessage = e => { const m = e.data; if (m.ready) ok = true; if (m.failed) fail(m.failed); if ('show' in m) show(m.show, m.z, m.blend); if (m.prof) window.__s2dP = m.prof; };
             wk.onerror = e => { e.preventDefault?.(); fail(e.message || 'did not load'); };
             wk.postMessage({ init: true, canvas: off, T, S }, [off]);
             send = m => wk && wk.postMessage(m);
             setTimeout(() => { if (!ok) fail('no answer in 8 s'); }, 8000);
         } catch (e) { wk?.terminate(); wk = null; console.warn('sea-2d: no worker, drawing on the page', e); here(); }
     } else here();
-    addEventListener('scroll', () => send({ y: scrollY }), { passive: true });
-    addEventListener('resize', () => send({ y: scrollY, vh: innerHeight, ...box() }));
+    addEventListener('scroll', () => send({ y: scrollY, clip: clip(), end: end() }), { passive: true });
+    addEventListener('resize', () => send({ y: scrollY, vh: innerHeight, ...box(), clip: clip(), end: end() }));
     document.addEventListener('visibilitychange', () => send({ hidden: document.hidden }));
     let c0 = S.colour; setInterval(() => { const c = colour(); if (c !== c0) { c0 = c; send({ colour: c }); } }, 300);   // the picker
 }
@@ -91,7 +103,7 @@ if (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScop
     self.onmessage = e => {
         const m = e.data;
         if (m.init) {
-            try { api = draw(m.canvas, m.T, m.S, (v, z) => self.postMessage({ show: v, z }), n => new OffscreenCanvas(n, n), p => self.postMessage({ prof: p })); self.postMessage({ ready: true }); }
+            try { api = draw(m.canvas, m.T, m.S, (v, z, blend) => self.postMessage({ show: v, z, blend }), (w, h = w) => new OffscreenCanvas(w, h), p => self.postMessage({ prof: p })); self.postMessage({ ready: true }); }
             catch (err) { self.postMessage({ failed: String(err && err.message || err) }); }
         } else if (api) api.set(m);
     };
@@ -115,16 +127,16 @@ function draw(canvas, T, S, show, newCanvas, report) {
     /* ---- colour: the picked hue, as the live layer takes it (the sea at the lab's saturation and lightness, the ship's ink pushed vivid) */
     // on a pale ground (the light theme, or a light picked colour) light added to the page would not show: the live layer then draws its
     // points as dark ink of the same hue, and so does this (pale; dark: the tints it uses then)
-    let sea = [0.3, 0.5, 0.8], ink = [0.4, 0.6, 1], pale = false, dark = null, colorKey = null;
+    let hueNow = 0.58, sea = [0.3, 0.5, 0.8], ink = [0.4, 0.6, 1], pale = false, blendPale = false, dark = null, colorKey = null;
     function color() {
         if (S.colour === colorKey) return; colorKey = S.colour;
         const [c, bg = '', theme = ''] = S.colour.split('|'), gm = /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/.exec(bg), ground = gm ? [gm[1] / 255, gm[2] / 255, gm[3] / 255] : [0.26, 0.26, 0.26];
         const m = /^#?([0-9a-f]{6})$/i.exec(c), rgb = m ? [0, 2, 4].map(k => parseInt(m[1].slice(k, k + 2), 16) / 255) : [0.08, 0.4, 0.72];
         const mx = Math.max(...rgb), mn = Math.min(...rgb), d = mx - mn, [r, g, b] = rgb;
-        const h = !d ? 0 : (mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4) / 6;
+        const h = !d ? 0 : (mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4) / 6; hueNow = h;
         sea = hsl(h, o.sat, o.lum); ink = hsl(h, 0.85, 0.62);
         const lin = v => { v = Math.min(1, v); return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };   // as the live layer judges it (groundLum; dark ink past half of smoothstep(0.06, 0.4))
-        pale = theme === 'light' || 0.2126 * lin(ground[0]) + 0.7152 * lin(ground[1]) + 0.0722 * lin(ground[2]) > 0.23; dark = { sea: hsl(h, o.sat, 0.28), ink: hsl(h, 0.85, 0.22) };
+        const lum = 0.2126 * lin(ground[0]) + 0.7152 * lin(ground[1]) + 0.0722 * lin(ground[2]); pale = theme === 'light' || lum > 0.23; blendPale = theme === 'light' || lum > 0.2;   // (the ending's blend: live's own test) dark = { sea: hsl(h, o.sat, 0.28), ink: hsl(h, 0.85, 0.22) };
         dotSprites(pale ? dark.sea : sea.map(v => v + (1 - v) * 0.3));
     }
 
@@ -147,6 +159,123 @@ function draw(canvas, T, S, show, newCanvas, report) {
     const disc = (n, x, y) => n === 1 ? 1 : smooth(0.5, 0.1, Math.hypot((x + 0.5) / n - 0.5, (y + 0.5) / n - 0.5));
     const KMAX = 6, kern = [];
     for (let n = 1; n <= KMAX; n++) { kern[n] = new Float32Array(n * n); for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) kern[n][y * n + x] = disc(n, x, y); }
+    /* ---- the ending (live's armada): the fleet's ship (the clipper, the route's last level before the launch) as silk cloth, 32 copies
+       sailing off across the testimonials and the footer, seen from a camera high over the sea. The ship is the same for every copy, in the
+       same view, so it is drawn once (cloth and dots, from the model) and set down 32 times a frame, each copy at its place on the course, its
+       distance's size, surging and drifting on its own clock; the canvas lies over the page there, screened (multiplied on a pale ground),
+       drawn from the block's top edge down, and moves up with the page until the page's end */
+    const ARMADA_K = 32, ARMADA_LOOP = 48, ARMADA_SPEED = 0.6, ARMADA_VIEW = { wide: { turn: 313, tilt: 34, x: -0.1, y: -0.7, unit: null }, tall: { turn: 292, tilt: 40, x: 0, y: -0.75, unit: 0.62 } };
+    const ARMADA = (() => { let a = 20260915; const rf = () => (a = (a * 16807) % 2147483647) / 2147483647, out = [], L = ARMADA_LOOP;   // live's scatter, the same seed
+        for (let tries = 0; out.length < ARMADA_K && tries < 80000; tries++) {
+            const sAlong = rf() * L, zAcross = -5.8 + rf() * 9;
+            if (out.every(o => { const ds = Math.abs(o[0] - sAlong), dl = Math.min(ds, L - ds); return Math.hypot(dl, o[1] - zAcross) > 2.8; })) out.push([sAlong, zAcross, 0.84 + 0.22 * rf(), rf()]);
+        }
+        return out; })();
+    const FL = 5;   // the fleet's level
+    let armSpr = null, armKey = '', armWinKey = '', armWin = null;
+    // the copies' loop along the course for this screen: from just before the first can enter the frame to after every one has left it (live's armadaWin)
+    function armadaWindow(V, unit, asp) {
+        const extra = Math.max(0, (S.end || 0) - (S.y + (S.clip || 0))), xN = 2 * extra / H;   // the block's part above the screen when the page has ended: a copy must clear it before it wraps (live's extraNDC)
+        const k = W + 'x' + H + ':' + unit.toFixed(3) + ':' + Math.round(extra); if (k === armWinKey) return armWin; armWinKey = k;
+        const Rf = mul(rx(V.tilt * D2R), ry(-V.turn * D2R)), visH = 2 * cam[2] * tanH, visW = visH * asp, Ax = V.x * visW / 2, Ay = V.y * visH / 2;
+        const on = (sAl, a, dAl, dUp, hl) => { const cx = sAl + dAl * hl, uy = dUp * hl, px = Ax + Rf[0] * cx + Rf[1] * uy + Rf[2] * a, py = Ay + Rf[3] * cx + Rf[4] * uy + Rf[5] * a, pz = Rf[6] * cx + Rf[7] * uy + Rf[8] * a, d = cam[2] - pz, ny = py / (d * tanH);
+            return d > 0.5 && Math.abs(px / (d * tanH * asp)) < 1.12 && ny > -1.12 && ny < 1.12 + xN; };
+        let first = Infinity, last = -Infinity;
+        for (const S of ARMADA) { const a = S[1] * unit, hl = S[2] * unit; for (let sAl = -40; sAl <= 160; sAl += 0.25) if (on(sAl, a, 0, 0.5, hl) || on(sAl, a, 1.0, 0, hl) || on(sAl, a, -0.5, 0, hl) || on(sAl, a, 0, 1.4, hl) || on(sAl, a, -1.9, 0, hl)) { if (sAl < first) first = sAl; if (sAl > last) last = sAl; } }
+        if (!Number.isFinite(first)) { first = -12; last = 28; }
+        return (armWin = { s0: first - 2, len: Math.max(ARMADA_LOOP * Math.max(unit, 0.6), last - first + 4) });
+    }
+    // the ship drawn once: its cloth (the sails' and the hull's particle grids, smoothed as live's cloth is: Catmull-Rom, each cell cut 3 x 3),
+    // flat-shaded per facet (the colour fanned from the picked hue, light at the head and deep at the foot; a plain light from the upper left; a
+    // little sheen where it turns edge-on), far facets first, then its dots; px: pixels per hull length
+    function armadaSprite(Rf, px) {
+        const pos = boat.pos[FL], WL = WATERLINE, Kc = 3, tris = [], P3 = i => [pos[i * 4], pos[i * 4 + 1] - WL, pos[i * 4 + 2]];
+        const cr = t => [((2 - t) * t - 1) * t / 2, (t * t * (3 * t - 5) + 2) / 2, ((4 - 3 * t) * t + 1) * t / 2, (t - 1) * t * t / 2];
+        let top = -Infinity; for (const sd of boat.mesh.sails) if (sd.levels[FL]) for (const i of sd.idx) top = Math.max(top, pos[i * 4 + 1]);
+        const hy = Math.max(1e-3, top - WL);
+        const grid = (idx, nu, nv, sides, hull) => {
+            const per = nu * nv;
+            for (let sdx = 0; sdx < sides; sdx++) {
+                const at = (iu, iv) => idx[sdx * per + Math.max(0, Math.min(nv - 1, iv)) * nu + Math.max(0, Math.min(nu - 1, iu))];
+                const FU = (nu - 1) * Kc + 1, FV = (nv - 1) * Kc + 1, V = [];
+                for (let fv = 0; fv < FV; fv++) for (let fu = 0; fu < FU; fu++) {
+                    const iu = Math.min(nu - 2, Math.floor(fu / Kc)), iv = Math.min(nv - 2, Math.floor(fv / Kc)), ws = cr(fu / Kc - iu), wt = cr(fv / Kc - iv), p = [0, 0, 0];
+                    for (let b = 0; b < 4; b++) for (let a = 0; a < 4; a++) { const q = P3(at(iu - 1 + a, iv - 1 + b)), w = ws[a] * wt[b]; p[0] += q[0] * w; p[1] += q[1] * w; p[2] += q[2] * w; }
+                    V.push([Rf[0] * p[0] + Rf[1] * p[1] + Rf[2] * p[2], Rf[3] * p[0] + Rf[4] * p[1] + Rf[5] * p[2], Rf[6] * p[0] + Rf[7] * p[1] + Rf[8] * p[2], fv / (FV - 1), p[1] / hy]);
+                }
+                for (let fv = 0; fv < FV - 1; fv++) for (let fu = 0; fu < FU - 1; fu++) { const a = fv * FU + fu; tris.push([V[a], V[a + 1], V[a + FU], hull], [V[a + 1], V[a + FU + 1], V[a + FU], hull]); }
+            }
+        };
+        for (const sd of boat.mesh.sails) if (sd.levels[FL]) grid(sd.idx, sd.na, sd.nup, 1, false);
+        if (boat.mesh.hull) grid(boat.mesh.hull.idx, boat.mesh.hull.nu, boat.mesh.hull.nv, 2, true);
+        if (!tris.length) return null;
+        // the sprite's extent (screen: x right, y down)
+        let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+        for (const t of tris) for (const v of t.slice(0, 3)) { x0 = Math.min(x0, v[0]); x1 = Math.max(x1, v[0]); y0 = Math.min(y0, -v[1]); y1 = Math.max(y1, -v[1]); }
+        const pad = 3, w = Math.ceil((x1 - x0) * px) + 2 * pad, h = Math.ceil((y1 - y0) * px) + 2 * pad, ox = -x0 * px + pad, oy = -y0 * px + pad;
+        const acc = new Float32Array(w * h * 4), Lx = -0.4, Ly = 0.75, Lz = 0.5, Ll = Math.hypot(Lx, Ly, Lz);
+        tris.sort((a, b) => (a[0][2] + a[1][2] + a[2][2]) - (b[0][2] + b[1][2] + b[2][2]));   // far first (toward -z, away from the camera)
+        const [A, B, C] = armCols;
+        for (const [p, q, rr, hull] of tris) {
+            const ux = q[0] - p[0], uy = q[1] - p[1], uz = q[2] - p[2], vx = rr[0] - p[0], vy = rr[1] - p[1], vz = rr[2] - p[2];
+            let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
+            if (nz < 0) { nx = -nx; ny = -ny; nz = -nz; }   // the side facing the camera (cloth is two-sided)
+            const lit = 0.45 + 0.85 * Math.max(0, (nx * Lx + ny * Ly + nz * Lz) / Ll), sheen = Math.min(1, 0.5 * Math.pow(1 - nz, 2.5)) * 0.65;
+            const f = (p[3] + q[3] + rr[3]) / 3 * 0.7 + (p[4] + q[4] + rr[4]) / 3 * 0.3, y = 1 - Math.min(1, Math.max(0, f));   // up the sail (and a little up the rig): 0 head .. 1 foot
+            const col = [0, 1, 2].map(k => { let c = hull ? C[k] * 0.7 : (A[k] + (B[k] - A[k]) * smooth(0, 0.55, y)) * (1 - smooth(0.45, 1, y)) + C[k] * smooth(0.45, 1, y);
+                if (!hull) c *= 1 - 0.32 * smooth(0.6, 1, y); c = Math.min(1, c * (1 + (lit - 1) * 0.9)); return c + (1 - c) * sheen; });
+            fillTri(acc, w, h, p[0] * px + ox, -p[1] * px + oy, q[0] * px + ox, -q[1] * px + oy, rr[0] * px + ox, -rr[1] * px + oy, col, 0.95);
+        }
+        // its dots: the clipper's solid particles, as light on the cloth
+        const lit2 = ink.map(v => v + (1 - v) * 0.45);
+        for (let i = 0; i < SHIP_N; i += 2) {
+            const rl = role(i); if (rl === 6 || rl === 7 || rl === 8 || pos[i * 4 + 3] < 0.03) continue;
+            const x = pos[i * 4], y = pos[i * 4 + 1] - WL, zz = pos[i * 4 + 2], sx = (Rf[0] * x + Rf[1] * y + Rf[2] * zz) * px + ox, sy = -(Rf[3] * x + Rf[4] * y + Rf[5] * zz) * px + oy;
+            const X = sx | 0, Y = sy | 0; if (X < 0 || Y < 0 || X >= w || Y >= h) continue;
+            const q4 = (Y * w + X) * 4, a = 0.35 * pos[i * 4 + 3], k = 1 - a; for (let c = 0; c < 3; c++) acc[q4 + c] = lit2[c] * a + acc[q4 + c] * k; acc[q4 + 3] = a + acc[q4 + 3] * k;
+        }
+        const cv = newCanvas(w, h), g = cv.getContext('2d'), im = g.createImageData(w, h), d32 = new Uint32Array(im.data.buffer);
+        for (let q = 0; q < w * h; q++) { const a = acc[q * 4 + 3]; if (!(a > 0.003)) continue; const ia = 255 / a; d32[q] = (Math.min(255, a * 255) << 24) | (Math.min(255, acc[q * 4 + 2] * ia) << 16) | (Math.min(255, acc[q * 4 + 1] * ia) << 8) | Math.min(255, acc[q * 4] * ia); }
+        g.putImageData(im, 0, 0);
+        return { cv, ox, oy, px };
+    }
+    // a triangle of one colour laid over the buffer (premultiplied), its edges covered by the pixel centres inside it
+    function fillTri(acc, w, h, ax, ay, bx, by, cx, cy, col, al) {
+        const area = (bx - ax) * (cy - ay) - (cx - ax) * (by - ay); if (Math.abs(area) < 1e-6) return; const ia = 1 / area;
+        const x0 = Math.max(0, Math.floor(Math.min(ax, bx, cx))), x1 = Math.min(w - 1, Math.ceil(Math.max(ax, bx, cx))), y0 = Math.max(0, Math.floor(Math.min(ay, by, cy))), y1 = Math.min(h - 1, Math.ceil(Math.max(ay, by, cy)));
+        for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+            const px = x + 0.5, py = y + 0.5, w0 = ((bx - px) * (cy - py) - (cx - px) * (by - py)) * ia, w1 = ((cx - px) * (ay - py) - (ax - px) * (cy - py)) * ia;
+            if (w0 < 0 || w1 < 0 || w0 + w1 > 1) continue;
+            const q = (y * w + x) * 4, k = 1 - al; acc[q] = col[0] * al + acc[q] * k; acc[q + 1] = col[1] * al + acc[q + 1] * k; acc[q + 2] = col[2] * al + acc[q + 2] * k; acc[q + 3] = al + acc[q + 3] * k;
+        }
+    }
+    let armCols = null;
+    function armadaFrame(t) {
+        ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; ctx.clearRect(0, 0, W, H);
+        const asp = W / H, tall = H > W, V = tall ? ARMADA_VIEW.tall : ARMADA_VIEW.wide, visH = 2 * cam[2] * tanH, visW = visH * asp, unit = V.unit || Math.max(0.4, Math.min(1, visW / 12));
+        const Rf = mul(rx(V.tilt * D2R), ry(-V.turn * D2R)), win = armadaWindow(V, unit, asp), Ax = V.x * visW / 2, Ay = V.y * visH / 2;
+        const sprPx = Math.round(H / (2 * 6 * tanH) * unit * 1.1), key = colorKey + '|' + sprPx + '|' + (tall ? 't' : 'w');   // the sprite at about the nearest copy's size
+        if (key !== armKey) { armKey = key; const h0 = hueNow; armCols = [hsl((h0 - 0.07 + 1) % 1, 0.95, 0.66), hsl(h0, 0.95, 0.52), hsl((h0 + 0.09) % 1, 0.9, 0.4)]; armSpr = armadaSprite(Rf, sprPx); }
+        if (!armSpr) return;
+        const below = Math.max(0, (S.end || 0) - S.y), clipY = Math.max(0, S.clip || 0);   // the page still below the screen: the shot sits lower by that; drawn only below the block's top
+        if (clipY >= H) return;
+        ctx.save(); ctx.beginPath(); ctx.rect(0, clipY, W, H - clipY); ctx.clip();
+        const list = [];
+        for (let k = 0; k < ARMADA.length; k++) {
+            const A = ARMADA[k], h = A[3], rel = ((A[0] * win.len / ARMADA_LOOP + t * ARMADA_SPEED) % win.len + win.len) % win.len;
+            const cx = win.s0 + rel + 0.45 * Math.sin(t * (0.05 + 0.04 * h) + 6.283 * h), cy = 0.02 * Math.sin(t * (0.8 + 0.3 * h) + 9 * h), cz = A[1] * unit + 0.08 * Math.sin(t * (0.04 + 0.04 * h) + 4.1 * h), hl = A[2] * unit;
+            const wx = Ax + Rf[0] * cx + Rf[1] * cy + Rf[2] * cz, wy = Ay + Rf[3] * cx + Rf[4] * cy + Rf[5] * cz, wz = Rf[6] * cx + Rf[7] * cy + Rf[8] * cz, d = cam[2] - wz; if (d < 0.5) continue;
+            list.push([d, (wx / (d * tanH * asp) * 0.5 + 0.5) * W, (0.5 - wy / (d * tanH) * 0.5) * H + below, hl * H / (2 * d * tanH)]);
+        }
+        list.sort((a, b) => b[0] - a[0]);   // far ones first
+        for (const [, sx, sy, pxl] of list) {
+            const s = pxl / armSpr.px, w = armSpr.cv.width * s, hgt = armSpr.cv.height * s, x = sx - armSpr.ox * s, y = sy - armSpr.oy * s;
+            if (x > W || y > H || x + w < 0 || y + hgt < clipY) continue;
+            ctx.drawImage(armSpr.cv, x, y, w, hgt);
+        }
+        ctx.restore();
+    }
+
     const SPR_MAX = 16, sprites = [];
     function dotSprites(c) {
         for (let n = KMAX + 1; n <= SPR_MAX * 4; n = n < SPR_MAX ? n + 1 : n === SPR_MAX ? SPR_MAX * 4 : Infinity) {
@@ -202,7 +331,7 @@ function draw(canvas, T, S, show, newCanvas, report) {
     for (let i = 0; i <= 4096; i++) FAR_T[i] = Math.exp(-i / 16 / o.dotFar);
     const far = d => { const u = d * 16; return u < 4096 ? FAR_T[u | 0] : 0; };
     const VMIN = 0.012, big = [], paths = [];   // a dot fainter than this adds under 2 of 255 to a pixel | this frame's big dots (x, y, size, light) | the lines' paths
-    let phE = 0, phR = 0, shownZ = 1, fps = 60, judge = { n: 0, work: 0, late: 0 }, last = 0, prevRaf = 0, vs = 0, tick = 0, t0 = performance.now(), raf = 0, shown = true, prof = null;
+    let phE = 0, phR = 0, shownZ = 1, shownBlend = '', fps = 60, judge = { n: 0, work: 0, late: 0 }, last = 0, prevRaf = 0, vs = 0, tick = 0, t0 = performance.now(), raf = 0, shown = true, prof = null;
     // a worker has requestAnimationFrame where it can draw to a canvas the page handed over (Chrome, Firefox); else a timer at the refresh
     const RAF = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : f => setTimeout(() => f(performance.now()), 1000 / 60);
     const CAF = typeof cancelAnimationFrame === 'function' ? cancelAnimationFrame : clearTimeout;
@@ -220,9 +349,13 @@ function draw(canvas, T, S, show, newCanvas, report) {
         const r = pose(), t = (now - t0) / 1000, tt = t * o.clock;
         // over the hero the layer sits above the page, below it behind the page (as live's flips, at once, by the scroll); the launch and the
         // armada at the page's end are not drawn here yet
-        const z = K.layerZ !== undefined ? rowsAt(S.y)[0][K.layerZ] : 1, vis = r.rocket < 0.5 && z < 2;
-        if (vis !== shown || z !== shownZ) { shown = vis; shownZ = z; show(vis, z); } if (!vis) return;
+        // the ending begins as live's does, when the testimonials block's top comes on screen (whatever this page's length); before it the launch,
+        // behind the page's grounds, is not drawn
+        const ending = S.clip !== undefined && S.clip < S.h, z = ending ? 12 : Math.min(1, K.layerZ !== undefined ? rowsAt(S.y)[0][K.layerZ] : 1), vis = ending || r.rocket < 0.5;
         color();
+        const blend = ending ? (blendPale ? 'multiply' : 'screen') : '';
+        if (vis !== shown || z !== shownZ || blend !== shownBlend) { shown = vis; shownZ = z; shownBlend = blend; show(vis, z, blend); } if (!vis) return;
+        if (ending) { const a0 = S.prof && performance.now(); armadaFrame(t); if (S.prof) { const P = prof || (prof = { n: 0, dots: 0, ship: 0, fleet: 0, buf: 0, lines: 0 }); P.n++; P.armada = (P.armada || 0) + performance.now() - a0; if (P.n % 30 === 0) report({ ...P, fps }); } return; }
         const visH = 2 * cam[2] * tanH, visW = visH * W / H;
 
         /* the scene's sway and bob, the hull's ride (the live layer's formulas, at rest) */
