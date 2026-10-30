@@ -1,8 +1,7 @@
 const THEME_STORAGE_KEY = 'portfolio-theme-primary';
 const HUE_STORAGE_KEY = 'portfolio-theme-hue';
 const FALLBACK_THEME_COLOR = '#4faad1';
-const GREY_CHROMA = 0.04;   // below this spread (max - min channel, 0..1) a hex's own hue is noise: the picker's hue stands in
-const GREY_TINT_S = 14;     // a grey pick's buttons, links and shades keep this much saturation (%) of the picker's hue; the ground stays the grey
+const GREY_CHROMA = 0.04;   // below this spread (max - min channel, 0..1) a hex's own hue is noise: the picker's hue stands in (the page stays grey; the particles, ship, silk, clouds and ink take the hue from --primary-hue)
 
 let currentColor = null;
 let currentHue = null;   // the picker's hue, kept apart from the hex: a grey (the spectrum's left and bottom edges) has none, and reads back as 0, red
@@ -427,13 +426,8 @@ function updateColors(color, options) {
     options = options || {};
     const selectedColor = limitBrightness(color);
     const grey = isGrey(selectedColor) && currentHue !== null;
-    let derivedFrom = selectedColor;
-    if (grey) {
-        const [, s, l] = hexToHsl(selectedColor);
-        derivedFrom = hslToHex(currentHue, Math.max(s, GREY_TINT_S), Math.min(Math.max(l, 4), 96));   // pure black / white have no room for a tint
-    }
-    const shades = calculateShades(derivedFrom);
-    const buttonColors = calculateButtonColors(derivedFrom);
+    const shades = calculateShades(selectedColor);
+    const buttonColors = calculateButtonColors(selectedColor);
     const linkColor = calculateLinkColor(shades.default);
     const neutralColor = calculateNeutralColor(selectedColor);
     const bgStrongOpacity = hexToRgba(shades.tint, 0.9);

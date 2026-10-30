@@ -88,10 +88,15 @@ function start() {
         const picked = parseColor(root.getPropertyValue('--primary-color')) || parseColor(root.getPropertyValue('--button-color')) || [79, 170, 209, 1];
         const ground = groundAt(Math.min(innerWidth - 1, Math.max(0, mouse.x + WIDTH / 2)), Math.min(innerHeight - 1, Math.max(0, mouse.y + WIDTH / 2)));
         const ph = parseFloat(root.getPropertyValue('--primary-hue')), [h0, s0] = toHsl(picked), h = s0 < 0.05 && isFinite(ph) ? ph / 360 : h0, s = Math.max(s0, 0.75), dark = lum(ground) < 0.3;
-        let l = dark ? 0.58 : 0.42, rgb = toRgb([h, s, l]);
-        for (let k = 0; k < 16 && contrast(rgb, ground) < CONTRAST; k++) { l = dark ? Math.min(0.94, l + 0.025) : Math.max(0.08, l - 0.025); rgb = toRgb([h, s, l]); }   // push the lightness away from the ground until it stands out
-        // over a link what shows is |ground - ink|, so the ink sits that colour away from the ground in each channel, as far as 0-255 allows
-        const inkRgb = rgb.map((v, c) => { const g = ground[c]; return Math.round(!over ? v : g + v <= 255 ? g + v : g - v >= 0 ? g - v : 255 - g > g ? 255 : 0); }), ink = `rgb(${inkRgb.join(', ')})`;
+        const away = up => { let l = up ? 0.58 : 0.42, rgb = toRgb([h, s, l]);
+            for (let k = 0; k < 16 && contrast(rgb, ground) < CONTRAST; k++) { l = up ? Math.min(0.94, l + 0.025) : Math.max(0.08, l - 0.025); rgb = toRgb([h, s, l]); }   // push the lightness away from the ground until it stands out
+            return rgb; };
+        const fits = rgb => rgb.every((v, c) => ground[c] + v <= 255 || ground[c] - v >= 0);
+        let rgb = away(dark);
+        if (over && !fits(rgb)) { const other = away(!dark); if (fits(other)) rgb = other; }   // on a mid ground a light ink can't show through the difference, a deep one can
+        // over a link what shows is |ground - ink|, so the ink sits that colour away from the ground in each channel; where 0-255 can't reach it,
+        // the ink that shows farthest from the ground: ink = ground shows 0, ink = 255 shows 255 - ground (ink 0 shows the ground itself, so the blob vanished on a mid-grey button)
+        const inkRgb = rgb.map((v, c) => { const g = ground[c]; return Math.round(!over ? v : g + v <= 255 ? g + v : g - v >= 0 ? g - v : g >= 85 ? g : 255); }), ink = `rgb(${inkRgb.join(', ')})`;
         inkTo = inkRgb.map(v => v / 255); if (snap || !inkNow) inkNow = inkTo.slice();   // the canvas eases to it as the spans' background-color transition does
         if (snap) cursor.classList.add('is-snap');
         cursor.classList.toggle('is-link', over);
