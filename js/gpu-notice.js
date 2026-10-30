@@ -2,7 +2,7 @@
  * then runs its lighter CPU version, and the notice says how to turn acceleration on for the full one. A page cannot change the setting itself,
  * nor open the browser's settings page, so it gives the address to paste, with a button that copies it.
  *
- * Shown once a few seconds in, on a desktop browser that can turn acceleration off (not Safari, not a phone), until it is closed (remembered
+ * Shown as the page opens, on a desktop browser that can turn acceleration off (not Safari, not a phone), until it is closed (remembered
  * in localStorage). ?gpunotice=1 shows it anyway, for a look at it.
  */
 (function () {
@@ -86,6 +86,6 @@
         }); });
     }
 
-    function start() { if (force || noAcceleration()) setTimeout(show, force ? 300 : 4000); }
-    if (document.readyState === 'complete') start(); else addEventListener('load', start, { once: true });
+    // at once, right after the page's first paint (the probe makes a WebGL context, which can take a moment on exactly these machines)
+    if (force) show(); else requestAnimationFrame(function () { setTimeout(function () { if (noAcceleration()) show(); }, 0); });
 })();
