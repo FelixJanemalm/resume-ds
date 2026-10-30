@@ -22,12 +22,6 @@
     <link rel="stylesheet" href="../css/drawer.css">
     <link rel="stylesheet" href="../css/case-study-page.css">
     <link rel="stylesheet" href="../css/footer.css">
-    <!-- Leaflet is not loaded. Its only use is initJourneyMap() further down, which is reached solely through
-         switchDemoTab('map', ...) — and nothing calls switchDemoTab any more: the demo tab strip is gone from this
-         page (only its CSS is left) and there is no #cs-journey-map element for the map to mount on. So the
-         stylesheet and the ~140 KB of script were fetched from a third origin on every view of this case study to
-         draw a map that cannot appear. initJourneyMap() is left in place; put the tab markup back and these two
-         tags with it. -->
     <style>
         /* ─── Rejected-constraint list (things the solution does NOT assume) ─── */
         .cs-constraint-tags {
@@ -435,10 +429,6 @@
         /* ─── Sankey (ported from batch-story) ───
            Scoped to .cs-page, not :root: --text is set on body (case-study-page.css), so at :root these resolved to nothing. */
         .cs-page {
-            --sankey-primary: #CB945C;
-            --sankey-bg-secondary: color-mix(in srgb, var(--text) 4%, transparent);
-            --sankey-bg-tertiary: color-mix(in srgb, var(--text) 7%, transparent);
-            --sankey-border: color-mix(in srgb, var(--text) 12%, transparent);
             --sankey-text-primary: var(--text);
             --sankey-text-secondary: color-mix(in srgb, var(--text) 55%, transparent);
         }
@@ -577,81 +567,6 @@
                 z-index: 2;
             }
         }
-
-        /* ─── Material tree (ported from batch-story) ─── */
-        .tree-container { margin-top: 1.5rem; }
-        .tree-node {
-            border: 1px solid var(--sankey-border);
-            border-radius: 10px;
-            padding: 14px 16px;
-            margin-bottom: 6px;
-            cursor: pointer;
-            transition: border-color 0.2s, background 0.2s;
-            background: color-mix(in srgb, var(--text) 3%, transparent);
-        }
-        .tree-node:hover { border-color: #CB945C; background: color-mix(in srgb, #CB945C 5%, transparent); }
-        .tree-level-1 { margin-left: 0; border-left: 3px solid #CB945C; }
-        .tree-level-2 { margin-left: 20px; border-left: 3px solid #2f8112; }
-        .tree-level-3 { margin-left: 40px; border-left: 3px solid #3b82f6; }
-        .tree-node-title { font-weight: 600; font-size: 0.9rem; margin-bottom: 4px; }
-        .tree-node-subtitle { font-size: 0.8rem; color: var(--sankey-text-secondary); }
-        .tree-node-details { display: none; margin-top: 10px; font-size: 0.82rem; line-height: 1.6; }
-        .tree-node.expanded .tree-node-details { display: block; }
-        .tree-badge {
-            display: inline-block;
-            background: color-mix(in srgb, #2f8112 15%, transparent);
-            color: #2f8112;
-            border: 1px solid color-mix(in srgb, #2f8112 30%, transparent);
-            border-radius: 4px;
-            padding: 1px 7px;
-            font-size: 0.72rem;
-            font-weight: 600;
-            margin: 2px;
-        }
-        .tree-expand-hint {
-            font-size: 0.72rem;
-            color: var(--sankey-text-secondary);
-            margin-top: 4px;
-            font-style: italic;
-        }
-
-        /* ─── Journey map ─── */
-        .map-container {
-            border-radius: 12px;
-            overflow: hidden;
-            margin-top: 1.5rem;
-            border: 1px solid var(--sankey-border);
-        }
-        #cs-journey-map {
-            height: 380px;
-            width: 100%;
-        }
-        .leaflet-container { background: color-mix(in srgb, var(--text) 8%, transparent) !important; }
-
-        /* ─── Demo section tabs ─── */
-        .cs-demo-tabs {
-            display: flex;
-            gap: 0;
-            border-bottom: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
-            margin-bottom: 1.5rem;
-            overflow-x: auto;
-        }
-        .cs-demo-tab-btn {
-            padding: 0.65rem 1.1rem;
-            font-size: 0.82rem;
-            font-weight: 600;
-            background: none;
-            border: none;
-            border-bottom: 2px solid transparent;
-            cursor: pointer;
-            color: color-mix(in srgb, var(--text) 50%, transparent);
-            white-space: nowrap;
-            transition: color 0.2s, border-color 0.2s;
-        }
-        .cs-demo-tab-btn:hover { color: var(--text); }
-        .cs-demo-tab-btn.active { color: var(--text); border-bottom-color: #CB945C; }
-        .cs-demo-tab-panel { display: none; }
-        .cs-demo-tab-panel.active { display: block; }
 
         /* ─── Stats bar in QR section ─── */
         .cs-qr-stats {
@@ -1149,19 +1064,8 @@
     <script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js" defer></script>
 
     <script>
-    // ─── Demo tab switcher ────────────────────────────────────────────────────
-    function switchDemoTab(name, btn) {
-        document.querySelectorAll('.cs-demo-tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.cs-demo-tab-panel').forEach(p => p.classList.remove('active'));
-        btn.classList.add('active');
-        document.getElementById('demo-' + name).classList.add('active');
-        if (name === 'map' && !window._mapInitialized) initJourneyMap();
-        if (name === 'sankey' && !window._sankeyInitialized) initSankey();
-    }
-
     // ─── Supply chain Sankey (static demo data from real batches) ────────────
     function initSankey() {
-        window._sankeyInitialized = true;
         const container = document.getElementById('cs-sankey-diagram');
         container.innerHTML = '';
 
@@ -1367,149 +1271,6 @@
         });
     }
 
-    // ─── Material family tree (static demo data) ─────────────────────────────
-    function initMaterialTree() {
-        const c = document.getElementById('cs-material-tree');
-        c.innerHTML = `
-        <div class="tree-node tree-level-1" onclick="this.classList.toggle('expanded')">
-            <div class="tree-node-title">🧥 Garment Construction</div>
-            <div class="tree-node-subtitle">3 materials · 5 fiber sources · 6 certifications</div>
-            <div class="tree-expand-hint">Click to expand</div>
-            <div class="tree-node-details">
-                <span class="tree-badge">✓ GOTS</span>
-                <span class="tree-badge">✓ FSC</span>
-                <span class="tree-badge">✓ OEKO-TEX</span>
-                <span class="tree-badge">✓ Bluesign</span>
-                <p style="font-size:13px;margin-top:8px;opacity:0.7;">Materials that make up the garment itself — traced to fiber level</p>
-            </div>
-        </div>
-
-        <div class="tree-node tree-level-2" onclick="this.classList.toggle('expanded')">
-            <div class="tree-node-title">📦 Rib Knit Fabric — Main Body</div>
-            <div class="tree-node-subtitle">Primary fabric · Colorway: Sand · 0.42 kg CO₂e</div>
-            <div class="tree-expand-hint">Click to expand</div>
-            <div class="tree-node-details">
-                <p style="font-size:13px;margin-bottom:6px;"><strong>🏭 Mill:</strong> Certified knit fabric manufacturer</p>
-                <p style="font-size:13px;margin-bottom:6px;">📍 Portugal</p>
-                <p style="font-size:13px;margin-bottom:6px;"><strong>Quantity:</strong> ~2 yards per garment</p>
-                <p style="font-size:13px;margin-bottom:6px;"><strong>🌍 Origin:</strong> Portugal</p>
-                <p style="font-size:13px;margin-bottom:6px;"><strong>🔍 Traced to:</strong> Fiber level</p>
-                <span class="tree-badge">✓ OEKO-TEX 100</span>
-                <span class="tree-badge">✓ Bluesign</span>
-            </div>
-        </div>
-
-        <div class="tree-node tree-level-3" onclick="this.classList.toggle('expanded')">
-            <div class="tree-node-title">🧵 Organic Cotton (66%) · 0.28 kg CO₂e</div>
-            <div class="tree-node-subtitle">Certified organic farming · India</div>
-            <div class="tree-expand-hint">Click to expand</div>
-            <div class="tree-node-details">
-                <p style="font-size:13px;margin-bottom:6px;">📍 Gujarat, India — regional cotton mills</p>
-                <p style="font-size:13px;margin-bottom:6px;">🔍 Traced to: farm region</p>
-                <span class="tree-badge">✓ GOTS certified</span>
-            </div>
-        </div>
-
-        <div class="tree-node tree-level-3" onclick="this.classList.toggle('expanded')">
-            <div class="tree-node-title">🧵 Tencel™ Lyocell (26%) · 0.09 kg CO₂e</div>
-            <div class="tree-node-subtitle">FSC certified closed-loop · Lenzing, Austria</div>
-            <div class="tree-expand-hint">Click to expand</div>
-            <div class="tree-node-details">
-                <p style="font-size:13px;margin-bottom:6px;">📍 Lenzing, Austria — Lenzing AG</p>
-                <p style="font-size:13px;margin-bottom:6px;">🔍 Traced to: manufacturing facility</p>
-                <p style="font-size:13px;margin-bottom:6px;">Produced in a closed-loop process — 99% of solvent recovered and reused</p>
-                <span class="tree-badge">✓ FSC certified</span>
-                <span class="tree-badge">✓ EU Ecolabel</span>
-            </div>
-        </div>
-
-        <div class="tree-node tree-level-3" onclick="this.classList.toggle('expanded')">
-            <div class="tree-node-title">🧵 Creora® Spandex (8%) · 0.05 kg CO₂e</div>
-            <div class="tree-node-subtitle">30% bio-based · Đồng Nai, Vietnam</div>
-            <div class="tree-expand-hint">Click to expand</div>
-            <div class="tree-node-details">
-                <p style="font-size:13px;margin-bottom:6px;">📍 Đồng Nai Province, Vietnam — Hyosung</p>
-                <p style="font-size:13px;margin-bottom:6px;">🔍 Traced to: manufacturing facility</p>
-                <p style="font-size:13px;margin-bottom:6px;">30% bio-based corn content reduces fossil fuel dependency</p>
-            </div>
-        </div>
-
-        <div class="tree-node tree-level-2" onclick="this.classList.toggle('expanded')">
-            <div class="tree-node-title">📦 Elastic Waistband</div>
-            <div class="tree-node-subtitle">Waistband component · Natural rubber + Tencel + Cotton · 0.18 kg CO₂e</div>
-            <div class="tree-expand-hint">Click to expand</div>
-            <div class="tree-node-details">
-                <p style="font-size:13px;margin-bottom:6px;"><strong>🏭 Manufacturer:</strong> Dyreko Limited</p>
-                <p style="font-size:13px;margin-bottom:6px;">📍 Meizhou, Guangdong, China</p>
-                <p style="font-size:13px;margin-bottom:6px;"><strong>🌍 Traced to:</strong> Component manufacturer</p>
-                <span class="tree-badge">✓ FSC (rubber)</span>
-            </div>
-        </div>
-
-        <div class="tree-node tree-level-3" onclick="this.classList.toggle('expanded')">
-            <div class="tree-node-title">🧵 Natural Rubber — Yulex (50%)</div>
-            <div class="tree-node-subtitle">FSC certified hevea rubber · Thailand / Vietnam</div>
-            <div class="tree-expand-hint">Click to expand</div>
-            <div class="tree-node-details">
-                <p style="font-size:13px;margin-bottom:6px;">📍 Thailand / Vietnam — Yulex Corporation</p>
-                <p style="font-size:13px;margin-bottom:6px;">🔍 Traced to: plantation level</p>
-                <span class="tree-badge">✓ FSC certified</span>
-            </div>
-        </div>
-
-        <div class="tree-node tree-level-1 dashed-border" onclick="this.classList.toggle('expanded')">
-            <div class="tree-node-title">📦 Packaging</div>
-            <div class="tree-node-subtitle">2 items · Recyclable / compostable materials</div>
-            <div class="tree-expand-hint">Click to expand</div>
-            <div class="tree-node-details">
-                <p style="font-size:13px;opacity:0.7;">Hang tag (recycled paper) and shipping mailer (compostable) — both sourced to reduce end-of-life impact</p>
-            </div>
-        </div>
-        `;
-    }
-
-    // ─── Journey map ─────────────────────────────────────────────────────────
-    function initJourneyMap() {
-        window._mapInitialized = true;
-        // Dark tiles when the page background is dark (the OS setting doesn't decide it)
-        const bg = getComputedStyle(document.body).backgroundColor.match(/[\d.]+/g) || [16, 16, 18];
-        const isDark = (0.299 * bg[0] + 0.587 * bg[1] + 0.114 * bg[2]) < 128;
-
-        const map = L.map('cs-journey-map', { scrollWheelZoom: false }).setView([30, 60], 2);
-        L.tileLayer(
-            isDark
-                ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-                : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-            { attribution: '© OpenStreetMap contributors © CARTO', maxZoom: 10 }
-        ).addTo(map);
-
-        const stops = [
-            { latlng: [20.59, 78.96],   label: '1. India',           detail: 'Organic Cotton — GOTS certified farming',      color: '#CB945C' },
-            { latlng: [48.00, 13.80],   label: '2. Lenzing, Austria', detail: 'Tencel Lyocell production — FSC certified',    color: '#CB945C' },
-            { latlng: [10.96, 107.00],  label: '3. Vietnam',          detail: 'Creora® Spandex — 30% bio-based',             color: '#CB945C' },
-            { latlng: [14.06, 100.40],  label: '4. Thailand',         detail: 'Natural Rubber (Yulex) — FSC certified',      color: '#CB945C' },
-            { latlng: [23.13, 113.26],  label: '5. Guangzhou, China', detail: 'Tencel yarn production for elastic',          color: '#2f8112' },
-            { latlng: [24.29, 116.12],  label: '6. Meizhou, China',   detail: 'Elastic waistband — Dyreko Limited',          color: '#2f8112' },
-            { latlng: [39.40, -8.22],   label: '7. Portugal',         detail: 'Knitting + Cut & Sew Assembly + Dyeing',      color: '#3b82f6' },
-            { latlng: [37.09, -95.71],  label: '8. United States',    detail: 'Warehouse → Consumer',                       color: '#9333ea' },
-        ];
-
-        const icon = color => L.divIcon({
-            html: `<div style="width:12px;height:12px;background:${color};border:2px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.4)"></div>`,
-            iconSize: [12, 12], iconAnchor: [6, 6], className: ''
-        });
-
-        stops.forEach(s => {
-            L.marker(s.latlng, { icon: icon(s.color) })
-                .addTo(map)
-                .bindPopup(`<strong>${s.label}</strong><br>${s.detail}`, { maxWidth: 200 });
-        });
-
-        // Draw route lines
-        const coords = stops.map(s => s.latlng);
-        L.polyline(coords, { color: '#CB945C', weight: 1.5, opacity: 0.5, dashArray: '5,6' }).addTo(map);
-    }
-
     // ─── Bounce-loop playback for [data-bounce] videos ────────────────────────
     // Plays forward → on `ended`, reverse-steps via rAF back to start → forward again, ad infinitum.
     // rAF stepping is used because most browsers clamp negative playbackRate to 0 (no native reverse).
@@ -1563,7 +1324,6 @@
         // Re-run swipe-hint wiring now that initSankey has rendered the Sankey's
         // scroll container; the shared script ran before that element existed.
         if (typeof window.initSwipeHints === 'function') window.initSwipeHints();
-        window._sankeyInitialized = true;
     });
     </script>
 
