@@ -37,9 +37,9 @@ export function mountSilk2D(host, { strength = 1, ribbon } = {}) {   // ribbon: 
     const NU = 110, NV = 14, NVERT = (NU + 1) * (NV + 1), K = 0.4;   // the grid over the sheet; the buffer's scale (the sheet is soft: 0.4 of the section's size, stretched, reads as at half)
     const P = new Float32Array(NVERT * 3), S = new Float32Array(NVERT * 3), Cc = new Float32Array(NVERT * 4);   // per corner: its place, its place on the screen (x, y, depth), its colour and alpha
     const order = new Int32Array(NU * NV), depth = new Float32Array(NU * NV);
-    let W = 0, H = 0, img = null, px = null, acc = null, cols = null, key = '';
+    let W = 0, H = 0, img = null, px = null, acc = null, tmp = null, cols = null, key = '', bx0 = 0, by0 = 0, bx1 = 0, by1 = 0;   // bx/by: the part of the buffer drawn this frame
     const tanH = Math.tan(17.5 * Math.PI / 180), CAM = 12;
-    function size() { const w = host.clientWidth, h = host.clientHeight; if (!w || !h) return; W = canvas.width = Math.max(1, Math.round(w * K)); H = canvas.height = Math.max(1, Math.round(h * K)); img = ctx.createImageData(W, H); px = new Uint32Array(img.data.buffer); acc = new Float32Array(W * H * 4); }
+    function size() { const w = host.clientWidth, h = host.clientHeight; if (!w || !h) return; W = canvas.width = Math.max(1, Math.round(w * K)); H = canvas.height = Math.max(1, Math.round(h * K)); img = ctx.createImageData(W, H); px = new Uint32Array(img.data.buffer); acc = new Float32Array(W * H * 4); tmp = new Float32Array(W * H * 4); }
     function color() {
         let c = '', ph = NaN; try { c = getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim(); ph = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--primary-hue')); } catch (e) {}
         if (c + ph === key) return; key = c + ph;
@@ -85,45 +85,75 @@ export function mountSilk2D(host, { strength = 1, ribbon } = {}) {   // ribbon: 
         }
     }
     // one triangle, its colour and alpha linear across it, laid over what is under it (premultiplied light in acc)
-    function tri(a, b, c) {
+    function tri(a, b, c) {   // (per row: the span inside the three edges solved at once, the colour and alpha stepped along it)
         const ax = S[a * 3], ay = S[a * 3 + 1], bx = S[b * 3], by = S[b * 3 + 1], cx = S[c * 3], cy = S[c * 3 + 1];
         const area = (bx - ax) * (cy - ay) - (cx - ax) * (by - ay); if (Math.abs(area) < 1e-6) return;
         const x0 = Math.max(0, Math.floor(Math.min(ax, bx, cx))), x1 = Math.min(W - 1, Math.ceil(Math.max(ax, bx, cx))), y0 = Math.max(0, Math.floor(Math.min(ay, by, cy))), y1 = Math.min(H - 1, Math.ceil(Math.max(ay, by, cy)));
         if (x1 < x0 || y1 < y0) return;
+        if (x0 < bx0) bx0 = x0; if (y0 < by0) by0 = y0; if (x1 > bx1) bx1 = x1; if (y1 > by1) by1 = y1;
         const ia = 1 / area, A4 = a * 4, B4 = b * 4, C4 = c * 4;
+        const d0 = (by - cy) * ia, d1 = (cy - ay) * ia, d2 = -d0 - d1;   // each weight's step along a row
+        const cR = Cc[A4] * Cc[A4 + 3], cG = Cc[A4 + 1] * Cc[A4 + 3], cB = Cc[A4 + 2] * Cc[A4 + 3];   // (the colour carried premultiplied, so it steps linearly)
+        const eR = Cc[B4] * Cc[B4 + 3], eG = Cc[B4 + 1] * Cc[B4 + 3], eB = Cc[B4 + 2] * Cc[B4 + 3], fR = Cc[C4] * Cc[C4 + 3], fG = Cc[C4 + 1] * Cc[C4 + 3], fB = Cc[C4 + 2] * Cc[C4 + 3];
+        const aA = Cc[A4 + 3], aB = Cc[B4 + 3], aC = Cc[C4 + 3];
+        const sR = d0 * cR + d1 * eR + d2 * fR, sG = d0 * cG + d1 * eG + d2 * fG, sB = d0 * cB + d1 * eB + d2 * fB, sA = d0 * aA + d1 * aB + d2 * aC;
         for (let y = y0; y <= y1; y++) {
-            const py = y + 0.5;
-            for (let x = x0; x <= x1; x++) {
-                const pxx = x + 0.5;
-                const w0 = ((bx - pxx) * (cy - py) - (cx - pxx) * (by - py)) * ia, w1 = ((cx - pxx) * (ay - py) - (ax - pxx) * (cy - py)) * ia, w2 = 1 - w0 - w1;
-                if (w0 < 0 || w1 < 0 || w2 < 0) continue;
-                const al = w0 * Cc[A4 + 3] + w1 * Cc[B4 + 3] + w2 * Cc[C4 + 3]; if (al < 0.003) continue;
-                const q = (y * W + x) * 4, k = 1 - al;
-                acc[q] = (w0 * Cc[A4] + w1 * Cc[B4] + w2 * Cc[C4]) * al + acc[q] * k;
-                acc[q + 1] = (w0 * Cc[A4 + 1] + w1 * Cc[B4 + 1] + w2 * Cc[C4 + 1]) * al + acc[q + 1] * k;
-                acc[q + 2] = (w0 * Cc[A4 + 2] + w1 * Cc[B4 + 2] + w2 * Cc[C4 + 2]) * al + acc[q + 2] * k;
-                acc[q + 3] = al + acc[q + 3] * k;
+            const py = y + 0.5, px0 = x0 + 0.5;
+            const w0 = ((bx - px0) * (cy - py) - (cx - px0) * (by - py)) * ia, w1 = ((cx - px0) * (ay - py) - (ax - px0) * (cy - py)) * ia, w2 = 1 - w0 - w1;
+            let lo = 0, hi = x1 - x0;   // the span's ends, in steps from x0
+            if (d0 > 0) lo = Math.max(lo, Math.ceil(-w0 / d0 - 1e-9)); else if (d0 < 0) hi = Math.min(hi, Math.floor(w0 / -d0 + 1e-9)); else if (w0 < 0) continue;
+            if (d1 > 0) lo = Math.max(lo, Math.ceil(-w1 / d1 - 1e-9)); else if (d1 < 0) hi = Math.min(hi, Math.floor(w1 / -d1 + 1e-9)); else if (w1 < 0) continue;
+            if (d2 > 0) lo = Math.max(lo, Math.ceil(-w2 / d2 - 1e-9)); else if (d2 < 0) hi = Math.min(hi, Math.floor(w2 / -d2 + 1e-9)); else if (w2 < 0) continue;
+            if (hi < lo) continue;
+            let R = w0 * cR + w1 * eR + w2 * fR + lo * sR, G = w0 * cG + w1 * eG + w2 * fG + lo * sG, B = w0 * cB + w1 * eB + w2 * fB + lo * sB, al = w0 * aA + w1 * aB + w2 * aC + lo * sA;
+            for (let k = lo, q = (y * W + x0 + lo) * 4; k <= hi; k++, q += 4, R += sR, G += sG, B += sB, al += sA) {
+                if (al < 0.003) continue;
+                const m = 1 - al; acc[q] = R + acc[q] * m; acc[q + 1] = G + acc[q + 1] * m; acc[q + 2] = B + acc[q + 2] * m; acc[q + 3] = al + acc[q + 3] * m;
             }
         }
     }
+    // a 1-2-1 blur across and down where the sheet turns edge-on (past the twist): its fold is a thin silhouette there, and at this buffer's
+    // size its edge would step; the rest of the sheet has soft edges of its own
+    function soften() {   // (only where the opacity changes, and only past the twist, where the sheet turns edge-on)
+        if (bx1 < bx0) return;
+        let xt = W; for (let i = Math.max(0, Math.floor(o.twistAt * NU)); i <= NU; i++) for (let j = 0; j <= NV; j++) xt = Math.min(xt, S[(i * (NV + 1) + j) * 3]);
+        const x0 = Math.max(0, bx0 - 1, Math.floor(xt) - 2), x1 = Math.min(W - 1, bx1 + 1), y0 = Math.max(0, by0 - 1), y1 = Math.min(H - 1, by1 + 1), E = 0.01;
+        for (let y = Math.max(0, y0 - 1), ye = Math.min(H - 1, y1 + 1); y <= ye; y++) for (let x = x0; x <= x1; x++) {   // (a row more each way: the pass down reads them)
+            const q = (y * W + x) * 4, l = x > 0 ? q - 4 : q, r = x < W - 1 ? q + 4 : q, a = acc[q + 3];
+            if (Math.abs(acc[l + 3] - a) < E && Math.abs(acc[r + 3] - a) < E) { tmp[q] = acc[q]; tmp[q + 1] = acc[q + 1]; tmp[q + 2] = acc[q + 2]; tmp[q + 3] = a; continue; }
+            tmp[q] = (acc[l] + 2 * acc[q] + acc[r]) * 0.25; tmp[q + 1] = (acc[l + 1] + 2 * acc[q + 1] + acc[r + 1]) * 0.25;
+            tmp[q + 2] = (acc[l + 2] + 2 * acc[q + 2] + acc[r + 2]) * 0.25; tmp[q + 3] = (acc[l + 3] + 2 * a + acc[r + 3]) * 0.25;
+        }
+        const row = W * 4;
+        for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+            const q = (y * W + x) * 4, u = y > 0 ? q - row : q, d = y < H - 1 ? q + row : q, a = tmp[q + 3];
+            if (Math.abs(tmp[u + 3] - a) < E && Math.abs(tmp[d + 3] - a) < E) { acc[q] = tmp[q]; acc[q + 1] = tmp[q + 1]; acc[q + 2] = tmp[q + 2]; acc[q + 3] = a; continue; }
+            acc[q] = (tmp[u] + 2 * tmp[q] + tmp[d]) * 0.25; acc[q + 1] = (tmp[u + 1] + 2 * tmp[q + 1] + tmp[d + 1]) * 0.25;
+            acc[q + 2] = (tmp[u + 2] + 2 * tmp[q + 2] + tmp[d + 2]) * 0.25; acc[q + 3] = (tmp[u + 3] + 2 * a + tmp[d + 3]) * 0.25;
+        }
+    }
     function draw(t) {
-        if (!W) return; const now = performance.now(); if (now - polled > 600 || !cols) { polled = now; color(); } sheet(t); acc.fill(0);
+        if (!W) return; const now = performance.now(); if (now - polled > 600 || !cols) { polled = now; color(); } sheet(t); acc.fill(0); bx0 = W; by0 = H; bx1 = -1; by1 = -1;
         for (let i = 0, n = 0; i < NU; i++) for (let j = 0; j < NV; j++, n++) { order[n] = n; const q = (i * (NV + 1) + j) * 3; depth[n] = S[q + 2] + S[q + 3 * (NV + 1) + 2]; }   // far quads first
         const ord = Array.from(order).sort((m, n) => depth[n] - depth[m]);
         for (const n of ord) { const i = (n / NV) | 0, j = n % NV, a = i * (NV + 1) + j, b = a + NV + 1; tri(a, b, b + 1); tri(a, b + 1, a + 1); }
-        for (let q = 0, n = W * H; q < n; q++) {
-            const a = acc[q * 4 + 3]; if (!(a > 0.002)) { px[q] = 0; continue; }
+        soften();
+        px.fill(0); if (bx1 < bx0) { ctx.putImageData(img, 0, 0); return; }
+        for (let y = Math.max(0, by0 - 2), ye = Math.min(H - 1, by1 + 2); y <= ye; y++) for (let x = Math.max(0, bx0 - 2), xe = Math.min(W - 1, bx1 + 2), q = y * W + x; x <= xe; x++, q++) {   // (the drawn part, and the blur's reach round it)
+            const a = acc[q * 4 + 3]; if (!(a > 0.002)) continue;
             const ia = 255 / a; px[q] = (Math.min(255, a * 255) << 24) | (Math.min(255, acc[q * 4 + 2] * ia) << 16) | (Math.min(255, acc[q * 4 + 1] * ia) << 8) | Math.min(255, acc[q * 4] * ia);
         }
         ctx.putImageData(img, 0, 0);
     }
     let visible = false, raf = 0, last = 0, polled = -1e9;
+    const prof = /[?&]prof\b/.test(location.search) ? (window.__silkP = { n: 0, ms: 0 }) : null;
     const t0 = performance.now();
     function frame(now) {
         raf = 0; if (!visible) return;
         raf = requestAnimationFrame(frame);
         if (now - last < 40) return; last = now;   // 24 a second: it moves very slowly (its clock runs at 0.08)
-        draw((now - t0) / 1000);
+        const d0 = performance.now(); draw((now - t0) / 1000);
+        if (prof) { prof.n++; prof.ms += performance.now() - d0; }   // ?prof: window.__silkP, the drawing's own time
     }
     size(); new ResizeObserver(() => { size(); draw((performance.now() - t0) / 1000); }).observe(host);
     new IntersectionObserver(entries => { visible = entries[entries.length - 1].isIntersecting; if (visible && !raf) raf = requestAnimationFrame(frame); }, { rootMargin: '10% 0px' }).observe(host);
