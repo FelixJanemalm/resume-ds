@@ -219,7 +219,7 @@ function cpuOnly() {
     return noGPU;
 }
 function mount(host, def) {
-    const cpu = cpuOnly();
+    const cpu = cpuOnly(), pr = cpu ? 1 : PR;   // drawn on the CPU, a card's canvas is at CSS pixels: its specks are soft glows, and a 2x screen would cost four times the pixels
     if (!cpu && !hasWebGL2()) return null;
     const S = cpu ? null : sharedGL(); if (!cpu && !S) return null;
     const gl = S && S.gl, item = host.closest('.item') || host;
@@ -269,7 +269,7 @@ function mount(host, def) {
     };
     function size() {
         const w = host.clientWidth, h = host.clientHeight; if (!w || !h) return false;
-        const cw = Math.max(1, Math.round(w * PR)), ch = Math.max(1, Math.round(h * PR));
+        const cw = Math.max(1, Math.round(w * pr)), ch = Math.max(1, Math.round(h * pr));
         if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }   // setting either clears the canvas, even to the same value
         if (!cpu && (canvas.width > S.w || canvas.height > S.h)) { S.w = Math.max(S.w, canvas.width); S.h = Math.max(S.h, canvas.height); gl.setSize(S.w, S.h, false); }
         camera.aspect = w / h; camera.updateProjectionMatrix();
@@ -298,7 +298,7 @@ function mount(host, def) {
     function cpuDraw() {
         const W = canvas.width, H = canvas.height; if (!W || !H) return;
         if (!img || img.width !== W || img.height !== H) { img = ctx.createImageData(W, H); px32 = new Uint32Array(img.data.buffer); buf = new Float32Array(W * H * 3); lit = new Int32Array(W * H); }
-        const tH = Math.tan(FOV / 2 * Math.PI / 180), asp = W / H, scale = mat.uniforms.uScale.value * PR;
+        const tH = Math.tan(FOV / 2 * Math.PI / 180), asp = W / H, scale = mat.uniforms.uScale.value * pr;
         const { pos, col, size: sz, alpha, blur } = cur;
         let nLit = 0;
         for (let i = 0; i < M; i++) {
@@ -338,7 +338,7 @@ function mount(host, def) {
                 sum[bk * 4] += lc[i6] / k; sum[bk * 4 + 1] += lc[i6 + 1] / k; sum[bk * 4 + 2] += lc[i6 + 2] / k; sum[bk * 4 + 3]++;   // the specks' own colours, averaged per step
             }
             if (any) {
-                ctx.globalCompositeOperation = 'lighter'; ctx.lineWidth = 1;   // one device pixel, as the GPU's lines; fading head to tail, so half the head's light
+                ctx.globalCompositeOperation = 'lighter'; ctx.lineWidth = 1 / (devicePixelRatio || 1);   // one device pixel, as the GPU's lines (the canvas is at CSS pixels); fading head to tail, so half the head's light
                 for (let b = 0; b < NB; b++) { const n = sum[b * 4 + 3]; if (!n) continue; ctx.strokeStyle = `rgba(${sum[b * 4] / n * 255 | 0},${sum[b * 4 + 1] / n * 255 | 0},${sum[b * 4 + 2] / n * 255 | 0},${(b + 0.5) / NB * 0.5})`; ctx.stroke(paths[b]); }
                 ctx.globalCompositeOperation = 'source-over';
             }

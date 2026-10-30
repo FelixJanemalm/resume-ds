@@ -3,8 +3,8 @@
  *
  * The same sheet from the same numbers (voyage-fold.js's RIBBON): its centre line, its roll from edge-on to facing, its slow breathing on simplex noise, its
  * colour fanned out from the picked hue, the sheen where it turns edge-on and the soft edges, worked out at the corners of a grid over the
- * sheet and filled in between them, triangle by triangle, far ones first, into a pixel buffer at half the section's size (the canvas is
- * stretched to the section; the sheet is soft, and it moves slowly, so 30 frames a second). The fine threads and the grain are left out:
+ * sheet and filled in between them, triangle by triangle, far ones first, into a pixel buffer at 0.4 of the section's size (the canvas is
+ * stretched to the section; the sheet is soft, and it moves slowly, so 24 frames a second). The fine threads and the grain are left out:
  * at this size they would only shimmer.
  */
 
@@ -34,7 +34,7 @@ export function mountSilk2D(host, { strength = 1, ribbon } = {}) {   // ribbon: 
     canvas.className = 'ws-silk'; canvas.setAttribute('aria-hidden', 'true');
     host.classList.add('ws-silk-host'); host.insertBefore(canvas, host.firstChild);
     const ctx = canvas.getContext('2d');
-    const NU = 110, NV = 14, NVERT = (NU + 1) * (NV + 1), K = 0.5;   // the grid over the sheet; the buffer's scale
+    const NU = 110, NV = 14, NVERT = (NU + 1) * (NV + 1), K = 0.4;   // the grid over the sheet; the buffer's scale (the sheet is soft: 0.4 of the section's size, stretched, reads as at half)
     const P = new Float32Array(NVERT * 3), S = new Float32Array(NVERT * 3), Cc = new Float32Array(NVERT * 4);   // per corner: its place, its place on the screen (x, y, depth), its colour and alpha
     const order = new Int32Array(NU * NV), depth = new Float32Array(NU * NV);
     let W = 0, H = 0, img = null, px = null, acc = null, cols = null, key = '';
@@ -122,7 +122,7 @@ export function mountSilk2D(host, { strength = 1, ribbon } = {}) {   // ribbon: 
     function frame(now) {
         raf = 0; if (!visible) return;
         raf = requestAnimationFrame(frame);
-        if (now - last < 31) return; last = now;   // 30 a second: it moves slowly
+        if (now - last < 40) return; last = now;   // 24 a second: it moves very slowly (its clock runs at 0.08)
         draw((now - t0) / 1000);
     }
     size(); new ResizeObserver(() => { size(); draw((performance.now() - t0) / 1000); }).observe(host);

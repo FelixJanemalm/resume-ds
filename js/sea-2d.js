@@ -147,8 +147,10 @@ function draw(canvas, T, S, show, newCanvas, report) {
        time; per copy its place in the formation (hull lengths aft, toward the horizon, across) and its size */
     const FLEET_WAVE = [0, 0, 0, 1, 1, 1, 2, 2, 2], FLEET_SAMPLE = [0.4, 0.4, 0.4, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22];
     const FLEET_POS = [[-1.1, 0.30, -0.8, 0.30], [-1.2, 0.55, 0.8, 0.24], [0.9, 0.45, 0.9, 0.26], [-2.3, 0.80, -1.4, 0.18], [-0.4, 0.95, 1.9, 0.16], [2.0, 0.85, -1.2, 0.17], [-3.2, 1.10, 0.4, 0.13], [1.2, 1.20, 2.6, 0.12], [3.1, 1.15, 1.6, 0.12]];
-    const fleetM = []; { let a = 20261030; const rf = () => (a = (a * 16807) % 2147483647) / 2147483647;
-        for (let k = 0; k < 9; k++) { const cnt = Math.floor(SHIP_N * FLEET_SAMPLE[k]); for (let j = 0; j < cnt; j++) { const src = Math.floor(j * SHIP_N / cnt), rl = Math.round(boat.meta[0][src * 4]); if (rl !== 6 && rl !== 7) fleetM.push(src, k, FLEET_WAVE[k] + 0.999 * rf()); } } }
+    // a small copy needs fewer of them than live gives it: each copy keeps at most 3 x the ship's own density on the screen (live's far copies,
+    // at an eighth of the ship's size, put 15 particles on each of its pixels), each member carrying the light of those it stands for (fleetW)
+    const fleetM = [], fleetW = []; { let a = 20261030; const rf = () => (a = (a * 16807) % 2147483647) / 2147483647;
+        for (let k = 0; k < 9; k++) { const cnt0 = Math.floor(SHIP_N * FLEET_SAMPLE[k]), sz = FLEET_POS[k][3], cnt = Math.max(1, Math.min(cnt0, Math.floor(SHIP_N * sz * sz * 3))); fleetW[k] = cnt0 / cnt; for (let j = 0; j < cnt; j++) { const src = Math.floor(j * SHIP_N / cnt), rl = Math.round(boat.meta[0][src * 4]); if (rl !== 6 && rl !== 7) fleetM.push(src, k, FLEET_WAVE[k] + 0.999 * rf()); } } }
     const shipIdx = [], refl = new Uint8Array(SHIP_N); for (let i = 0; i < SHIP_N; i++) { const r = role(i); if (r !== 6 && r !== 7) shipIdx.push(i); refl[i] = r === 8 ? 1 : 0; }
 
     /* ---- the sea's dots: a seeded disc of the shader's own layout (radius 34 lab units round the lab's middle, denser in the middle) */
@@ -479,7 +481,7 @@ function draw(canvas, T, S, show, newCanvas, report) {
                 if (!proj(cpM[b + 1] + M[0] * x + M[1] * y + M[2] * z, cpM[b + 2] + M[3] * x + M[4] * y + M[5] * z, cpM[b + 3] + M[6] * x + M[7] * y + M[8] * z, P2)) continue;
                 const X = P2[0] | 0, Y = P2[1] | 0; if (X < 0 || Y < 0 || X >= W - 1 || Y >= H - 1) continue;
                 const q = Y * W + X; if (accS[q] === 0 && accI[q] === 0) lit1[nLit++] = q;
-                accI[q] += fw * (0.25 + 0.6 * shade) * (rf ? rW : 1);
+                accI[q] += fw * fleetW[fleetM[j + 1]] * (0.25 + 0.6 * shade) * (rf ? rW : 1);
                 if (X < x0) x0 = X; if (Y < y0) y0 = Y; if (X + 1 > x1) x1 = X + 1; if (Y + 1 > y1) y1 = Y + 1;
             }
         }
