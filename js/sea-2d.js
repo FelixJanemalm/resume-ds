@@ -19,7 +19,7 @@
 import { DEFAULTS, LAB } from './voyage-fold.js';
 import { buildBoatLevels, WATERLINE } from './voyage-boat.js';
 
-const D2R = Math.PI / 180, NDOTS = 60000, SHIP_N = 128 * 128;
+const D2R = Math.PI / 180, NDOTS = 42000, DOT_BOOST = 1.2, SHIP_N = 128 * 128;   // the first 42,000 of the shader's 60,000 dots (the same layout, thinned), each a fifth brighter for the light the rest carried
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const rx = a => { const c = Math.cos(a), s = Math.sin(a); return [1, 0, 0, 0, c, -s, 0, s, c]; };   // row-major 3x3
 const ry = a => { const c = Math.cos(a), s = Math.sin(a); return [c, 0, s, 0, 1, 0, -s, 0, c]; };
@@ -178,7 +178,15 @@ function draw(canvas, T, S, show, newCanvas, report) {
         return R;
     }
 
-    const on = new Int32Array(NDOTS); let nOn = 0, onAge = 0, onK = 0, onAt = [0, 0, 0], onWH = '';   // the dots on the screen
+    const on = new Int32Array(NDOTS); let nOn = 0, onAge = 0, onK = 0, onAt = [0, 0, 0], onWH = '', onNew = true;   // the dots on the screen (onNew: just listed, none worked out yet)
+    // each dot's height on the swell and its light, worked out for half the dots a frame (alternately the even and the odd ones: the swell
+    // moves slowly) and kept; every dot is still placed and drawn every frame, so none trails the scroll or the sway
+    const dH = new Float32Array(NDOTS), dV = new Float32Array(NDOTS); let dotTick = 0, dotAt = 0;   // dotAt: when they were last worked out (after a pause, all are)
+    // tables for the costly per-dot functions: the band's falloff pow(x, bandPow) at 1/1024 steps, the distance fade exp(-d / dotFar) at 1/16
+    const BAND_T = new Float32Array(1026), FAR_T = new Float32Array(4097);
+    for (let i = 0; i <= 1025; i++) BAND_T[i] = Math.pow(Math.min(1, i / 1024), o.bandPow);
+    for (let i = 0; i <= 4096; i++) FAR_T[i] = Math.exp(-i / 16 / o.dotFar);
+    const far = d => { const u = d * 16; return u < 4096 ? FAR_T[u | 0] : 0; };
     const VMIN = 0.012, big = [], paths = [];   // a dot fainter than this adds under 2 of 255 to a pixel | this frame's big dots (x, y, size, light) | the lines' paths
     let fps = 60, judge = { n: 0, work: 0, late: 0 }, last = 0, prevRaf = 0, vs = 0, tick = 0, t0 = performance.now(), raf = 0, shown = true, prof = null;
     // a worker has requestAnimationFrame where it can draw to a canvas the page handed over (Chrome, Firefox); else a timer at the refresh
@@ -239,19 +247,26 @@ function draw(canvas, T, S, show, newCanvas, report) {
            are drawn after it as sprites */
         const dotsW = r.foldW;
         if (dotsW > 0.003) {
-            const gD = dotsW * o.dotGain, sx = Math.sin(ax), cxa = Math.cos(ax), qk = o.bands / o.lambda;
+            const gD = dotsW * o.dotGain * DOT_BOOST, sx = Math.sin(ax), cxa = Math.cos(ax), qk = o.bands / o.lambda;
             const qx = (d[0] + (d1[0] - d[0]) * bf) * qk, qz = (d[1] + (d1[1] - d[1]) * bf) * qk, qc = o.speed * tt * qk, qb = o.bend * 0.1 * qk, pxK = o.dotPx * PR * 16.8;
             // two thirds of the disc lies off the screen: every half second (or when the view has moved) the dots on it, with a margin for the
             // swell and the sway, are listed, and only those are worked out each frame
             if (--onAge < 0 || onWH !== W + 'x' + H || Math.abs(k - onK) > 0.02 * onK || Math.abs(camL[0] - onAt[0]) + Math.abs(camL[2] - onAt[2]) > 1) {
-                onAge = 30; onWH = W + 'x' + H; onK = k; onAt = camL.slice(); nOn = 0; const mx = W * 0.15, my = H * 0.15;
+                onAge = 30; onWH = W + 'x' + H; onK = k; onAt = camL.slice(); nOn = 0; onNew = true; const mx = W * 0.15, my = H * 0.15;
                 for (let i = 0; i < NDOTS; i++) if (toWorld(dots[i * 3], 0, dots[i * 3 + 1], P2) && P2[0] > -mx && P2[0] < W + mx && P2[1] > -my && P2[1] < H + my) on[nOn++] = i;
             }
+            const half = ++dotTick & 1, all = onNew || now - dotAt > 100; onNew = false; dotAt = now;
             for (let c = 0; c < nOn; c++) {
-                const i = on[c], x = dots[i * 3], z = dots[i * 3 + 1], sd = dots[i * 3 + 2], h = hAt(x, z);
-                const across = -x * sx + z * cxa, qB = x * qx + z * qz - qb * across * across + qc;   // the phase, in bands
-                const ex = camL[0] - x, ey = camL[1] - h, ez = camL[2] - z, band = Math.pow(1 - (qB - Math.floor(qB)), o.bandPow);
-                const vB = gD * (0.18 + 0.9 * band) * (0.45 + 1.1 * sd) * Math.exp(-Math.sqrt(ex * ex + ey * ey + ez * ez) / o.dotFar);
+                const i = on[c], x = dots[i * 3], z = dots[i * 3 + 1], sd = dots[i * 3 + 2];
+                if (all || (i & 1) === half) {
+                    const ex = camL[0] - x, ez = camL[2] - z, top = gD * 1.08 * (0.45 + 1.1 * sd);
+                    if (top * far(Math.sqrt(ex * ex + ez * ez)) < VMIN) dV[i] = 0;   // too far to show even on a crest: no swell worked out for it
+                    else {
+                        const h = hAt(x, z), across = -x * sx + z * cxa, qB = x * qx + z * qz - qb * across * across + qc, ey = camL[1] - h;   // the phase, in bands
+                        dH[i] = h; dV[i] = top / 1.08 * (0.18 + 0.9 * BAND_T[((1 - (qB - Math.floor(qB))) * 1024) | 0]) * far(Math.sqrt(ex * ex + ey * ey + ez * ez));
+                    }
+                }
+                const vB = dV[i], h = dH[i];
                 if (vB < VMIN || !toWorld(x, h, z, P2)) continue;
                 const px = pxK * (0.6 + 0.9 * sd) / Math.max(1, P2[2] / k), n = Math.max(1, Math.round(px));
                 const X = Math.round(P2[0] - n / 2), Y = Math.round(P2[1] - n / 2);
@@ -301,7 +316,7 @@ function draw(canvas, T, S, show, newCanvas, report) {
         const c1 = d[0] * d1[0] + d[1] * d1[1], s1 = pp[0] * d1[0] + pp[1] * d1[1], du = (1 - bf) + bf * c1, lineFar = o.lineFar / Math.max(0.05, r.zoom);
         const gain = o.lineGain * Math.sqrt(Math.min(1, Math.max(0.1, r.zoom))) * r.silkW;
         if (gain > 0.003) {
-            const lc = pale ? dark.sea : sea.map(v => v + (1 - v) * 0.25), span = 70, NA = 48, NB = 12, top = Math.min(1, gain);
+            const lc = pale ? dark.sea : sea.map(v => v + (1 - v) * 0.25), span = 70, NA = 36, NB = 12, top = Math.min(1, gain);
             ctx.lineWidth = 1; ctx.lineCap = 'butt'; ctx.lineJoin = 'bevel';   // a one-pixel line is the rasteriser's fast path: the shader's width (o.lineWidth css px) is carried as light (below)
             for (let b = 0; b < NB; b++) paths[b] = new Path2D();   // one path per brightness step, stroked once each
             const uC = camL[0] * d[0] + camL[2] * d[1];   // the camera's place along the swell's travel
