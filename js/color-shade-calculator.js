@@ -1,6 +1,7 @@
 const THEME_STORAGE_KEY = 'portfolio-theme-primary';
 const HUE_STORAGE_KEY = 'portfolio-theme-hue';
 const FALLBACK_THEME_COLOR = '#4faad1';
+const BLACK_TINT = 0.14;    // the spectrum's bottom row runs from pure black (left) to the hue at this brightness (right), as the top runs from white to the hue
 const GREY_CHROMA = 0.04;   // below this spread (max - min channel, 0..1) a hex's own hue is noise: the picker's hue stands in (the page stays grey; the particles, ship, silk, clouds and ink take the hue from --primary-hue)
 
 let currentColor = null;
@@ -67,28 +68,25 @@ document.addEventListener('DOMContentLoaded', function() {
         hueRect = hueCanvas.getBoundingClientRect();
     }
 
-    function createShadeSpectrum(color) {
+    // HSV value at a point of the spectrum (x, y 0..1): 1 along the top, down to x * BLACK_TINT along the bottom
+    function spectrumValue(x, y) {
+        return 1 - y * (1 - x * BLACK_TINT);
+    }
+
+    // drawn per pixel from the same mapping the pointer reads, so the colour under the cursor is the colour picked
+    function createShadeSpectrum() {
         const canvas = spectrumCanvas;
         const ctx = spectrumCtx;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // Base color
-        ctx.fillStyle = color;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // White gradient
-        const whiteGradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
-        whiteGradient.addColorStop(0, "#fff");
-        whiteGradient.addColorStop(1, "transparent");
-        ctx.fillStyle = whiteGradient;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Black gradient
-        const blackGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-        blackGradient.addColorStop(0, "transparent");
-        blackGradient.addColorStop(1, "#000");
-        ctx.fillStyle = blackGradient;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const w = canvas.width, h = canvas.height, img = ctx.createImageData(w, h);
+        const k = n => (n + hue / 60) % 6;
+        for (let py = 0; py < h; py++) {
+            for (let px = 0; px < w; px++) {
+                const x = px / (w - 1), v = spectrumValue(x, py / (h - 1)), i = (py * w + px) * 4;
+                for (const [c, n] of [[0, 5], [1, 3], [2, 1]]) img.data[i + c] = Math.round(255 * (v - v * x * Math.max(0, Math.min(k(n), 4 - k(n), 1))));
+                img.data[i + 3] = 255;
+            }
+        }
+        ctx.putImageData(img, 0, 0);
 
         spectrumHitbox.addEventListener('pointerdown', startGetSpectrumColor);
     }
@@ -113,12 +111,12 @@ document.addEventListener('DOMContentLoaded', function() {
         lightness = Math.min(Math.max(0.0001, hsl.l), 0.9999);
         const hsv = tinycolor(color).toHsv();
         const x = spectrumRect.width * hsv.s;
-        const y = spectrumRect.height * (1 - hsv.v);
+        const y = Math.min(spectrumRect.height, spectrumRect.height * (1 - hsv.v) / (1 - hsv.s * BLACK_TINT));
         const hueX = (hue / 360) * hueRect.width;
         updateSpectrumCursor(x, y);
         updateHueCursor(hueX);
         setCurrentColor(color);
-        createShadeSpectrum(`hsl(${hue}, 100%, 50%)`);
+        createShadeSpectrum();
     }
 
     function setCurrentColor(color) {
@@ -170,7 +168,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Convert mouse position into saturation and brightness
         const xRatio = x / spectrumRect.width;
         const yRatio = y / spectrumRect.height;
-        const hsvValue = 1 - yRatio;
+        const hsvValue = spectrumValue(xRatio, yRatio);
         const hsvSaturation = xRatio;
     
         // Convert HSV to HSL
@@ -214,9 +212,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const x = Math.min(Math.max(0, e.clientX - hueRect.left), hueRect.width);
         const percent = x / hueRect.width;
         hue = 360 * percent;
-        const hueColor = tinycolor(`hsl(${hue}, 100%, 50%)`).toHslString();
         const color = tinycolor(`hsl(${hue}, ${saturation * 100}%, ${lightness * 100}%)`).toHslString();
-        createShadeSpectrum(hueColor);
+        createShadeSpectrum();
         updateHueCursor(x);
         setCurrentColor(color);
     }
