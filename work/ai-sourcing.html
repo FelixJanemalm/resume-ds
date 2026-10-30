@@ -432,8 +432,9 @@
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
         .cs-demo-body { padding: clamp(1.25rem, 3vw, 2rem); }
 
-        /* ─── Sankey (ported from batch-story) ─── */
-        :root {
+        /* ─── Sankey (ported from batch-story) ───
+           Scoped to .cs-page, not :root: --text is set on body (case-study-page.css), so at :root these resolved to nothing. */
+        .cs-page {
             --sankey-primary: #CB945C;
             --sankey-bg-secondary: color-mix(in srgb, var(--text) 4%, transparent);
             --sankey-bg-tertiary: color-mix(in srgb, var(--text) 7%, transparent);
@@ -497,6 +498,9 @@
         }
         .sankey-svg-container svg { display: block; margin: 0 auto; }
         .sankey-svg-container svg text { pointer-events: none; }
+        /* Label colours follow the page theme; the OS light/dark setting has no say (case studies are always dark) */
+        .sankey-label-name { fill: var(--sankey-text-primary); }
+        .sankey-label-sub { fill: color-mix(in srgb, var(--text) 72%, transparent); }
         .sankey-svg-container::-webkit-scrollbar { height: 8px; }
         .sankey-svg-container::-webkit-scrollbar-track {
             background: color-mix(in srgb, var(--text) 5%, transparent);
@@ -1161,9 +1165,6 @@
         const container = document.getElementById('cs-sankey-diagram');
         container.innerHTML = '';
 
-        const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
-            || window.matchMedia('(prefers-color-scheme: dark)').matches;
-
         // Real supply chain nodes — mirrors batch-story-v3 batch 75e11a7f-5a40-48b6-979a-cce4e5577439
         const nodes = [
             // Raw materials (left column)
@@ -1340,8 +1341,6 @@
             .on('mouseout', function() { d3.select(this).style('filter','drop-shadow(0 2px 6px rgba(0,0,0,0.2))'); hideTip(); });
 
         // Labels
-        const textColor = isDark ? '#f0f0f0' : '#1D1D1F';
-        const subColor  = isDark ? '#b0b0b0' : '#555555';
         const labelG = svg.append('g').style('font-family', 'system-ui, -apple-system, sans-serif');
         sNodes.forEach(d => {
             const isLeft = d.x0 < width / 2;
@@ -1350,7 +1349,7 @@
             const anchor = isLeft ? 'start' : 'end';
             const t = labelG.append('text').attr('x', xPos).attr('y', yMid - 4).attr('text-anchor', anchor);
             t.append('tspan').attr('x', xPos).attr('dy', 0).text(d.name)
-                .style('font-size', '12px').style('font-weight', '700').style('fill', textColor);
+                .attr('class', 'sankey-label-name').style('font-size', '12px').style('font-weight', '700');
             if (d.subtitle) {
                 // wrap subtitle at ~28 chars
                 const words = d.subtitle.split(' ');
@@ -1358,12 +1357,12 @@
                 words.forEach(w => {
                     if ((line + ' ' + w).trim().length > 28 && line) {
                         t.append('tspan').attr('x', xPos).attr('dy', first ? '1.15em' : '1.1em').text(line)
-                            .style('font-size', '10px').style('font-weight', '400').style('fill', subColor);
+                            .attr('class', 'sankey-label-sub').style('font-size', '10px').style('font-weight', '400');
                         line = w; first = false;
                     } else { line = (line ? line + ' ' : '') + w; }
                 });
                 if (line) t.append('tspan').attr('x', xPos).attr('dy', first ? '1.15em' : '1.1em').text(line)
-                    .style('font-size', '10px').style('font-weight', '400').style('fill', subColor);
+                    .attr('class', 'sankey-label-sub').style('font-size', '10px').style('font-weight', '400');
             }
         });
     }
@@ -1472,8 +1471,9 @@
     // ─── Journey map ─────────────────────────────────────────────────────────
     function initJourneyMap() {
         window._mapInitialized = true;
-        const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
-            || window.matchMedia('(prefers-color-scheme: dark)').matches;
+        // Dark tiles when the page background is dark (the OS setting doesn't decide it)
+        const bg = getComputedStyle(document.body).backgroundColor.match(/[\d.]+/g) || [16, 16, 18];
+        const isDark = (0.299 * bg[0] + 0.587 * bg[1] + 0.114 * bg[2]) < 128;
 
         const map = L.map('cs-journey-map', { scrollWheelZoom: false }).setView([30, 60], 2);
         L.tileLayer(

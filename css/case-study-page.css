@@ -2,6 +2,9 @@
 /* ─── Case Study Page Theme ─── */
 /* Accents derive from theme.css :root tokens (--primary-color, --sysPrimary*) so the page stays cohesive with the main site palette. */
 
+/* Case studies are always dark, whatever the OS setting: the browser's own scrollbars and controls too */
+html:has(.cs-page) { color-scheme: dark; }
+
 body:has(.cs-page) {
     --bg: #101012;
     --text: #ededef;

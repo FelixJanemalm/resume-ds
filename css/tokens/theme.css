@@ -22,6 +22,10 @@
 
 }
 
+/* Browser-drawn UI (scrollbars, form controls, the canvas) follows the picked theme, not the OS light/dark setting */
+html:has(> body.default-light), html:has(> body.default-light-colorblind) { color-scheme: light; }
+html:has(> body.default-dark), html:has(> body.default-dark-colorblind) { color-scheme: dark; }
+
 .default-light {
 
     --header-scrolled: rgba(0, 0, 0, 0.1);
